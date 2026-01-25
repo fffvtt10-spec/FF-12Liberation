@@ -1,4 +1,4 @@
-import React from 'react'; // Adicione no topo do main.jsx
+import React from 'react'; // Adicione no topo do main.jsxgit mv src/pages/App.jsx src/pages/AppTemp.jsx
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
