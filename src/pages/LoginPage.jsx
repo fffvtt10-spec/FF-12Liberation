@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { login } from '../firebase';
+// Importe seu vídeo aqui ou use o caminho direto se estiver em public
+import videoFundo from '../assets/video-fundo.mp4'; 
 
 export default function LoginPage() {
   const [role, setRole] = useState(null); 
@@ -11,7 +13,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await login(email, password);
-      // A lógica de redirecionamento mestre/jogador entra aqui após o sucesso
+      // Lógica de redirecionamento mestre/jogador
     } catch (err) {
       setErro("FALHA NA CONEXÃO COM O ÉTER.");
     }
@@ -19,51 +21,48 @@ export default function LoginPage() {
 
   return (
     <div className="login-container">
-      {/* Filtro SVG para fundir as partículas e criar o efeito de chama líquida */}
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-        <filter id="fire-filter">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" result="fire-filter" />
-        </filter>
-      </svg>
+      {/* Camada do Vídeo de Fundo */}
+      <video autoPlay loop muted className="background-video">
+        <source src={videoFundo} type="video/mp4" />
+      </video>
 
-      <div className="fire-canvas">
-        {/* Gerando chamas e micro partículas */}
-        {[...Array(20)].map((_, i) => (
-          <div key={i} className="fire-particle" style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 4}s`,
-            width: `${20 + Math.random() * 60}px`,
-            height: `${20 + Math.random() * 60}px`
-          }}></div>
-        ))}
-      </div>
-
-      <div className="content-wrapper">
+      <div className="content-overlay">
         {!role ? (
-          <div className="role-card fade-in">
-            <h2>ESCOLHA SUA CLASSE</h2>
-            <div className="btn-group-vertical">
-              <button className="btn-fft-selection" onClick={() => setRole('player')}>
-                <span className="icon">🛡️</span> JOGADOR
+          <div className="selection-screen fade-in">
+            <h2 className="ff-title">ESCOLHA SUA CLASSE</h2>
+            <div className="ff-button-group">
+              <button className="ff-btn" onClick={() => setRole('player')}>
+                JOGADOR
               </button>
-              <button className="btn-fft-selection" onClick={() => setRole('master')}>
-                <span className="icon">📜</span> NARRADOR
+              <button className="ff-btn" onClick={() => setRole('master')}>
+                NARRADOR
               </button>
             </div>
           </div>
         ) : (
           <form className="login-panel fade-in" onSubmit={handleLogin}>
-            <button className="back-btn" onClick={() => setRole(null)}>← RETORNAR</button>
-            <h3>{role === 'master' ? 'NARRADOR' : 'JOGADOR'}</h3>
-            <div className="input-field">
-              <input type="email" placeholder="E-MAIL" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <button className="ff-back" onClick={() => setRole(null)}>← RETORNAR</button>
+            <h3 className="ff-subtitle">{role === 'master' ? 'NARRADOR' : 'JOGADOR'}</h3>
+            
+            <div className="ff-input-group">
+              <input 
+                type="email" 
+                placeholder="E-MAIL" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                required 
+              />
+              <input 
+                type="password" 
+                placeholder="SENHA" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+              />
             </div>
-            <div className="input-field">
-              <input type="password" placeholder="SENHA" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            {erro && <p className="error-txt">{erro}</p>}
-            <button type="submit" className="btn-action">ENTRAR</button>
+
+            {erro && <p className="ff-error">{erro}</p>}
+            <button type="submit" className="ff-submit">ENTRAR</button>
           </form>
         )}
       </div>
@@ -80,82 +79,115 @@ export default function LoginPage() {
           position: relative;
         }
 
-        /* Chamas Orgânicas */
-        .fire-canvas {
+        .background-video {
           position: absolute;
-          bottom: -50px;
+          top: 0;
+          left: 0;
           width: 100%;
-          height: 60%;
-          filter: url(#fire-filter);
+          height: 100%;
+          object-fit: cover;
           z-index: 1;
         }
 
-        .fire-particle {
-          position: absolute;
-          bottom: 0;
-          background: linear-gradient(to top, #4b0082, #00f2ff);
-          border-radius: 50%;
-          opacity: 0.6;
-          animation: flame-rise 3s infinite ease-in;
-        }
-
-        @keyframes flame-rise {
-          0% { transform: translateY(0) scale(1.5); opacity: 0.8; }
-          100% { transform: translateY(-500px) scale(0.1); opacity: 0; }
-        }
-
-        /* Painel de Login Estilo Interface RPG */
-        .content-wrapper { position: relative; z-index: 10; }
-
-        .role-card, .login-panel {
-          background: rgba(0, 0, 30, 0.85);
-          border: 1px solid rgba(0, 242, 255, 0.4);
-          padding: 40px;
-          border-radius: 8px;
-          box-shadow: 0 0 30px rgba(0, 242, 255, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.05);
-          text-align: center;
-          width: 380px;
-          backdrop-filter: blur(5px);
-        }
-
-        h2, h3 { color: #fff; letter-spacing: 4px; margin-bottom: 30px; text-shadow: 0 0 10px #00f2ff; }
-
-        .btn-group-vertical { display: flex; flex-direction: column; gap: 15px; }
-
-        .btn-fft-selection, .btn-action {
-          background: transparent;
-          border: 1px solid #00f2ff;
-          color: #fff;
-          padding: 15px;
-          cursor: pointer;
-          font-weight: bold;
-          letter-spacing: 2px;
-          transition: 0.3s;
+        .content-overlay {
           position: relative;
-        }
-
-        .btn-fft-selection:hover, .btn-action:hover {
-          background: #00f2ff;
-          color: #000;
-          box-shadow: 0 0 20px #00f2ff;
-        }
-
-        .input-field input {
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.4); /* Escurece levemente o vídeo para ler melhor */
+        }
+
+        .selection-screen, .login-panel {
+          text-align: center;
+          padding: 40px;
+          border-radius: 4px;
+        }
+
+        /* Tipografia Estilo Final Fantasy */
+        .ff-title {
+          color: #fff;
+          font-size: 32px;
+          letter-spacing: 8px;
+          margin-bottom: 40px;
+          text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        .ff-subtitle {
+          color: #ffcc00; /* Dourado clássico */
+          letter-spacing: 4px;
+          margin-bottom: 30px;
+        }
+
+        .ff-button-group {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          align-items: center;
+        }
+
+        .ff-btn, .ff-submit {
+          background: transparent;
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          color: #fff;
+          padding: 15px 50px;
+          font-size: 16px;
+          letter-spacing: 3px;
+          cursor: pointer;
+          transition: 0.4s;
+          width: 280px;
+        }
+
+        .ff-btn:hover, .ff-submit:hover {
+          background: #fff;
+          color: #000;
+          box-shadow: 0 0 20px #fff;
+        }
+
+        .ff-input-group input {
+          display: block;
+          width: 300px;
           padding: 12px;
           margin-bottom: 20px;
-          background: rgba(0,0,0,0.8);
+          background: rgba(0, 0, 0, 0.8);
           border: 1px solid #444;
           color: #fff;
           text-align: center;
+          letter-spacing: 2px;
+          outline: none;
         }
 
-        .input-field input:focus { border-color: #00f2ff; outline: none; }
+        .ff-input-group input:focus {
+          border-color: #ffcc00;
+        }
 
-        .back-btn { background: none; border: none; color: #00f2ff; cursor: pointer; font-size: 10px; margin-bottom: 10px; }
+        .ff-back {
+          background: none;
+          border: none;
+          color: #ffcc00;
+          cursor: pointer;
+          font-size: 12px;
+          margin-bottom: 10px;
+          letter-spacing: 1px;
+        }
 
-        .fade-in { animation: fadeIn 1.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .ff-error {
+          color: #ff4444;
+          font-size: 12px;
+          margin-bottom: 15px;
+        }
+
+        /* Animação de Fade Suave */
+        .fade-in {
+          animation: fadeInFF 2s ease-out forwards;
+        }
+
+        @keyframes fadeInFF {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}} />
     </div>
   );
