@@ -1,4 +1,6 @@
 import React from 'react';
+// Importamos a imagem para que o Vite gerencie o caminho corretamente
+import fundoRPG from '../assets/fundo-rpg.jpg'; 
 
 export default function LandingPage({ onStart }) {
   return (
@@ -19,23 +21,26 @@ export default function LandingPage({ onStart }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          /* Ajuste o caminho da imagem abaixo conforme sua pasta assets */
+          /* Usamos a variável da imagem importada aqui */
           background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
-                      url('./assets/fundo-rpg.jpg') no-repeat center center;
+                      url(${fundoRPG}) no-repeat center center;
           background-size: cover; 
           cursor: pointer;
-          overflow: hidden; /* Remove barras de scroll */
+          overflow: hidden; 
           margin: 0;
           padding: 0;
+          position: fixed; /* Garante que cubra a tela toda sem mover */
+          top: 0;
+          left: 0;
         }
 
         .content {
           text-align: center;
-          animation: fadeIn Suave 4s ease-in-out; /* Fade suave e lento */
+          animation: fadeInSuave 4s ease-in-out; 
         }
 
         .game-title {
-          font-size: clamp(30px, 8vw, 60px); /* Fonte adaptável à tela */
+          font-size: clamp(30px, 8vw, 60px);
           margin-bottom: 0;
           letter-spacing: 8px;
           color: #fff;
@@ -44,7 +49,7 @@ export default function LandingPage({ onStart }) {
 
         .sub-title {
           font-size: clamp(14px, 4vw, 24px);
-          color: #ffcc00; /* Dourado clássico FFT */
+          color: #ffcc00;
           margin-top: 10px;
           text-shadow: 1px 1px 3px #000;
         }
@@ -53,7 +58,6 @@ export default function LandingPage({ onStart }) {
           margin-top: 80px;
           font-size: 18px;
           color: #fff;
-          letter-spacing: 2px;
           animation: blink 1.5s infinite;
         }
 
@@ -63,7 +67,7 @@ export default function LandingPage({ onStart }) {
         }
 
         @keyframes fadeInSuave {
-          from { opacity: 0; filter: blur(5px); } /* Inicia com desfoque para suavizar */
+          from { opacity: 0; filter: blur(10px); }
           to { opacity: 1; filter: blur(0); }
         }
       ` }} />
