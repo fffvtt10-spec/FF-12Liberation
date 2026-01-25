@@ -197,4 +197,24 @@ Error generating stack: `+a.message+`
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        .background-video {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          min-width: 100%;
+          min-height: 100%;
+          z-index: -1;
+          transform: translate(-50%, -50%);
+          object-fit: cover;
+          /* Animação para suavizar o loop */
+          animation: videoLoopFade 10s infinite; 
+        }
+
+        @keyframes videoLoopFade {
+          0% { opacity: 0; }
+          5% { opacity: 1; }   /* Aparece suave no início */
+          95% { opacity: 1; }  /* Mantém visível */
+          100% { opacity: 0; } /* Desaparece antes de resetar */
+        }
       `}})]})}const vS="/FF-12Liberation/assets/musica-tema-78rqvj_H.mp3";function _S(){const[r,i]=oa.useState("landing"),s=oa.useRef(null),c=()=>{s.current&&(s.current.volume=.2,s.current.play().catch(f=>console.log("Erro ao tocar áudio:",f))),i("login")};return le.jsxs("div",{className:"app-container",children:[le.jsx("audio",{ref:s,src:vS,loop:!0}),r==="landing"?le.jsx(mv,{onStart:c}):le.jsx(yS,{})]})}dv.createRoot(document.getElementById("root")).render(le.jsx(iv.StrictMode,{children:le.jsx(_S,{})}));
