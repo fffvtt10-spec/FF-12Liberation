@@ -22,7 +22,14 @@ export default function LoginPage() {
   return (
     <div className="login-container">
       {/* Camada do Vídeo de Fundo */}
-      <video autoPlay loop muted className="background-video">
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline 
+        preload="auto" 
+        className="background-video"
+      >
         <source src={videoFundo} type="video/mp4" />
       </video>
 
