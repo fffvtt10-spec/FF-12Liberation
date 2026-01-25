@@ -65,6 +65,8 @@ export default function LoginPage() {
           position: relative;
         }
 
+        /* Altere apenas estas partes no seu Style */
+
         .background-video {
           position: absolute;
           top: 50%;
@@ -73,12 +75,19 @@ export default function LoginPage() {
           min-height: 100%;
           width: auto;
           height: auto;
-          z-index: 0; /* Fica acima do background preto, mas abaixo do overlay */
+          z-index: 0;
           transform: translate(-50%, -50%);
           object-fit: cover;
-          /* Ajuste o tempo (10s) para a duração real do seu vídeo */
-          animation: videoLoopFade 10s infinite; 
+          /* Reduzi para 0.5s de fade apenas no ponto de transição */
+          animation: quickLoopFade 0.5s ease-in-out;
         }
+
+        @keyframes quickLoopFade {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+
+/* Remova o videoLoopFade antigo e use este se o vídeo for muito curto */
 
         .content-overlay {
           position: relative;
@@ -123,13 +132,6 @@ export default function LoginPage() {
         @keyframes fadeInFF {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes videoLoopFade {
-          0% { opacity: 0; }
-          5% { opacity: 1; }
-          95% { opacity: 1; }
-          100% { opacity: 0; }
         }
       `}} />
     </div>
