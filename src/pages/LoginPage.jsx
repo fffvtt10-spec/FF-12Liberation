@@ -188,6 +188,26 @@ export default function LoginPage() {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        .background-video {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          min-width: 100%;
+          min-height: 100%;
+          z-index: -1;
+          transform: translate(-50%, -50%);
+          object-fit: cover;
+          /* Animação para suavizar o loop */
+          animation: videoLoopFade 10s infinite; 
+        }
+
+        @keyframes videoLoopFade {
+          0% { opacity: 0; }
+          5% { opacity: 1; }   /* Aparece suave no início */
+          95% { opacity: 1; }  /* Mantém visível */
+          100% { opacity: 0; } /* Desaparece antes de resetar */
+        }
       `}} />
     </div>
   );
