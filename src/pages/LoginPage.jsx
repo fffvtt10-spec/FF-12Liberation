@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { login } from '../firebase';
-import fundoLogin from '../assets/fundo-login.jpg';
 
 export default function LoginPage() {
+  const [role, setRole] = useState(null); // null, 'player', ou 'master'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [erro, setErro] = useState('');
@@ -10,194 +10,175 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      const userCredential = await login(email, password);
+      const user = userCredential.user;
+      
+      // Lógica de Redirecionamento Baseada no Role
+      if (role === 'master') {
+        console.log("Redirecionando para Painel do Mestre:", user.uid);
+        // window.location.href = `/admin/${user.uid}`;
+      } else {
+        console.log("Redirecionando para Tela do Jogador");
+      }
     } catch (err) {
-      setErro("ACESSO NEGADO: CREDENCIAIS INVÁLIDAS");
+      setErro("FALHA NA AUTENTICAÇÃO. TENTE NOVAMENTE.");
     }
   };
 
   return (
-    <div className="login-screen">
-      <div className="summoning-circle-wrapper">
-        {/* Camadas da Aura de Invocação */}
-        <div className="aura-layer layer-1"></div>
-        <div className="aura-layer layer-2"></div>
-        <div className="aura-layer layer-3"></div>
-
-        <form className="login-form-epic" onSubmit={handleLogin}>
-          <div className="header-glitch">
-            <h2 className="main-title">IDENTIFIQUE-SE</h2>
-            <div className="separator"></div>
-          </div>
-
-          <div className="input-field">
-            <input 
-              type="email" 
-              placeholder="E-MAIL"
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              required 
-            />
-          </div>
-
-          <div className="input-field">
-            <input 
-              type="password" 
-              placeholder="SENHA"
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-            />
-          </div>
-
-          {erro && <div className="error-box">{erro}</div>}
-
-          <button type="submit" className="btn-summon">
-            <span>INICIAR JORNADA</span>
-          </button>
-        </form>
+    <div className="login-container">
+      {/* Fundo de Chamas e Partículas */}
+      <div className="fire-wrapper">
+        <div className="fire">
+          <div className="particle"></div>
+          <div className="particle"></div>
+          <div className="particle"></div>
+          <div className="particle"></div>
+          <div className="particle"></div>
+        </div>
       </div>
 
+      {!role ? (
+        <div className="role-selection">
+          <h2 className="fade-in">COMO DESEJA ENTRAR?</h2>
+          <div className="btn-group">
+            <button className="btn-epic" onClick={() => setRole('player')}>JOGADOR</button>
+            <button className="btn-epic" onClick={() => setRole('master')}>NARRADOR</button>
+          </div>
+        </div>
+      ) : (
+        <form className="login-box-epic fade-in" onSubmit={handleLogin}>
+          <button className="back-link" onClick={() => setRole(null)}>← VOLTAR</button>
+          <h3>{role === 'master' ? 'ACESSO AO MESTRE' : 'ENTRADA DE JOGADOR'}</h3>
+          
+          <input 
+            type="email" 
+            placeholder="E-MAIL" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            required 
+          />
+          <input 
+            type="password" 
+            placeholder="SENHA" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            required 
+          />
+          
+          {erro && <p className="error">{erro}</p>}
+          <button type="submit" className="btn-summon">LOGAR</button>
+        </form>
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
-        .login-screen {
+        .login-container {
           height: 100vh;
           width: 100vw;
+          background: #000;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.3)), url(${fundoLogin}) no-repeat center center;
-          background-size: cover;
           overflow: hidden;
-        }
-
-        .summoning-circle-wrapper {
           position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 500px;
-          height: 500px;
         }
 
-        /* Efeito de Aura Giratória */
-        .aura-layer {
+        /* Efeito de Chamas Azuis/Roxas */
+        .fire-wrapper {
           position: absolute;
+          bottom: -50px;
+          width: 100%;
+          height: 500px;
+          filter: blur(20px) contrast(30);
+          background: #000;
+          z-index: 1;
+        }
+
+        .fire {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+
+        .particle {
+          position: absolute;
+          bottom: 0;
+          left: 50%;
+          width: 100px;
+          height: 100px;
+          background: #4b0082; /* Roxo */
           border-radius: 50%;
-          border: 2px solid transparent;
-          filter: blur(2px);
+          filter: blur(10px);
+          animation: rise 4s infinite ease-in;
+          opacity: 0.5;
         }
 
-        .layer-1 {
-          width: 380px;
-          height: 380px;
-          border: 1px solid rgba(0, 255, 255, 0.4);
-          box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
-          animation: spin 10s linear infinite;
+        .particle:nth-child(2n) { background: #0000ff; left: 40%; animation-delay: 1s; }
+        .particle:nth-child(3n) { background: #8a2be2; left: 60%; animation-delay: 2s; }
+
+        @keyframes rise {
+          0% { transform: translateY(0) scale(1); opacity: 0.8; }
+          100% { transform: translateY(-600px) scale(0.1); opacity: 0; }
         }
 
-        .layer-2 {
-          width: 420px;
-          height: 420px;
-          border: 1px dashed rgba(255, 204, 0, 0.3);
-          animation: spinReverse 15s linear infinite;
-        }
-
-        .layer-3 {
-          width: 460px;
-          height: 460px;
-          border: 2px double rgba(0, 255, 255, 0.1);
-          box-shadow: inset 0 0 50px rgba(0, 255, 255, 0.1);
-          animation: pulse 4s ease-in-out infinite;
-        }
-
-        .login-form-epic {
+        /* Caixa de Login Estilo Menu FF */
+        .login-box-epic, .role-selection {
           position: relative;
           z-index: 10;
+          background: rgba(0, 0, 40, 0.9);
+          border: 2px solid #555;
+          padding: 40px;
+          border-radius: 4px;
+          box-shadow: 0 0 20px rgba(75, 0, 130, 0.5);
           text-align: center;
-          width: 300px;
+          width: 350px;
         }
 
-        .main-title {
-          color: #fff;
-          font-size: 24px;
-          letter-spacing: 6px;
-          text-shadow: 0 0 10px #00f2ff, 0 0 20px #00f2ff;
-          margin-bottom: 10px;
-        }
+        h2, h3 { color: #fff; letter-spacing: 3px; margin-bottom: 20px; }
 
-        .separator {
-          height: 2px;
-          width: 100%;
-          background: linear-gradient(90deg, transparent, #ffcc00, transparent);
-          margin-bottom: 30px;
-        }
-
-        .input-field {
-          margin-bottom: 20px;
-        }
-
-        .input-field input {
+        input {
           width: 100%;
           padding: 12px;
-          background: rgba(0, 0, 0, 0.7);
-          border: none;
-          border-bottom: 2px solid #00f2ff;
+          margin-bottom: 15px;
+          background: #000;
+          border: 1px solid #444;
           color: #fff;
-          text-align: center;
-          letter-spacing: 2px;
           outline: none;
+        }
+
+        input:focus { border-color: #8a2be2; box-shadow: 0 0 10px #4b0082; }
+
+        .btn-epic, .btn-summon {
+          width: 100%;
+          padding: 15px;
+          background: transparent;
+          border: 1px solid #fff;
+          color: #fff;
+          cursor: pointer;
+          margin-bottom: 10px;
           transition: 0.3s;
         }
 
-        .input-field input:focus {
-          background: rgba(0, 242, 255, 0.1);
-          border-bottom: 2px solid #ffcc00;
-          box-shadow: 0 10px 20px -10px #00f2ff;
-        }
-
-        .btn-summon {
-          background: transparent;
-          border: 1px solid #ffcc00;
-          padding: 15px 30px;
-          color: #ffcc00;
-          font-weight: bold;
-          letter-spacing: 3px;
-          cursor: pointer;
-          position: relative;
-          transition: 0.5s;
-          margin-top: 20px;
-          overflow: hidden;
-        }
-
-        .btn-summon:hover {
+        .btn-epic:hover, .btn-summon:hover {
+          background: #fff;
           color: #000;
-          background: #ffcc00;
-          box-shadow: 0 0 30px #ffcc00;
+          box-shadow: 0 0 15px #fff;
         }
 
-        .error-box {
-          color: #ff4444;
-          font-size: 11px;
-          margin: 10px 0;
-          letter-spacing: 1px;
+        .back-link {
+          background: none;
+          border: none;
+          color: #aaa;
+          font-size: 10px;
+          cursor: pointer;
+          margin-bottom: 10px;
         }
 
-        /* Animações Épicas */
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
+        .error { color: #ff4444; font-size: 12px; }
 
-        @keyframes spinReverse {
-          from { transform: rotate(360deg); }
-          to { transform: rotate(0deg); }
-        }
-
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.5; }
-          50% { transform: scale(1.05); opacity: 0.8; }
-        }
-      ` }} />
+        .fade-in { animation: fadeIn 1.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      `}} />
     </div>
   );
 }
