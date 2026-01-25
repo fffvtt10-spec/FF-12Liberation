@@ -88,6 +88,8 @@ Error generating stack: `+a.message+`
           position: relative;
         }
 
+        /* Altere apenas estas partes no seu Style */
+
         .background-video {
           position: absolute;
           top: 50%;
@@ -96,12 +98,19 @@ Error generating stack: `+a.message+`
           min-height: 100%;
           width: auto;
           height: auto;
-          z-index: 0; /* Fica acima do background preto, mas abaixo do overlay */
+          z-index: 0;
           transform: translate(-50%, -50%);
           object-fit: cover;
-          /* Ajuste o tempo (10s) para a duração real do seu vídeo */
-          animation: videoLoopFade 10s infinite; 
+          /* Reduzi para 0.5s de fade apenas no ponto de transição */
+          animation: quickLoopFade 0.5s ease-in-out;
         }
+
+        @keyframes quickLoopFade {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+
+/* Remova o videoLoopFade antigo e use este se o vídeo for muito curto */
 
         .content-overlay {
           position: relative;
@@ -146,12 +155,5 @@ Error generating stack: `+a.message+`
         @keyframes fadeInFF {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes videoLoopFade {
-          0% { opacity: 0; }
-          5% { opacity: 1; }
-          95% { opacity: 1; }
-          100% { opacity: 0; }
         }
       `}})]})}const vS="/FF-12Liberation/assets/musica-tema-78rqvj_H.mp3";function _S(){const[r,i]=oa.useState("landing"),s=oa.useRef(null),c=()=>{s.current&&(s.current.volume=.2,s.current.play().catch(f=>console.log("Erro ao tocar áudio:",f))),i("login")};return le.jsxs("div",{className:"app-container",children:[le.jsx("audio",{ref:s,src:vS,loop:!0}),r==="landing"?le.jsx(mv,{onStart:c}):le.jsx(yS,{})]})}dv.createRoot(document.getElementById("root")).render(le.jsx(iv.StrictMode,{children:le.jsx(_S,{})}));
