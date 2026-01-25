@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { login } from '../firebase';
 
 export default function LoginPage() {
-  const [role, setRole] = useState(null); // null, 'player', ou 'master'
+  const [role, setRole] = useState(null); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [erro, setErro] = useState('');
@@ -10,66 +10,63 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const userCredential = await login(email, password);
-      const user = userCredential.user;
-      
-      // Lógica de Redirecionamento Baseada no Role
-      if (role === 'master') {
-        console.log("Redirecionando para Painel do Mestre:", user.uid);
-        // window.location.href = `/admin/${user.uid}`;
-      } else {
-        console.log("Redirecionando para Tela do Jogador");
-      }
+      await login(email, password);
+      // A lógica de redirecionamento mestre/jogador entra aqui após o sucesso
     } catch (err) {
-      setErro("FALHA NA AUTENTICAÇÃO. TENTE NOVAMENTE.");
+      setErro("FALHA NA CONEXÃO COM O ÉTER.");
     }
   };
 
   return (
     <div className="login-container">
-      {/* Fundo de Chamas e Partículas */}
-      <div className="fire-wrapper">
-        <div className="fire">
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-          <div className="particle"></div>
-        </div>
+      {/* Filtro SVG para fundir as partículas e criar o efeito de chama líquida */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <filter id="fire-filter">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" result="fire-filter" />
+        </filter>
+      </svg>
+
+      <div className="fire-canvas">
+        {/* Gerando chamas e micro partículas */}
+        {[...Array(20)].map((_, i) => (
+          <div key={i} className="fire-particle" style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 4}s`,
+            width: `${20 + Math.random() * 60}px`,
+            height: `${20 + Math.random() * 60}px`
+          }}></div>
+        ))}
       </div>
 
-      {!role ? (
-        <div className="role-selection">
-          <h2 className="fade-in">COMO DESEJA ENTRAR?</h2>
-          <div className="btn-group">
-            <button className="btn-epic" onClick={() => setRole('player')}>JOGADOR</button>
-            <button className="btn-epic" onClick={() => setRole('master')}>NARRADOR</button>
+      <div className="content-wrapper">
+        {!role ? (
+          <div className="role-card fade-in">
+            <h2>ESCOLHA SUA CLASSE</h2>
+            <div className="btn-group-vertical">
+              <button className="btn-fft-selection" onClick={() => setRole('player')}>
+                <span className="icon">🛡️</span> JOGADOR
+              </button>
+              <button className="btn-fft-selection" onClick={() => setRole('master')}>
+                <span className="icon">📜</span> NARRADOR
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <form className="login-box-epic fade-in" onSubmit={handleLogin}>
-          <button className="back-link" onClick={() => setRole(null)}>← VOLTAR</button>
-          <h3>{role === 'master' ? 'ACESSO AO MESTRE' : 'ENTRADA DE JOGADOR'}</h3>
-          
-          <input 
-            type="email" 
-            placeholder="E-MAIL" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
-          />
-          <input 
-            type="password" 
-            placeholder="SENHA" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-          />
-          
-          {erro && <p className="error">{erro}</p>}
-          <button type="submit" className="btn-summon">LOGAR</button>
-        </form>
-      )}
+        ) : (
+          <form className="login-panel fade-in" onSubmit={handleLogin}>
+            <button className="back-btn" onClick={() => setRole(null)}>← RETORNAR</button>
+            <h3>{role === 'master' ? 'NARRADOR' : 'JOGADOR'}</h3>
+            <div className="input-field">
+              <input type="email" placeholder="E-MAIL" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="input-field">
+              <input type="password" placeholder="SENHA" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            {erro && <p className="error-txt">{erro}</p>}
+            <button type="submit" className="btn-action">ENTRAR</button>
+          </form>
+        )}
+      </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .login-container {
@@ -83,98 +80,79 @@ export default function LoginPage() {
           position: relative;
         }
 
-        /* Efeito de Chamas Azuis/Roxas */
-        .fire-wrapper {
+        /* Chamas Orgânicas */
+        .fire-canvas {
           position: absolute;
           bottom: -50px;
           width: 100%;
-          height: 500px;
-          filter: blur(20px) contrast(30);
-          background: #000;
+          height: 60%;
+          filter: url(#fire-filter);
           z-index: 1;
         }
 
-        .fire {
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-
-        .particle {
+        .fire-particle {
           position: absolute;
           bottom: 0;
-          left: 50%;
-          width: 100px;
-          height: 100px;
-          background: #4b0082; /* Roxo */
+          background: linear-gradient(to top, #4b0082, #00f2ff);
           border-radius: 50%;
-          filter: blur(10px);
-          animation: rise 4s infinite ease-in;
-          opacity: 0.5;
+          opacity: 0.6;
+          animation: flame-rise 3s infinite ease-in;
         }
 
-        .particle:nth-child(2n) { background: #0000ff; left: 40%; animation-delay: 1s; }
-        .particle:nth-child(3n) { background: #8a2be2; left: 60%; animation-delay: 2s; }
-
-        @keyframes rise {
-          0% { transform: translateY(0) scale(1); opacity: 0.8; }
-          100% { transform: translateY(-600px) scale(0.1); opacity: 0; }
+        @keyframes flame-rise {
+          0% { transform: translateY(0) scale(1.5); opacity: 0.8; }
+          100% { transform: translateY(-500px) scale(0.1); opacity: 0; }
         }
 
-        /* Caixa de Login Estilo Menu FF */
-        .login-box-epic, .role-selection {
-          position: relative;
-          z-index: 10;
-          background: rgba(0, 0, 40, 0.9);
-          border: 2px solid #555;
+        /* Painel de Login Estilo Interface RPG */
+        .content-wrapper { position: relative; z-index: 10; }
+
+        .role-card, .login-panel {
+          background: rgba(0, 0, 30, 0.85);
+          border: 1px solid rgba(0, 242, 255, 0.4);
           padding: 40px;
-          border-radius: 4px;
-          box-shadow: 0 0 20px rgba(75, 0, 130, 0.5);
+          border-radius: 8px;
+          box-shadow: 0 0 30px rgba(0, 242, 255, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.05);
           text-align: center;
-          width: 350px;
+          width: 380px;
+          backdrop-filter: blur(5px);
         }
 
-        h2, h3 { color: #fff; letter-spacing: 3px; margin-bottom: 20px; }
+        h2, h3 { color: #fff; letter-spacing: 4px; margin-bottom: 30px; text-shadow: 0 0 10px #00f2ff; }
 
-        input {
+        .btn-group-vertical { display: flex; flex-direction: column; gap: 15px; }
+
+        .btn-fft-selection, .btn-action {
+          background: transparent;
+          border: 1px solid #00f2ff;
+          color: #fff;
+          padding: 15px;
+          cursor: pointer;
+          font-weight: bold;
+          letter-spacing: 2px;
+          transition: 0.3s;
+          position: relative;
+        }
+
+        .btn-fft-selection:hover, .btn-action:hover {
+          background: #00f2ff;
+          color: #000;
+          box-shadow: 0 0 20px #00f2ff;
+        }
+
+        .input-field input {
           width: 100%;
           padding: 12px;
-          margin-bottom: 15px;
-          background: #000;
+          margin-bottom: 20px;
+          background: rgba(0,0,0,0.8);
           border: 1px solid #444;
           color: #fff;
-          outline: none;
+          text-align: center;
         }
 
-        input:focus { border-color: #8a2be2; box-shadow: 0 0 10px #4b0082; }
+        .input-field input:focus { border-color: #00f2ff; outline: none; }
 
-        .btn-epic, .btn-summon {
-          width: 100%;
-          padding: 15px;
-          background: transparent;
-          border: 1px solid #fff;
-          color: #fff;
-          cursor: pointer;
-          margin-bottom: 10px;
-          transition: 0.3s;
-        }
-
-        .btn-epic:hover, .btn-summon:hover {
-          background: #fff;
-          color: #000;
-          box-shadow: 0 0 15px #fff;
-        }
-
-        .back-link {
-          background: none;
-          border: none;
-          color: #aaa;
-          font-size: 10px;
-          cursor: pointer;
-          margin-bottom: 10px;
-        }
-
-        .error { color: #ff4444; font-size: 12px; }
+        .back-btn { background: none; border: none; color: #00f2ff; cursor: pointer; font-size: 10px; margin-bottom: 10px; }
 
         .fade-in { animation: fadeIn 1.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
