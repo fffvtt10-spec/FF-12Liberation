@@ -11,7 +11,6 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await login(email, password);
-      // Aqui o Firebase cuida do login. Futuramente redirecionamos para o painel.
     } catch (err) {
       setErro("Acesso Negado: Verifique suas credenciais.");
     }
@@ -19,31 +18,35 @@ export default function LoginPage() {
 
   return (
     <div className="login-screen">
-      <div className="login-box">
-        <h2 className="title-fft">IDENTIFIQUE-SE</h2>
-        <form onSubmit={handleLogin}>
-          <div className="input-group">
-            <label>E-MAIL</label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              required 
-            />
-          </div>
-          <div className="input-group">
-            <label>SENHA</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-            />
-          </div>
-          {erro && <p className="error-msg">{erro}</p>}
-          <button type="submit" className="btn-fft">ENTRAR</button>
-        </form>
-      </div>
+      {/* O formulário agora flutua sem uma caixa sólida em volta */}
+      <form className="aura-form" onSubmit={handleLogin}>
+        <h2 className="title-aura">IDENTIFIQUE-SE</h2>
+        <p className="subtitle">FAÇA LOGIN NA SUA CONTA</p>
+
+        <div className="input-aura-wrapper">
+          <input 
+            type="email" 
+            placeholder="E-MAIL"
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            required 
+          />
+        </div>
+
+        <div className="input-aura-wrapper">
+          <input 
+            type="password" 
+            placeholder="SENHA"
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            required 
+          />
+        </div>
+
+        {erro && <p className="error-msg">{erro}</p>}
+
+        <button type="submit" className="btn-aura">ENTRAR</button>
+      </form>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .login-screen {
@@ -52,75 +55,100 @@ export default function LoginPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${fundoLogin}) no-repeat center center;
+          background: url(${fundoLogin}) no-repeat center center;
           background-size: cover;
-          animation: fadeIn 2s ease-in;
+          overflow: hidden;
         }
 
-        .login-box {
-          background: rgba(0, 0, 50, 0.85); /* Azul escuro estilo FFT */
-          border: 3px solid #ccc;
-          border-radius: 8px;
-          padding: 30px;
-          width: 350px;
-          box-shadow: 0 0 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.1);
+        .aura-form {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 40px;
+          border-radius: 50%; /* Faz a aura ser circular/oval */
+          box-shadow: 0 0 60px 10px rgba(0, 150, 255, 0.3); /* Aura externa suave */
+          animation: ambientAura 6s infinite alternate ease-in-out;
         }
 
-        .title-fft {
+        .title-aura {
           color: #ffcc00;
-          text-align: center;
-          margin-bottom: 25px;
-          letter-spacing: 3px;
-          font-size: 22px;
-          text-shadow: 2px 2px #000;
-        }
-
-        .input-group {
-          margin-bottom: 20px;
-        }
-
-        .input-group label {
-          display: block;
-          color: #eee;
-          font-size: 12px;
+          font-size: 28px;
+          letter-spacing: 4px;
+          text-shadow: 0 0 15px rgba(255, 204, 0, 0.7);
           margin-bottom: 5px;
         }
 
-        .input-group input {
-          width: 100%;
-          padding: 10px;
-          background: #000;
-          border: 1px solid #ffcc00;
+        .subtitle {
           color: #fff;
-          outline: none;
+          font-size: 12px;
+          margin-bottom: 40px;
+          letter-spacing: 2px;
+          opacity: 0.8;
         }
 
-        .btn-fft {
-          width: 100%;
+        .input-aura-wrapper {
+          margin-bottom: 25px;
+          position: relative;
+        }
+
+        .input-aura-wrapper input {
+          width: 280px;
+          padding: 12px 20px;
+          background: rgba(0, 0, 0, 0.6);
+          border: 1px solid rgba(0, 150, 255, 0.5);
+          border-radius: 25px; /* Bordas arredondadas para evitar o "quadrado" */
+          color: #fff;
+          text-align: center;
+          outline: none;
+          transition: 0.4s;
+          box-shadow: 0 0 10px rgba(0, 150, 255, 0.2);
+        }
+
+        .input-aura-wrapper input:focus {
+          border-color: #00f2ff;
+          box-shadow: 0 0 20px rgba(0, 242, 255, 0.6);
+          transform: scale(1.05);
+        }
+
+        .btn-aura {
+          width: 180px;
           padding: 12px;
-          background: #ffcc00;
-          color: #000;
-          border: none;
+          margin-top: 20px;
+          background: transparent;
+          color: #00f2ff;
+          border: 2px solid #00f2ff;
+          border-radius: 30px;
           font-weight: bold;
           cursor: pointer;
+          position: relative;
+          overflow: hidden;
           transition: 0.3s;
-          margin-top: 10px;
+          box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
         }
 
-        .btn-fft:hover {
-          background: #fff;
-          box-shadow: 0 0 10px #ffcc00;
+        .btn-aura:hover {
+          background: #00f2ff;
+          color: #000;
+          box-shadow: 0 0 30px #00f2ff;
+        }
+
+        /* Animação da Aura Girando e Pulsando */
+        @keyframes ambientAura {
+          0% {
+            box-shadow: 0 0 50px 5px rgba(0, 150, 255, 0.3);
+            transform: scale(1);
+          }
+          100% {
+            box-shadow: 0 0 80px 20px rgba(0, 242, 255, 0.5);
+            transform: scale(1.02);
+          }
         }
 
         .error-msg {
           color: #ff4444;
-          font-size: 12px;
-          text-align: center;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          font-size: 13px;
+          margin-bottom: 15px;
+          text-shadow: 0 0 5px #000;
         }
       `}} />
     </div>
