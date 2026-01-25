@@ -27,3 +27,6 @@ export const signUp = (email, password) => {
 export const login = (email, password) => {
   return signInWithEmailAndPassword(auth, email, password);
 };
+
+// src/firebase.js
+console.log("Projeto Firebase ID:", import.meta.env.VITE_FIREBASE_PROJECT_ID); // Adicione isso aqui
