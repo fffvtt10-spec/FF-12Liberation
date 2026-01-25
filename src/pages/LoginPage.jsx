@@ -33,7 +33,7 @@ export default function LoginPage() {
       <div className="content-overlay">
         {!role ? (
           <div className="selection-screen fade-in">
-            <h2 className="ff-title">ESCOLHA SUA CLASSE</h2>
+            <h2 className="ff-title">ESCOLHA SEU DESTINO</h2>
             <div className="ff-button-group">
               <button className="ff-btn" onClick={() => setRole('player')}>JOGADOR</button>
               <button className="ff-btn" onClick={() => setRole('master')}>NARRADOR</button>
