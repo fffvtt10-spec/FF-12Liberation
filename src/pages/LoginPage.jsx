@@ -12,41 +12,51 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setErro("Acesso Negado: Verifique suas credenciais.");
+      setErro("ACESSO NEGADO: CREDENCIAIS INVÁLIDAS");
     }
   };
 
   return (
     <div className="login-screen">
-      {/* O formulário agora flutua sem uma caixa sólida em volta */}
-      <form className="aura-form" onSubmit={handleLogin}>
-        <h2 className="title-aura">IDENTIFIQUE-SE</h2>
-        <p className="subtitle">FAÇA LOGIN NA SUA CONTA</p>
+      <div className="summoning-circle-wrapper">
+        {/* Camadas da Aura de Invocação */}
+        <div className="aura-layer layer-1"></div>
+        <div className="aura-layer layer-2"></div>
+        <div className="aura-layer layer-3"></div>
 
-        <div className="input-aura-wrapper">
-          <input 
-            type="email" 
-            placeholder="E-MAIL"
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
-          />
-        </div>
+        <form className="login-form-epic" onSubmit={handleLogin}>
+          <div className="header-glitch">
+            <h2 className="main-title">IDENTIFIQUE-SE</h2>
+            <div className="separator"></div>
+          </div>
 
-        <div className="input-aura-wrapper">
-          <input 
-            type="password" 
-            placeholder="SENHA"
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-          />
-        </div>
+          <div className="input-field">
+            <input 
+              type="email" 
+              placeholder="E-MAIL"
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
+            />
+          </div>
 
-        {erro && <p className="error-msg">{erro}</p>}
+          <div className="input-field">
+            <input 
+              type="password" 
+              placeholder="SENHA"
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+            />
+          </div>
 
-        <button type="submit" className="btn-aura">ENTRAR</button>
-      </form>
+          {erro && <div className="error-box">{erro}</div>}
+
+          <button type="submit" className="btn-summon">
+            <span>INICIAR JORNADA</span>
+          </button>
+        </form>
+      </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .login-screen {
@@ -55,102 +65,139 @@ export default function LoginPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: url(${fundoLogin}) no-repeat center center;
+          background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.3)), url(${fundoLogin}) no-repeat center center;
           background-size: cover;
           overflow: hidden;
         }
 
-        .aura-form {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 40px;
-          border-radius: 50%; /* Faz a aura ser circular/oval */
-          box-shadow: 0 0 60px 10px rgba(0, 150, 255, 0.3); /* Aura externa suave */
-          animation: ambientAura 6s infinite alternate ease-in-out;
-        }
-
-        .title-aura {
-          color: #ffcc00;
-          font-size: 28px;
-          letter-spacing: 4px;
-          text-shadow: 0 0 15px rgba(255, 204, 0, 0.7);
-          margin-bottom: 5px;
-        }
-
-        .subtitle {
-          color: #fff;
-          font-size: 12px;
-          margin-bottom: 40px;
-          letter-spacing: 2px;
-          opacity: 0.8;
-        }
-
-        .input-aura-wrapper {
-          margin-bottom: 25px;
+        .summoning-circle-wrapper {
           position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 500px;
+          height: 500px;
         }
 
-        .input-aura-wrapper input {
-          width: 280px;
-          padding: 12px 20px;
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(0, 150, 255, 0.5);
-          border-radius: 25px; /* Bordas arredondadas para evitar o "quadrado" */
+        /* Efeito de Aura Giratória */
+        .aura-layer {
+          position: absolute;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          filter: blur(2px);
+        }
+
+        .layer-1 {
+          width: 380px;
+          height: 380px;
+          border: 1px solid rgba(0, 255, 255, 0.4);
+          box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
+          animation: spin 10s linear infinite;
+        }
+
+        .layer-2 {
+          width: 420px;
+          height: 420px;
+          border: 1px dashed rgba(255, 204, 0, 0.3);
+          animation: spinReverse 15s linear infinite;
+        }
+
+        .layer-3 {
+          width: 460px;
+          height: 460px;
+          border: 2px double rgba(0, 255, 255, 0.1);
+          box-shadow: inset 0 0 50px rgba(0, 255, 255, 0.1);
+          animation: pulse 4s ease-in-out infinite;
+        }
+
+        .login-form-epic {
+          position: relative;
+          z-index: 10;
+          text-align: center;
+          width: 300px;
+        }
+
+        .main-title {
+          color: #fff;
+          font-size: 24px;
+          letter-spacing: 6px;
+          text-shadow: 0 0 10px #00f2ff, 0 0 20px #00f2ff;
+          margin-bottom: 10px;
+        }
+
+        .separator {
+          height: 2px;
+          width: 100%;
+          background: linear-gradient(90deg, transparent, #ffcc00, transparent);
+          margin-bottom: 30px;
+        }
+
+        .input-field {
+          margin-bottom: 20px;
+        }
+
+        .input-field input {
+          width: 100%;
+          padding: 12px;
+          background: rgba(0, 0, 0, 0.7);
+          border: none;
+          border-bottom: 2px solid #00f2ff;
           color: #fff;
           text-align: center;
+          letter-spacing: 2px;
           outline: none;
-          transition: 0.4s;
-          box-shadow: 0 0 10px rgba(0, 150, 255, 0.2);
+          transition: 0.3s;
         }
 
-        .input-aura-wrapper input:focus {
-          border-color: #00f2ff;
-          box-shadow: 0 0 20px rgba(0, 242, 255, 0.6);
-          transform: scale(1.05);
+        .input-field input:focus {
+          background: rgba(0, 242, 255, 0.1);
+          border-bottom: 2px solid #ffcc00;
+          box-shadow: 0 10px 20px -10px #00f2ff;
         }
 
-        .btn-aura {
-          width: 180px;
-          padding: 12px;
-          margin-top: 20px;
+        .btn-summon {
           background: transparent;
-          color: #00f2ff;
-          border: 2px solid #00f2ff;
-          border-radius: 30px;
+          border: 1px solid #ffcc00;
+          padding: 15px 30px;
+          color: #ffcc00;
           font-weight: bold;
+          letter-spacing: 3px;
           cursor: pointer;
           position: relative;
+          transition: 0.5s;
+          margin-top: 20px;
           overflow: hidden;
-          transition: 0.3s;
-          box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
         }
 
-        .btn-aura:hover {
-          background: #00f2ff;
+        .btn-summon:hover {
           color: #000;
-          box-shadow: 0 0 30px #00f2ff;
+          background: #ffcc00;
+          box-shadow: 0 0 30px #ffcc00;
         }
 
-        /* Animação da Aura Girando e Pulsando */
-        @keyframes ambientAura {
-          0% {
-            box-shadow: 0 0 50px 5px rgba(0, 150, 255, 0.3);
-            transform: scale(1);
-          }
-          100% {
-            box-shadow: 0 0 80px 20px rgba(0, 242, 255, 0.5);
-            transform: scale(1.02);
-          }
-        }
-
-        .error-msg {
+        .error-box {
           color: #ff4444;
-          font-size: 13px;
-          margin-bottom: 15px;
-          text-shadow: 0 0 5px #000;
+          font-size: 11px;
+          margin: 10px 0;
+          letter-spacing: 1px;
         }
-      `}} />
+
+        /* Animações Épicas */
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes spinReverse {
+          from { transform: rotate(360deg); }
+          to { transform: rotate(0deg); }
+        }
+
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.5; }
+          50% { transform: scale(1.05); opacity: 0.8; }
+        }
+      ` }} />
     </div>
   );
 }
