@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ] # Ou 'master', dependendo da sua branch principal
+    branches: [ main ]
 
 permissions:
   contents: write
@@ -10,6 +10,13 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env: # Injeta os segredos como variáveis de ambiente para o Vite
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,5 +29,5 @@ jobs:
       - name: Deploy
         uses: jamesives/github-pages-deploy-action@v4
         with:
-          folder: dist # Pasta que o Vite gera
-          branch: gh-pages # Branch onde o site ficará hospedado
+          folder: dist
+          branch: gh-pages
