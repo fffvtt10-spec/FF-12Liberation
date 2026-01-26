@@ -13,8 +13,35 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setErro(""); // Limpa erros anteriores
+    
     try {
+      // 1. Autenticação no Firebase Auth
       await login(email, password);
+
+      // 2. Verificação de permissão no Firestore
+      const userRef = doc(db, "users", email); // Assumindo que o ID do doc é o e-mail
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+
+        // Validação de acesso para Narrador
+        if (role === 'master' && userData.role !== 'mestre') {
+          setErro("VOCÊ NÃO TEM PERMISSÃO DE NARRADOR.");
+          return;
+        }
+
+        // Redirecionamento baseado no cargo
+        if (userData.role === 'mestre') {
+          navigate('/mestre');
+        } else {
+          navigate('/jogador');
+        }
+      } else {
+        // Fallback caso o usuário não esteja no Firestore
+        setErro("CONTA NÃO VINCULADA AO ÉTER.");
+      }
     } catch (err) {
       setErro("FALHA NA CONEXÃO COM O ÉTER.");
     }
