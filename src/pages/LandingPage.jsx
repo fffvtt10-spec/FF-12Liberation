@@ -3,13 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import musicaTema from '../assets/musica-tema.mp3';
 import fundoRPG from '../assets/fundo-rpg.jpg'; 
 
-export default function LandingPage() {
+// Instância global para garantir que o áudio não reinicie ao navegar
+const backgroundMusic = new Audio(musicaTema);
+backgroundMusic.loop = true;
 
-  const audioRef = React.useRef(new Audio(musicaTema));
+export default function LandingPage() {
   const navigate = useNavigate();
 
+  // Função para lidar com o início da experiência
+  const handleStart = () => {
+    // Tenta tocar a música assim que o usuário interage com a tela
+    backgroundMusic.play().catch(error => {
+      console.log("Aguardando autorização do navegador para o áudio: ", error);
+    });
+    
+    // Navega para a tela de login mantendo a música tocando no fundo
+    navigate('/login');
+  };
+
   return (
-    <div className="landing-container" onClick={() => navigate('/login')}>
+    <div className="landing-container" onClick={handleStart}>
       <div className="content">
         <h1 className="game-title">FINAL FANTASY</h1>
         <h2 className="sub-title">12ª Libertação</h2>
@@ -33,6 +46,7 @@ export default function LandingPage() {
           position: fixed;
           top: 0;
           left: 0;
+          z-index: 1000;
         }
 
         .content {
@@ -45,6 +59,7 @@ export default function LandingPage() {
           letter-spacing: 8px;
           color: #fff;
           text-shadow: 3px 3px 5px #000, 0 0 20px rgba(0, 242, 255, 0.5);
+          font-family: 'serif';
         }
 
         .sub-title {
@@ -52,6 +67,7 @@ export default function LandingPage() {
           color: #ffcc00;
           margin-top: 10px;
           text-shadow: 1px 1px 3px #000;
+          font-family: 'serif';
         }
 
         .press-start {
@@ -61,6 +77,7 @@ export default function LandingPage() {
           letter-spacing: 5px;
           text-shadow: 0 0 10px #00f2ff;
           animation: blink 1.5s infinite;
+          font-family: 'sans-serif';
         }
 
         @keyframes blink {

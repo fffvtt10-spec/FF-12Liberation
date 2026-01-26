@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase'; 
-import { sendPasswordResetEmail, updatePassword } from "firebase/auth"; // Adicionado para reset e troca de senha
+import { sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 
 export default function AdminPage() {
@@ -10,6 +10,7 @@ export default function AdminPage() {
   
   // Estados para Formulários
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState(''); // Estado para a senha inicial
   const [newRole, setNewRole] = useState('player');
   const [adminPass, setAdminPass] = useState('');
 
@@ -29,18 +30,21 @@ export default function AdminPage() {
     setCharacters(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
-  // Lógica de Criação de Conta
+  // Lógica de Criação de Conta com Senha
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
+      // Salva os dados no Firestore para controle do Narrador
       await addDoc(collection(db, "users"), {
         email: newEmail,
+        password: newPassword, // Senha definida manualmente
         role: newRole,
         active: true
       });
       setNewEmail('');
+      setNewPassword(''); // Limpa o campo após criar
       fetchUsers();
-      alert("Nova conta registrada no sistema!");
+      alert("Nova conta e senha registradas no Éter!");
     } catch (err) {
       alert("Erro ao invocar conta.");
     }
@@ -78,15 +82,22 @@ export default function AdminPage() {
       <h1 className="main-title">GESTÃO DO ÉTER SUPREMO</h1>
       
       <div className="cards-grid">
-        {/* Balão 1: Criar Conta */}
+        {/* Balão 1: Criar Conta com Senha */}
         <div className="ff-card fade-in">
           <h3>INVOCAR NOVA CONTA</h3>
           <form onSubmit={handleCreateUser}>
             <input 
               type="email" 
-              placeholder="E-mail" 
+              placeholder="E-mail do Alvo" 
               value={newEmail} 
               onChange={e => setNewEmail(e.target.value)} 
+              required 
+            />
+            <input 
+              type="password" 
+              placeholder="Definir Senha Inicial" 
+              value={newPassword} 
+              onChange={e => setNewPassword(e.target.value)} 
               required 
             />
             <select value={newRole} onChange={e => setNewRole(e.target.value)}>
@@ -138,29 +149,62 @@ export default function AdminPage() {
       </div>
 
       <style>{`
-        .admin-dashboard { background: #000; min-height: 100vh; padding: 40px; color: #fff; font-family: 'Segoe UI', sans-serif; }
-        .main-title { color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 50px; text-shadow: 0 0 10px #ffcc00; }
-        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; }
+        .admin-dashboard { 
+          background: radial-gradient(circle at center, #001a33 0%, #000000 100%); 
+          min-height: 100vh; 
+          padding: 40px; 
+          color: #fff; 
+          font-family: 'Segoe UI', sans-serif; 
+          position: relative;
+          overflow: hidden;
+        }
+
+        /* Vórtice de Éter Calmo */
+        .admin-dashboard::before {
+          content: "";
+          position: absolute;
+          top: -50%; left: -50%;
+          width: 200%; height: 200%;
+          background: conic-gradient(from 0deg, transparent, rgba(0, 242, 255, 0.05), transparent);
+          animation: rotateEther 20s linear infinite;
+          z-index: 0;
+          pointer-events: none;
+        }
+
+        @keyframes rotateEther {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .main-title { position: relative; z-index: 1; color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 50px; text-shadow: 0 0 10px #ffcc00; }
+        .cards-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; }
+        
         .ff-card { 
-          background: rgba(0, 20, 50, 0.8); 
-          border: 1px solid #00f2ff; 
+          background: rgba(0, 10, 30, 0.85); 
+          border: 1px solid rgba(0, 242, 255, 0.5); 
           padding: 25px; 
           border-radius: 8px; 
-          box-shadow: 0 0 15px rgba(0,242,255,0.2);
-          backdrop-filter: blur(8px);
+          box-shadow: 0 0 20px rgba(0,242,255,0.1);
+          backdrop-filter: blur(10px);
         }
+
         h3 { color: #00f2ff; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; letter-spacing: 2px; }
         .item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #111; }
         .email-text { font-size: 13px; color: #ccc; margin: 0 10px; flex-grow: 1; overflow: hidden; text-overflow: ellipsis; }
         .badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #ffcc00; color: #000; font-weight: bold; }
         .badge.player { background: #00f2ff; }
-        input, select { background: rgba(0,0,0,0.8); border: 1px solid #444; color: #fff; padding: 10px; width: 100%; margin-bottom: 15px; outline: none; }
+        
+        input, select { background: rgba(0,0,0,0.8); border: 1px solid #444; color: #fff; padding: 12px; width: 100%; margin-bottom: 15px; outline: none; transition: 0.3s; }
+        input:focus { border-color: #ffcc00; box-shadow: 0 0 5px rgba(255, 204, 0, 0.3); }
+        
         button { background: transparent; border: 1px solid #00f2ff; color: #fff; padding: 8px 15px; cursor: pointer; transition: 0.3s; font-size: 12px; }
         button:hover { background: #fff; color: #000; box-shadow: 0 0 10px #fff; }
         button.del:hover { background: #ff4444; border-color: #ff4444; color: white; }
+        
         .list-box { max-height: 250px; overflow-y: auto; padding-right: 5px; }
         .list-box::-webkit-scrollbar { width: 4px; }
         .list-box::-webkit-scrollbar-thumb { background: #00f2ff; }
+        
         .fade-in { animation: fadeIn 1.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
