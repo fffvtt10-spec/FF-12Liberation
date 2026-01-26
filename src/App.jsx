@@ -28,4 +28,11 @@ function App() {
   );
 }
 
+const user = auth.currentUser;
+if (user && user.email === 'fffvtt10@gmail.com') {
+  return <AdminPage />;
+} else {
+  return <Redirect to="/login" />;
+}
+
 export default App;
