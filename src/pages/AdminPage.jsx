@@ -46,26 +46,34 @@ export default function AdminPage() {
   };
 
   const handleCreateUser = async (e) => {
-    e.preventDefault();
-    try {
-      // 1. Cria o acesso oficial no Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
-      const user = userCredential.user;
+  e.preventDefault();
+  // Guardamos suas credenciais de Admin para voltar depois
+  const adminEmail = 'fffvtt10@gmail.com'; 
+  const adminPassOriginal = 'SUA_SENHA_AQUI'; // Idealmente vindo de um .env ou estado
 
-      // 2. Vincula o cargo (Mestre ou Jogador) no Firestore usando o UID único do Auth
-      await setDoc(doc(db, "users", user.uid), {
-        email: newEmail,
-        role: newRole,
-        active: true,
-        createdAt: new Date()
-      });
+  try {
+    // 1. Cria o novo usuário (Isso vai te deslogar)
+    const userCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
+    const user = userCredential.user;
 
-      alert("Invocação concluída! O usuário agora existe no Éter.");
-      setNewEmail(''); setNewPassword(''); fetchData();
-    } catch (err) {
-      alert("Erro na invocação: " + err.message);
-    }
-  };
+    // 2. Salva no Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      email: newEmail,
+      role: newRole,
+      active: true,
+      createdAt: new Date()
+    });
+
+    alert("Usuário invocado! Reconectando Admin...");
+
+    // 3. O "Pulo do Gato": Logar você de volta como Admin imediatamente
+    await login(adminEmail, adminPassOriginal); 
+    
+    setNewEmail(''); setNewPassword(''); fetchData();
+  } catch (err) {
+    alert("Erro no processo: " + err.message);
+  }
+};
 
   // Nova Função: Exclusão de Conta (Banimento)
   const handleDeleteUser = async (id, email) => {

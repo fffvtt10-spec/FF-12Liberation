@@ -33,7 +33,7 @@ export default function AdminLoginPage() {
       <div className="content-overlay">
         <form className="login-panel fade-in" onSubmit={handleAdminLogin}>
           <button type="button" className="ff-back" onClick={() => navigate('/')}>← RETORNAR</button>
-          <h3 className="ff-subtitle">PORTAL DO NARRADOR</h3>
+          <h3 className="ff-subtitle">PORTAL DO ADMINISTRADOR</h3>
           <div className="ff-input-group">
             <input type="email" placeholder="E-MAIL" value={email} onChange={e => setEmail(e.target.value)} required />
             <input type="password" placeholder="CHAVE DE ACESSO" value={password} onChange={e => setPassword(e.target.value)} required />
