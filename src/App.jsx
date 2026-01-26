@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-// Trocamos BrowserRouter por HashRouter
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import LoginPage from './components/LoginPage';
-import AdminLoginPage from './components/AdminLoginPage';
-import AdminPage from './components/AdminPage';
+
+// Caminhos corrigidos: Saindo de App.jsx e entrando direto em /pages/
+import LoginPage from './pages/LoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import AdminPage from './pages/AdminPage';
+
+// ... restante do código (ProtectedAdminRoute e componente App)
 
 // Componente de Proteção de Rota
 const ProtectedAdminRoute = ({ children }) => {
