@@ -3,21 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import musicaTema from '../assets/musica-tema.mp3';
 import fundoRPG from '../assets/fundo-rpg.jpg'; 
 
-// Instância global para garantir que o áudio não reinicie ao navegar
+// Instância global para garantir que o áudio persista entre as rotas
 const backgroundMusic = new Audio(musicaTema);
 backgroundMusic.loop = true;
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
-  // Função para lidar com o início da experiência
+  // Função para disparar áudio e navegação simultaneamente
   const handleStart = () => {
-    // Tenta tocar a música assim que o usuário interage com a tela
-    backgroundMusic.play().catch(error => {
-      console.log("Aguardando autorização do navegador para o áudio: ", error);
+    // Inicia a música tema; navegadores exigem este clique prévio
+    backgroundMusic.play().then(() => {
+      console.log("Éter musical sintonizado.");
+    }).catch(error => {
+      console.log("Aguardando interação para liberar áudio: ", error);
     });
     
-    // Navega para a tela de login mantendo a música tocando no fundo
+    // Navega para a tela de login; a música continuará tocando
     navigate('/login');
   };
 
@@ -39,6 +41,7 @@ export default function LandingPage() {
           display: flex;
           align-items: center;
           justify-content: center;
+          /* Gradiente FF clássico sobre a imagem de fundo */
           background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
                       url(${fundoRPG}) no-repeat center center;
           background-size: cover; 
@@ -51,6 +54,7 @@ export default function LandingPage() {
 
         .content {
           text-align: center;
+          /* Animação de entrada suave com blur */
           animation: fadeInSuave 4s ease-in-out; 
         }
 
@@ -76,6 +80,7 @@ export default function LandingPage() {
           color: #fff;
           letter-spacing: 5px;
           text-shadow: 0 0 10px #00f2ff;
+          /* Efeito pulsante clássico de menu */
           animation: blink 1.5s infinite;
           font-family: 'sans-serif';
         }
