@@ -8,7 +8,6 @@ import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminPage from './pages/AdminPage';
 import MestrePage from './pages/MestrePage';
-import JogadorPage from './pages/JogadorPage';
 
 const ProtectedAdminRoute = ({ children }) => {
   const [loading, setLoading] = useState(true);
@@ -34,7 +33,6 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/mestre" element={<MestrePage />} /> {/* Rota do Mestre */}
-      <Route path="/jogador" element={<JogadorPage />} /> {/* Rota do Jogador */}
       <Route path="/admin-login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<AdminPage />} />
     </Routes>
