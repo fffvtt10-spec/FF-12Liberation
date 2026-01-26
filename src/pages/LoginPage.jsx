@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { login } from '../firebase';
 import videoFundo from '../assets/video-fundo.mp4'; 
 import iconAdmin from '../assets/botao-admin.png';
+import { db, login } from '../firebase'; // Certifique-se de importar o 'db'
+import { doc, getDoc } from "firebase/firestore";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -12,40 +14,43 @@ export default function LoginPage() {
   const [erro, setErro] = useState('');
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setErro(""); // Limpa erros anteriores
-    
-    try {
-      // 1. Autenticação no Firebase Auth
-      await login(email, password);
+  e.preventDefault();
+  setErro(""); // Limpa erros anteriores
+  
+  try {
+    // 1. Faz o login no Firebase Auth
+    const userCredential = await login(email, password);
+    const user = userCredential.user;
 
-      // 2. Verificação de permissão no Firestore
-      const userRef = doc(db, "users", email); // Assumindo que o ID do doc é o e-mail
-      const userSnap = await getDoc(userRef);
+    // 2. Busca o cargo (role) do usuário no Firestore usando o UID
+    // Importante: Na AdminPage usamos user.uid como ID do documento
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
 
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
 
-        // Validação de acesso para Narrador
-        if (role === 'master' && userData.role !== 'mestre') {
-          setErro("VOCÊ NÃO TEM PERMISSÃO DE NARRADOR.");
-          return;
-        }
-
-        // Redirecionamento baseado no cargo
-        if (userData.role === 'mestre') {
-          navigate('/mestre');
-        } else {
-          navigate('/jogador');
-        }
-      } else {
-        // Fallback caso o usuário não esteja no Firestore
-        setErro("CONTA NÃO VINCULADA AO ÉTER.");
+      // 3. Validação: Se ele escolheu "NARRADOR" mas no banco é "jogador", ele não entra
+      // Nota: 'role' (estado do clique) vs 'userData.role' (o que está no banco)
+      if (role === 'master' && userData.role !== 'mestre') {
+        setErro("ACESSO NEGADO: VOCÊ NÃO É UM MESTRE.");
+        return;
       }
-    } catch (err) {
-      setErro("FALHA NA CONEXÃO COM O ÉTER.");
+
+      // 4. Redirecionamento correto
+      if (userData.role === 'mestre') {
+        navigate('/mestre'); // Crie esta rota no seu App.jsx
+      } else {
+        navigate('/jogador'); // Crie esta rota no seu App.jsx
+      }
+    } else {
+      setErro("USUÁRIO SEM PERFIL NO ÉTER.");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    setErro("FALHA NA CONEXÃO COM O ÉTER.");
+  }
+};
 
   return (
     <div className="login-container">
