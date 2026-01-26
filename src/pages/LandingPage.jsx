@@ -4,7 +4,7 @@ import musicaTema from '../assets/musica-tema.mp3';
 import fundoRPG from '../assets/fundo-rpg.jpg'; 
 
 // Instância global para garantir que o áudio persista entre as rotas
-const backgroundMusic = new Audio(musicaTema);
+export const backgroundMusic = new Audio(musicaTema);
 backgroundMusic.loop = true;
 
 export default function LandingPage() {
