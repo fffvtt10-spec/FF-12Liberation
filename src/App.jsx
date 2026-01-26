@@ -7,6 +7,8 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminPage from './pages/AdminPage';
+import MestrePage from './pages/MestrePage';
+import JogadorPage from './pages/JogadorPage';
 
 const ProtectedAdminRoute = ({ children }) => {
   const [loading, setLoading] = useState(true);
@@ -28,14 +30,13 @@ const ProtectedAdminRoute = ({ children }) => {
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/admin-login" element={<AdminLoginPage />} />
-        <Route path="/admin" element={<ProtectedAdminRoute><AdminPage /></ProtectedAdminRoute>} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/mestre" element={<MestrePage />} /> {/* Rota do Mestre */}
+      <Route path="/jogador" element={<JogadorPage />} /> {/* Rota do Jogador */}
+      <Route path="/admin-login" element={<AdminLoginPage />} />
+      <Route path="/admin" element={<AdminPage />} />
+    </Routes>
   );
 }
