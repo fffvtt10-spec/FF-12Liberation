@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../firebase'; 
+import { auth, db, login } from '../firebase';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
 // Imports unificados para garantir que o build não falhe com declarações duplicadas
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc } from "firebase/firestore";
