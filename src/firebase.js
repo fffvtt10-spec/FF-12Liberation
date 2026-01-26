@@ -1,10 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword 
-} from "firebase/auth";
-import { getFirestore } from "firebase/firestore"; // Importação necessária
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { getFirestore } from "firebase/firestore"; // Adicionado
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,12 +13,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app); // Exportando o banco de dados
+export const db = getFirestore(app); // Exportação vital para o build
 
-export const signUp = (email, password) => {
-  return createUserWithEmailAndPassword(auth, email, password);
-};
-
-export const login = (email, password) => {
-  return signInWithEmailAndPassword(auth, email, password);
-};
+export const signUp = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+export const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
