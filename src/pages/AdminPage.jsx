@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase'; 
+import { createUserWithEmailAndPassword } from "firebase/auth"; 
+import { setDoc, doc } from "firebase/firestore";
 import { sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { backgroundMusic } from './LandingPage'; // Ajuste o caminho se necessário
@@ -41,22 +43,26 @@ export default function AdminPage() {
   };
 
   const handleCreateUser = async (e) => {
-    e.preventDefault();
-    try {
-      await addDoc(collection(db, "users"), {
-        email: newEmail,
-        password: newPassword,
-        role: newRole,
-        active: true
-      });
-      setNewEmail('');
-      setNewPassword('');
-      fetchData();
-      alert("Nova conta registrada no sistema!");
-    } catch (err) {
-      alert("Erro ao invocar conta.");
-    }
-  };
+  e.preventDefault();
+  try {
+    // 1. Cria o acesso oficial no Firebase Authentication
+    const userCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
+    const user = userCredential.user;
+
+    // 2. Vincula o cargo (Mestre ou Jogador) no Firestore usando o UID único
+    await setDoc(doc(db, "users", user.uid), {
+      email: newEmail,
+      role: newRole,
+      active: true
+    });
+
+    alert("Invocação concluída! O usuário agora existe no Éter.");
+    setNewEmail(''); setNewPassword(''); fetchData();
+  } catch (err) {
+    // Erros comuns: senha com menos de 6 caracteres ou e-mail já existente
+    alert("Erro na invocação: " + err.message);
+  }
+};
 
   const handleDeleteChar = async (id) => {
     if (window.confirm("Banir este personagem permanentemente?")) {
