@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase'; 
-import { createUserWithEmailAndPassword } from "firebase/auth"; 
-import { setDoc, doc } from "firebase/firestore";
-import { sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
-import { backgroundMusic } from './LandingPage'; // Ajuste o caminho se necessário
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
+// Imports unificados aqui para evitar o erro "doc has already been declared"
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc } from "firebase/firestore";
+import { backgroundMusic } from './LandingPage';
 
 export default function AdminPage() {
   // Estados para Gestão de Dados
