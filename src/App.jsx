@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// Trocamos BrowserRouter por HashRouter
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import LoginPage from './components/LoginPage';
@@ -22,7 +23,7 @@ const ProtectedAdminRoute = ({ children }) => {
 
   if (loading) return <div style={{background: '#000', height: '100vh'}}></div>;
 
-  // Validação rígida para o e-mail de mestre
+  // Validação para o e-mail de mestre
   if (user && user.email === 'fffvtt10@gmail.com') {
     return children;
   }
@@ -32,7 +33,8 @@ const ProtectedAdminRoute = ({ children }) => {
 
 export default function App() {
   return (
-    <Router basename="/FF-12Liberation">
+    // Com HashRouter, o basename não é estritamente necessário, mas ajuda na organização
+    <Router>
       <Routes>
         {/* Rota Pública de Login */}
         <Route path="/" element={<LoginPage />} />
