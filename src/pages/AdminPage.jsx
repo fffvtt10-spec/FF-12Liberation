@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase'; 
 import { sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { backgroundMusic } from './LandingPage'; // Ajuste o caminho se necessário
 
 export default function AdminPage() {
   // Estados para Gestão de Dados
@@ -14,6 +15,13 @@ export default function AdminPage() {
   const [newRole, setNewRole] = useState('jogador'); // Nomenclatura normalizada
   const [adminPass, setAdminPass] = useState('');
 
+  useEffect(() => {
+  // Quando o Admin entra, o som do menu silencia
+  backgroundMusic.pause();
+  
+  // Opcional: Se quiser que a música volte ao sair da página admin
+  // return () => backgroundMusic.play().catch(() => {}); 
+}, []);
   useEffect(() => {
     fetchData();
   }, []);
@@ -83,8 +91,8 @@ export default function AdminPage() {
               <input type="email" placeholder="E-mail do Alvo" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
               <input type="password" placeholder="Definir Senha Inicial" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
               <select value={newRole} onChange={e => setNewRole(e.target.value)}>
-                <option value="jogador">JOGADOR (1 Personagem)</option>
-                <option value="mestre">MESTRE (Narrador)</option>
+                <option value="jogador">JOGADOR</option>
+                <option value="mestre">MESTRE</option>
               </select>
               <button type="submit">CRIAR ACESSO</button>
             </form>
