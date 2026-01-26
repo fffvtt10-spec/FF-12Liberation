@@ -20,6 +20,7 @@ export default function LoginPage() {
 
   return (
     <div className="login-container">
+      {/* 1. VÍDEO DE FUNDO */}
       <video 
         autoPlay 
         loop 
@@ -31,6 +32,7 @@ export default function LoginPage() {
         <source src={videoFundo} type="video/mp4" />
       </video>
 
+      {/* 2. CONTEÚDO PRINCIPAL (LOGIN) */}
       <div className="content-overlay">
         {!role ? (
           <div className="selection-screen fade-in">
@@ -42,7 +44,7 @@ export default function LoginPage() {
           </div>
         ) : (
           <form className="login-panel fade-in" onSubmit={handleLogin}>
-            <button className="ff-back" onClick={() => setRole(null)}>← RETORNAR</button>
+            <button className="ff-back" type="button" onClick={() => setRole(null)}>← RETORNAR</button>
             <h3 className="ff-subtitle">{role === 'master' ? 'NARRADOR' : 'JOGADOR'}</h3>
             <div className="ff-input-group">
               <input type="email" placeholder="E-MAIL" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -54,19 +56,28 @@ export default function LoginPage() {
         )}
       </div>
 
+      {/* 3. BOTÃO ADMIN (DENTRO DO CONTAINER PAI) */}
+      <button 
+        className="admin-portal-btn" 
+        onClick={() => window.location.href = '/admin'}
+        title="Acesso ao Narrador"
+        type="button"
+      >
+        <img src={iconAdmin} alt="Portal Admin" />
+      </button>
+
+      {/* 4. ESTILOS CONSOLIDADOS */}
       <style dangerouslySetInnerHTML={{ __html: `
         .login-container {
           height: 100vh;
           width: 100vw;
-          background: #000; /* Fundo base preto */
+          background: #000;
           display: flex;
           align-items: center;
           justify-content: center;
           overflow: hidden;
           position: relative;
         }
-
-        /* Altere apenas estas partes no seu Style */
 
         .background-video {
           position: absolute;
@@ -79,7 +90,6 @@ export default function LoginPage() {
           z-index: 0;
           transform: translate(-50%, -50%);
           object-fit: cover;
-          /* Reduzi para 0.5s de fade apenas no ponto de transição */
           animation: quickLoopFade 0.5s ease-in-out;
         }
 
@@ -87,8 +97,6 @@ export default function LoginPage() {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
-
-/* Remova o videoLoopFade antigo e use este se o vídeo for muito curto */
 
         .content-overlay {
           position: relative;
@@ -134,59 +142,39 @@ export default function LoginPage() {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        /* ESTILO DO BOTÃO ADMIN */
+        .admin-portal-btn {
+          position: absolute;
+          bottom: 30px;
+          right: 30px;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          z-index: 100;
+          width: 80px; /* Aumentei um pouco para visibilidade */
+          transition: 0.5s ease-in-out;
+          filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)) grayscale(100%);
+          opacity: 0.5;
+          animation: itemGlow 4s infinite ease-in-out;
+        }
+
+        .admin-portal-btn img {
+          width: 100%;
+          height: auto;
+        }
+
+        .admin-portal-btn:hover {
+          transform: scale(1.2) rotate(-5deg);
+          filter: drop-shadow(0 0 15px #00f2ff) grayscale(0%);
+          opacity: 1;
+        }
+
+        @keyframes itemGlow {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)); }
+          50% { filter: drop-shadow(0 0 15px rgba(255, 204, 0, 0.5)); }
+        }
       `}} />
     </div>
   );
 }
-<div className="login-container">
-  {/* Conteúdo anterior do vídeo e formulário ... */}
-
-  {/* Botão de Acesso Administrativo Flutuante */}
-  <button 
-    className="admin-portal-btn" 
-    onClick={() => window.location.href = '/admin'} // Ou sua rota de admin
-    title="Acesso ao Narrador"
-  >
-    <img src={iconAdmin} alt="Portal Admin" />
-  </button>
-
-  <style dangerouslySetInnerHTML={{ __html: `
-    /* ... estilos anteriores ... */
-
-    .admin-portal-btn {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      z-index: 100;
-      width: 60px;
-      transition: 0.5s ease-in-out;
-      filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)) grayscale(100%);
-      opacity: 0.6;
-    }
-
-    .admin-portal-btn img {
-      width: 100%;
-      height: auto;
-    }
-
-    .admin-portal-btn:hover {
-      transform: scale(1.2) rotate(-5deg);
-      filter: drop-shadow(0 0 15px #00f2ff) grayscale(0%);
-      opacity: 1;
-    }
-
-    /* Efeito de "pulsar" para o botão, como um item raro de RPG */
-    @keyframes itemGlow {
-      0% { filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)); }
-      50% { filter: drop-shadow(0 0 15px rgba(255, 204, 0, 0.5)); }
-      100% { filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)); }
-    }
-
-    .admin-portal-btn {
-      animation: itemGlow 4s infinite ease-in-out;
-    }
-  `}} />
-</div>
