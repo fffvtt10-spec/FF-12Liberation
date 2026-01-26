@@ -1,38 +1,58 @@
-import React, { useState, useRef } from 'react';
-import LandingPage from "./pages/LandingPage.jsx";
-import LoginPage from "./pages/LoginPage.jsx";
-import musicaTema from "./assets/musica-tema.mp3";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { auth } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import LoginPage from './components/LoginPage';
+import AdminLoginPage from './components/AdminLoginPage';
+import AdminPage from './components/AdminPage';
 
-function App() {
-  const [stage, setStage] = useState('landing');
-  const audioRef = useRef(null);
+// Componente de Proteção de Rota
+const ProtectedAdminRoute = ({ children }) => {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
-  const handleStart = () => {
-    // Inicia a música com volume baixo (0.2 vai de 0 a 1)
-    if (audioRef.current) {
-      audioRef.current.volume = 0.2;
-      audioRef.current.play().catch(e => console.log("Erro ao tocar áudio:", e));
-    }
-    setStage('login');
-  };
+  useEffect(() => {
+    // Listener para persistência de login
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  if (loading) return <div style={{background: '#000', height: '100vh'}}></div>;
+
+  // Validação rígida para o e-mail de mestre
+  if (user && user.email === 'fffvtt10@gmail.com') {
+    return children;
+  }
+
+  return <Navigate to="/admin-login" />;
+};
+
+export default function App() {
   return (
-    <div className="app-container">
-      <audio ref={audioRef} src={musicaTema} loop />
-      {stage === 'landing' ? (
-        <LandingPage onStart={handleStart} />
-      ) : (
-        <LoginPage />
-      )}
-    </div>
+    <Router basename="/FF-12Liberation">
+      <Routes>
+        {/* Rota Pública de Login */}
+        <Route path="/" element={<LoginPage />} />
+        
+        {/* Rota de Login do Admin (Acesso pelo Leão) */}
+        <Route path="/admin-login" element={<AdminLoginPage />} />
+
+        {/* Rota Protegida do Painel de Mestre */}
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedAdminRoute>
+              <AdminPage />
+            </ProtectedAdminRoute>
+          } 
+        />
+
+        {/* Fallback para rotas não encontradas */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Router>
   );
 }
-
-const user = auth.currentUser;
-if (user && user.email === 'fffvtt10@gmail.com') {
-  return <AdminPage />;
-} else {
-  return <Redirect to="/login" />;
-}
-
-export default App;
