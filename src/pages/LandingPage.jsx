@@ -1,8 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import musicaTema from '../assets/musica-tema.mp3';
 import fundoRPG from '../assets/fundo-rpg.jpg'; 
 
 export default function LandingPage() {
+
+  const audioRef = React.useRef(new Audio(musicaTema));
   const navigate = useNavigate();
 
   return (

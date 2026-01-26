@@ -49,8 +49,20 @@ export default function LoginPage() {
             <button type="button" className="ff-back" onClick={() => setRole(null)}>← RETORNAR</button>
             <h3 className="ff-subtitle">{role === 'master' ? 'NARRADOR' : 'JOGADOR'}</h3>
             <div className="ff-input-group">
-              <input type="email" placeholder="E-MAIL" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <input type="password" placeholder="SENHA" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <input 
+                type="email" 
+                placeholder="E-MAIL" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                required 
+              />
+              <input 
+                type="password" 
+                placeholder="SENHA" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+              />
             </div>
             {erro && <p className="ff-error">{erro}</p>}
             <button type="submit" className="ff-submit">ENTRAR</button>
@@ -58,7 +70,7 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* 3. BOTÃO DE ADMIN (LION) COM Z-INDEX 100 */}
+      {/* 3. BOTÃO DE ADMIN (LION ICON) COM Z-INDEX 100 */}
       <button 
         className="admin-portal-btn" 
         onClick={() => navigate('/admin-login')} 
@@ -87,7 +99,7 @@ export default function LoginPage() {
           min-height: 100%;
           width: auto;
           height: auto;
-          z-index: 1;
+          z-index: 1; 
           transform: translate(-50%, -50%);
           object-fit: cover;
           animation: quickLoopFade 0.5s ease-in-out;
@@ -106,7 +118,7 @@ export default function LoginPage() {
           justify-content: center;
           width: 100%;
           height: 100%;
-          background: rgba(0, 0, 0, 0.4); /* Transparência do overlay */
+          background: rgba(0, 0, 0, 0.4);
         }
 
         .ff-title { 
@@ -116,13 +128,14 @@ export default function LoginPage() {
           margin-bottom: 40px; 
           text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); 
           text-align: center;
+          font-family: 'serif'; /* Simula tipografia FF */
         }
 
         .ff-subtitle { color: #ffcc00; letter-spacing: 4px; margin-bottom: 30px; text-align: center; }
         .ff-button-group { display: flex; flex-direction: column; gap: 20px; align-items: center; }
         
         .ff-btn, .ff-submit {
-          background: rgba(0, 0, 30, 0.6); /* Painel transparente */
+          background: rgba(0, 0, 30, 0.6); 
           border: 1px solid rgba(255, 255, 255, 0.6);
           color: #fff;
           padding: 15px 50px;
@@ -131,6 +144,7 @@ export default function LoginPage() {
           transition: 0.4s;
           width: 280px;
           backdrop-filter: blur(5px);
+          font-weight: bold;
         }
 
         .ff-btn:hover, .ff-submit:hover { 
@@ -140,16 +154,22 @@ export default function LoginPage() {
         }
 
         .ff-input-group input {
-          display: block; width: 300px; padding: 12px; margin-bottom: 20px;
-          background: rgba(0, 0, 0, 0.7); border: 1px solid #444;
-          color: #fff; text-align: center; letter-spacing: 2px; outline: none;
+          display: block; 
+          width: 300px; 
+          padding: 12px; 
+          margin: 0 auto 20px auto;
+          background: rgba(0, 0, 0, 0.7); 
+          border: 1px solid #444;
+          color: #fff; 
+          text-align: center; 
+          letter-spacing: 2px; 
+          outline: none;
         }
 
         .ff-input-group input:focus { border-color: #ffcc00; }
-        .ff-back { background: none; border: none; color: #ffcc00; cursor: pointer; margin-bottom: 10px; }
-        .ff-error { color: #ff4444; font-size: 12px; margin-bottom: 15px; }
+        .ff-back { background: none; border: none; color: #ffcc00; cursor: pointer; margin-bottom: 15px; display: block; font-weight: bold; }
+        .ff-error { color: #ff4444; font-size: 12px; margin-bottom: 15px; text-shadow: 0 0 5px #000; }
 
-        /* ESTILO DO BOTÃO DE LEÃO (ADMIN) */
         .admin-portal-btn {
           position: absolute;
           bottom: 30px;
@@ -164,7 +184,7 @@ export default function LoginPage() {
         }
 
         .admin-portal-btn img { width: 100%; height: auto; }
-        .admin-portal-btn:hover { transform: scale(1.2) rotate(-5deg); }
+        .admin-portal-btn:hover { transform: scale(1.2) rotate(-5deg); filter: drop-shadow(0 0 15px #00f2ff); }
 
         .fade-in { animation: fadeInFF 2s ease-out forwards; }
 
