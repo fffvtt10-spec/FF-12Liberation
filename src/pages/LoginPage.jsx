@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { login } from '../firebase';
 import videoFundo from '../assets/video-fundo.mp4'; 
+import iconAdmin from '../assets/botao-admin.png';
 
 export default function LoginPage() {
   const [role, setRole] = useState(null); 
@@ -137,3 +138,55 @@ export default function LoginPage() {
     </div>
   );
 }
+<div className="login-container">
+  {/* Conteúdo anterior do vídeo e formulário ... */}
+
+  {/* Botão de Acesso Administrativo Flutuante */}
+  <button 
+    className="admin-portal-btn" 
+    onClick={() => window.location.href = '/admin'} // Ou sua rota de admin
+    title="Acesso ao Narrador"
+  >
+    <img src={iconAdmin} alt="Portal Admin" />
+  </button>
+
+  <style dangerouslySetInnerHTML={{ __html: `
+    /* ... estilos anteriores ... */
+
+    .admin-portal-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      z-index: 100;
+      width: 60px;
+      transition: 0.5s ease-in-out;
+      filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)) grayscale(100%);
+      opacity: 0.6;
+    }
+
+    .admin-portal-btn img {
+      width: 100%;
+      height: auto;
+    }
+
+    .admin-portal-btn:hover {
+      transform: scale(1.2) rotate(-5deg);
+      filter: drop-shadow(0 0 15px #00f2ff) grayscale(0%);
+      opacity: 1;
+    }
+
+    /* Efeito de "pulsar" para o botão, como um item raro de RPG */
+    @keyframes itemGlow {
+      0% { filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)); }
+      50% { filter: drop-shadow(0 0 15px rgba(255, 204, 0, 0.5)); }
+      100% { filter: drop-shadow(0 0 5px rgba(0, 242, 255, 0.3)); }
+    }
+
+    .admin-portal-btn {
+      animation: itemGlow 4s infinite ease-in-out;
+    }
+  `}} />
+</div>
