@@ -6,79 +6,172 @@ import iconAdmin from '../assets/botao-admin.png';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState(null); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [erro, setErro] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    try { await login(email, password); } 
-    catch (err) { setErro("FALHA NA CONEXÃO COM O ÉTER."); }
+    try {
+      await login(email, password);
+    } catch (err) {
+      setErro("FALHA NA CONEXÃO COM O ÉTER.");
+    }
   };
 
   return (
-    <div className="login-wrapper">
-      <video autoPlay loop muted playsInline className="video-bg-layer">
+    <div className="login-container">
+      {/* 1. VÍDEO DE FUNDO COM Z-INDEX 1 */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline 
+        preload="auto" 
+        className="background-video"
+      >
         <source src={videoFundo} type="video/mp4" />
       </video>
 
-      <div className="ui-overlay">
+      {/* 2. OVERLAY TRANSPARENTE COM Z-INDEX 10 */}
+      <div className="content-overlay">
         {!role ? (
-          <div className="glass-panel fade-in">
-            <h2 className="ff-text-shadow">ESCOLHA SEU CAMINHO</h2>
-            <div className="btn-stack">
-              <button className="ff-btn-styled" onClick={() => setRole('player')}>JOGADOR</button>
-              <button className="ff-btn-styled" onClick={() => setRole('master')}>MESTRE</button>
+          <div className="selection-screen fade-in">
+            <h2 className="ff-title">ESCOLHA SUA CLASSE</h2>
+            <div className="ff-button-group">
+              <button className="ff-btn" onClick={() => setRole('player')}>JOGADOR</button>
+              <button className="ff-btn" onClick={() => setRole('master')}>NARRADOR</button>
             </div>
           </div>
         ) : (
-          <form className="glass-panel fade-in" onSubmit={handleLogin}>
-            <button type="button" className="back-arrow" onClick={() => setRole(null)}>❮ VOLTAR</button>
-            <h2 className="ff-text-shadow">{role.toUpperCase()}</h2>
-            <div className="input-stack">
-              <input type="email" placeholder="E-MAIL" onChange={e => setEmail(e.target.value)} required />
-              <input type="password" placeholder="SENHA" onChange={e => setPassword(e.target.value)} required />
+          <form className="login-panel fade-in" onSubmit={handleLogin}>
+            <button type="button" className="ff-back" onClick={() => setRole(null)}>← RETORNAR</button>
+            <h3 className="ff-subtitle">{role === 'master' ? 'NARRADOR' : 'JOGADOR'}</h3>
+            <div className="ff-input-group">
+              <input type="email" placeholder="E-MAIL" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input type="password" placeholder="SENHA" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            {erro && <p className="error-ether">{erro}</p>}
-            <button type="submit" className="ff-btn-styled submit-glow">CONECTAR</button>
+            {erro && <p className="ff-error">{erro}</p>}
+            <button type="submit" className="ff-submit">ENTRAR</button>
           </form>
         )}
       </div>
 
-      <button className="lion-admin-btn" onClick={() => navigate('/admin-login')}>
-        <img src={iconAdmin} alt="Admin Portal" />
+      {/* 3. BOTÃO DE ADMIN (LION) COM Z-INDEX 100 */}
+      <button 
+        className="admin-portal-btn" 
+        onClick={() => navigate('/admin-login')} 
+        title="Acesso ao Narrador"
+      >
+        <img src={iconAdmin} alt="Portal Admin" />
       </button>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .login-wrapper { height: 100vh; width: 100vw; position: relative; overflow: hidden; }
-        .video-bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        .ui-overlay { position: relative; z-index: 10; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
-        .glass-panel { 
-          background: rgba(0, 0, 30, 0.75); border: 1px solid rgba(0, 242, 255, 0.4);
-          padding: 40px; border-radius: 4px; backdrop-filter: blur(8px);
-          box-shadow: 0 0 30px rgba(0, 242, 255, 0.15); text-align: center;
+        .login-container {
+          height: 100vh;
+          width: 100vw;
+          background: #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          position: relative;
         }
-        .ff-text-shadow { color: #fff; letter-spacing: 4px; text-shadow: 0 0 10px #00f2ff; margin-bottom: 30px; }
-        .ff-btn-styled { 
-          background: transparent; border: 1px solid #fff; color: #fff; 
-          padding: 12px 50px; cursor: pointer; transition: 0.4s; letter-spacing: 2px;
-          margin: 10px; width: 250px;
+
+        .background-video {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          min-width: 100%;
+          min-height: 100%;
+          width: auto;
+          height: auto;
+          z-index: 1;
+          transform: translate(-50%, -50%);
+          object-fit: cover;
+          animation: quickLoopFade 0.5s ease-in-out;
         }
-        .ff-btn-styled:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
-        .input-stack input { 
-          display: block; width: 280px; padding: 12px; margin: 10px auto;
-          background: rgba(0,0,0,0.8); border: 1px solid #444; color: #fff; text-align: center;
+
+        @keyframes quickLoopFade {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
-        .lion-admin-btn { 
-          position: absolute; bottom: 30px; right: 30px; z-index: 100;
-          background: none; border: none; cursor: pointer; transition: 0.5s;
-          width: 70px; filter: drop-shadow(0 0 8px rgba(0, 242, 255, 0.6));
+
+        .content-overlay {
+          position: relative;
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.4); /* Transparência do overlay */
         }
-        .lion-admin-btn:hover { transform: scale(1.2) rotate(-5deg); filter: grayscale(0%); }
-        .back-arrow { background: none; border: none; color: #ffcc00; cursor: pointer; margin-bottom: 10px; display: block; }
-        .fade-in { animation: fadeIn 1s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        .ff-title { 
+          color: #fff; 
+          font-size: 32px; 
+          letter-spacing: 8px; 
+          margin-bottom: 40px; 
+          text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); 
+          text-align: center;
+        }
+
+        .ff-subtitle { color: #ffcc00; letter-spacing: 4px; margin-bottom: 30px; text-align: center; }
+        .ff-button-group { display: flex; flex-direction: column; gap: 20px; align-items: center; }
+        
+        .ff-btn, .ff-submit {
+          background: rgba(0, 0, 30, 0.6); /* Painel transparente */
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          color: #fff;
+          padding: 15px 50px;
+          letter-spacing: 3px;
+          cursor: pointer;
+          transition: 0.4s;
+          width: 280px;
+          backdrop-filter: blur(5px);
+        }
+
+        .ff-btn:hover, .ff-submit:hover { 
+          background: #fff; 
+          color: #000; 
+          box-shadow: 0 0 20px #fff; 
+        }
+
+        .ff-input-group input {
+          display: block; width: 300px; padding: 12px; margin-bottom: 20px;
+          background: rgba(0, 0, 0, 0.7); border: 1px solid #444;
+          color: #fff; text-align: center; letter-spacing: 2px; outline: none;
+        }
+
+        .ff-input-group input:focus { border-color: #ffcc00; }
+        .ff-back { background: none; border: none; color: #ffcc00; cursor: pointer; margin-bottom: 10px; }
+        .ff-error { color: #ff4444; font-size: 12px; margin-bottom: 15px; }
+
+        /* ESTILO DO BOTÃO DE LEÃO (ADMIN) */
+        .admin-portal-btn {
+          position: absolute;
+          bottom: 30px;
+          right: 30px;
+          z-index: 100;
+          background: none;
+          border: none;
+          cursor: pointer;
+          width: 70px;
+          transition: 0.5s;
+          filter: drop-shadow(0 0 8px rgba(0, 242, 255, 0.6));
+        }
+
+        .admin-portal-btn img { width: 100%; height: auto; }
+        .admin-portal-btn:hover { transform: scale(1.2) rotate(-5deg); }
+
+        .fade-in { animation: fadeInFF 2s ease-out forwards; }
+
+        @keyframes fadeInFF {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}} />
     </div>
   );
