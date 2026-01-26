@@ -1,11 +1,11 @@
-// src/firebase.js
 import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword 
 } from "firebase/auth";
-// Configuração do Firebase
+import { getFirestore } from "firebase/firestore"; // Importação necessária
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -17,16 +17,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app); // Exportando o banco de dados
 
-// Função para Criar Conta
 export const signUp = (email, password) => {
   return createUserWithEmailAndPassword(auth, email, password);
 };
 
-// Função para Logar
 export const login = (email, password) => {
   return signInWithEmailAndPassword(auth, email, password);
 };
-
-// src/firebase.js
-console.log("Projeto Firebase ID:", import.meta.env.VITE_FIREBASE_PROJECT_ID); // Adicione isso aqui
