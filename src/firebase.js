@@ -13,7 +13,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app); // Exportação vital para o build
+export const db = getFirestore(app); // Exportação do banco de dados
 
 export const signUp = (email, password) => createUserWithEmailAndPassword(auth, email, password);
 export const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
