@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../firebase';
 import videoFundo from '../assets/video-fundo.mp4'; 
 import iconAdmin from '../assets/botao-admin.png';
 import { db, login } from '../firebase'; // Certifique-se de importar o 'db'
