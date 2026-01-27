@@ -38,7 +38,8 @@ export default function MestrePage() {
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     
-    // CORREÇÃO: Listener em tempo real com ordenação por servidor para garantir que apareça
+    // Listener em tempo real
+    // DICA: Se não aparecer, verifique o console (F12) para clicar no link de criação de índice do Firebase
     const q = query(
       collection(db, "missoes"), 
       where("mestreId", "==", auth.currentUser.uid), 
@@ -46,7 +47,10 @@ export default function MestrePage() {
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMissoes(data);
+    }, (error) => {
+      console.error("Erro no Firestore: ", error);
     });
     return () => unsubscribe();
   }, []);
@@ -64,13 +68,15 @@ export default function MestrePage() {
       const msToAdd = parseDuration(form.duracao);
       const expiraEm = new Date(new Date().getTime() + msToAdd);
       
+      // Adição do serverTimestamp para garantir ordenação correta
       await addDoc(collection(db, "missoes"), {
         ...form, 
         mestreNome: mestreIdentidade, 
         mestreId: auth.currentUser.uid, 
-        createdAt: serverTimestamp(), // Garante a sincronia com o banco
+        createdAt: serverTimestamp(), 
         expiraEm: expiraEm.toISOString()
       });
+      
       setShowModal(false);
       setForm({ nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz: " + err.message); }
@@ -103,7 +109,7 @@ export default function MestrePage() {
                   <div className="poster-rank">{m.rank}</div>
                   <span className="mestre-tag">Narrador: {m.mestreNome}</span>
                   <h4>{m.nome}</h4>
-                  <p className="gil-recompensa">💰 {m.gilRecompensa || 0} Gil</p>
+                  <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa || 0} Gil</p>
                   <Timer expiry={m.expiraEm} />
                   <div className="poster-actions">
                     <button onClick={() => window.open(m.imagem, '_blank')}>IMAGEM</button>
@@ -159,7 +165,7 @@ export default function MestrePage() {
                 <input 
                   type="text" 
                   className="gil-input"
-                  placeholder="Recompensa Gil (Ex: 1500)" 
+                  placeholder="Gil de Recompensa (Ex: 5000)" 
                   value={form.gilRecompensa} 
                   onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} 
                 />
@@ -187,7 +193,7 @@ export default function MestrePage() {
             <p><strong>OBJETIVOS:</strong> {showDetails.objetivo}</p>
             <div className="recompensa-list">
               <strong>RECOMPENSAS:</strong>
-              <p>💰 {showDetails.gilRecompensa} Gil</p>
+              <p>💰 Recompensa: {showDetails.gilRecompensa} Gil</p>
               <ul>{showDetails.recompensa.split('\n').filter(r => r.trim() !== "").map((r,i) => <li key={i}>{r}</li>)}</ul>
             </div>
             <button className="ff-submit-gold" onClick={() => setShowDetails(null)}>FECHAR</button>
@@ -246,8 +252,9 @@ export default function MestrePage() {
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
 
-        /* Remove as setas do input de Gil */
+        /* Estilo Gil Recompensa: Sem setas laterais */
         .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .gil-input { -moz-appearance: textfield; }
 
         .rank-tag { display: inline-block; padding: 2px 8px; background: #fff; color: #000; font-size: 10px; font-weight: bold; margin-bottom: 10px; }
         .fade-in { animation: fadeIn 1s ease-out; }
