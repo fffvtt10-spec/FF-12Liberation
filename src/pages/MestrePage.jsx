@@ -110,6 +110,7 @@ export default function MestrePage() {
         </div>
         
         <div className="mestre-grid">
+          {/* COLUNA 1: MISSÕES */}
           <div className="ff-card board-column">
             <div className="card-header no-border">
               <h3>QUADRO DE MISSÕES</h3>
@@ -133,8 +134,8 @@ export default function MestrePage() {
             </div>
           </div>
 
+          {/* COLUNA 2: RESENHAS (IMAGEM REMOVIDA DAQUI) */}
           <div className="ff-card sanchez-card board-column">
-            <div className="sanchez-fade-oval" style={{backgroundImage: `url(${sanchezImg})`}}></div>
             <div className="sanchez-header-top no-border">
               <h3>RESENHA DO SANCHEZ</h3>
               <button className="ff-add-btn-gold-small" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
@@ -153,6 +154,7 @@ export default function MestrePage() {
             </div>
           </div>
 
+          {/* COLUNA 3: SESSÕES */}
           <div className="ff-card board-column">
             <div className="card-header no-border">
               <h3>SESSÕES DE JOGO</h3>
@@ -163,6 +165,7 @@ export default function MestrePage() {
         </div>
       </div>
 
+      {/* MODAL DE CRIAÇÃO DE MISSÃO */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -199,8 +202,8 @@ export default function MestrePage() {
               </div>
 
               <div className="modal-input-group">
-                <label>RECOMPENSAS EXTRAS</label>
-                <textarea className="tall-area-dark" placeholder="Itens especiais..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
+                <label>RECOMPENSAS EXTRAS (TEXTO)</label>
+                <textarea className="tall-area-dark" placeholder="Itens, especiarias, equipamentos..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               </div>
 
               <div className="row-double-ff">
@@ -228,6 +231,7 @@ export default function MestrePage() {
         </div>
       )}
 
+      {/* MODAL DE CRIAÇÃO DE RESENHA */}
       {showResenhaModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -258,31 +262,54 @@ export default function MestrePage() {
         </div>
       )}
 
+      {/* MODAL DE DETALHES (NOVO UX MELHORADO) */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
-            <div className="detail-header-fixed">
-               <span className="rank-tag-main">RANK {showDetails.rank}</span>
-               <h2>{showDetails.nome}</h2>
-            </div>
-            <div className="detail-body-main">
-              <strong>REQUISITOS:</strong>
-              <p>{showDetails.requisitos}</p>
-              <strong>OBJETIVOS:</strong>
-              <p>{showDetails.objetivo}</p>
-              <div className="recompensa-final-box">
-                <strong>RECOMPENSAS:</strong>
-                <p className="primary-reward">💰 {showDetails.gilRecompensa} Gil + especiarias</p>
-                <div className="extra-scroll-rewards">
-                   {showDetails.recompensa?.split('\n').map((r,i) => <p key={i}>• {r}</p>)}
+            
+            <div className="detail-header-modern">
+                <div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div>
+                <div className="detail-title-col">
+                    <h2>{showDetails.nome}</h2>
+                    <span className="detail-narrator">Narrador: {showDetails.mestreNome}</span>
                 </div>
-              </div>
             </div>
+
+            <div className="detail-body-grid">
+               <div className="detail-section">
+                   <label className="section-label">⚡ REQUISITOS</label>
+                   <p className="section-text">{showDetails.requisitos || "Sem requisitos especiais."}</p>
+               </div>
+               
+               <div className="detail-section">
+                   <label className="section-label">🎯 OBJETIVOS</label>
+                   <p className="section-text">{showDetails.objetivo}</p>
+               </div>
+
+               <div className="detail-section reward-section">
+                    <label className="section-label">💎 RECOMPENSAS</label>
+                    <div className="reward-content-box">
+                        <div className="gil-display-row">
+                             <span className="gil-icon">💰</span> 
+                             <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span>
+                        </div>
+                        {showDetails.recompensa && (
+                            <div className="extra-rewards-list">
+                                {showDetails.recompensa.split('\n').map((r,i) => (
+                                    <div key={i} className="reward-item">• {r}</div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+               </div>
+            </div>
+
             <button className="ff-final-close-btn" onClick={() => setShowDetails(null)}>FECHAR RELATÓRIO</button>
           </div>
         </div>
       )}
 
+      {/* PAPIRO DA RESENHA (COM FOTO E FADE) */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -326,7 +353,7 @@ export default function MestrePage() {
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
 
         .sanchez-card { position: relative; overflow: hidden; }
-        .sanchez-fade-oval { position: absolute; top: 15px; right: 15px; width: 150px; height: 150px; background-size: cover; background-position: center; border-radius: 50%; mask-image: radial-gradient(circle, black 40%, transparent 100%); opacity: 0.7; z-index: 0; pointer-events: none; }
+        /* Sanchez removido do board, mantendo apenas CSS estrutural do card */
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
@@ -347,12 +374,38 @@ export default function MestrePage() {
         .tall-area-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; height: 110px; resize: none; font-family: 'serif'; outline: none; }
         .tall-area-ff-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #fff; padding: 15px; height: 250px; resize: none; font-family: 'serif'; outline: none; font-size: 16px; border-radius: 4px; }
         
-        .detail-view-main { width: 550px; background: #000c1d; border: 2px solid #ffcc00; padding: 30px; }
-        .rank-tag-main { color: #ffcc00; font-size: 18px; font-weight: bold; display: block; margin-bottom: 5px; }
+        /* --- ESTILOS DO NOVO DETAIL VIEW --- */
+        .detail-view-main { width: 600px; background: #000814; border: 1px solid #ffcc00; padding: 0; box-shadow: 0 0 40px rgba(255, 204, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; }
         
+        .detail-header-modern { background: linear-gradient(90deg, #1a1a1a 0%, #000 100%); padding: 25px 30px; display: flex; align-items: center; border-bottom: 1px solid #333; gap: 20px; }
+        .detail-rank-badge { font-size: 32px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); border: 2px solid #ffcc00; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.5); }
+        .detail-title-col h2 { margin: 0; font-size: 24px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        .detail-narrator { color: #00f2ff; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 4px; display: block; }
+
+        .detail-body-grid { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
+        .detail-section { margin-bottom: 5px; }
+        .section-label { color: #ffcc00; font-size: 11px; font-weight: bold; display: block; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .section-text { font-size: 15px; line-height: 1.5; color: #ddd; margin: 0; white-space: pre-wrap; }
+
+        .reward-section { margin-top: 10px; background: rgba(255,204,0,0.05); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,204,0,0.2); }
+        .gil-display-row { display: flex; align-items: center; gap: 10px; font-size: 18px; color: #ffcc00; font-weight: bold; margin-bottom: 8px; }
+        .extra-rewards-list { margin-top: 8px; padding-left: 5px; }
+        .reward-item { color: #aaa; font-size: 14px; margin-bottom: 4px; font-style: italic; }
+
+        .ff-final-close-btn { width: 100%; background: #111; color: #fff; border: none; border-top: 1px solid #333; padding: 20px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; transition: 0.2s; }
+        .ff-final-close-btn:hover { background: #222; color: #ffcc00; }
+        
+        /* --- ESTILOS DO PAPIRO --- */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
         .papiro-real-container { width: 750px; height: 550px; background-size: 100% 100%; background-repeat: no-repeat; padding: 85px 120px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
-        .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; mask-image: radial-gradient(circle, black 55%, transparent 100%); margin-left: 20px; }
+        
+        /* Foto do Sanchez no papiro com fade suave */
+        .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; 
+           mask-image: radial-gradient(circle, black 60%, transparent 100%); 
+           -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); 
+           opacity: 0.9;
+        }
+        
         .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
         .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; }
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
@@ -366,8 +419,7 @@ export default function MestrePage() {
         .btn-group-ff { display: flex; gap: 20px; margin-top: 25px; }
         .btn-forjar-main { flex: 1; background: #ffcc00; color: #000; border: none; padding: 14px; font-weight: bold; cursor: pointer; font-size: 14px; text-transform: uppercase; }
         .btn-cancelar-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
-        .ff-final-close-btn { width: 100%; background: #fff; color: #000; border: none; padding: 15px; font-weight: bold; margin-top: 25px; cursor: pointer; font-size: 14px; text-transform: uppercase; }
-
+        
         .player-selector-box-fixed { margin: 25px 0; border-top: 1px solid #333; padding-top: 15px; }
         .destinatarios-grid-fixed { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
         .chip-label-ff { background: rgba(0, 10, 30, 0.8); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 18px; border-radius: 4px; font-size: 12px; cursor: pointer; display: inline-block; }
