@@ -398,7 +398,6 @@ export default function MestrePage() {
         /* --- ESTILOS DO PAPIRO --- */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
         
-        /* AUMENTO DA DIMENSÃO DO PAPIRO AQUI */
         .papiro-real-container { 
             width: 1000px; 
             height: 800px; 
@@ -406,7 +405,8 @@ export default function MestrePage() {
             max-height: 95vh;
             background-size: 100% 100%; 
             background-repeat: no-repeat; 
-            padding: 85px 120px; 
+            /* AUMENTADO DE 85px 120px PARA 110px 160px PARA FORÇAR O TEXTO PARA DENTRO */
+            padding: 110px 160px; 
             color: #3b2b1a; 
             position: relative; 
             display: flex; 
@@ -421,7 +421,23 @@ export default function MestrePage() {
         }
         
         .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
-        .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; }
+        
+        .papiro-body-real { 
+           margin-top: 25px; 
+           flex: 1; 
+           overflow-y: auto; 
+           line-height: 1.6; 
+           font-size: 18px; 
+           padding-right: 10px;
+           /* ESCONDE SCROLLBAR NO FIREFOX */
+           scrollbar-width: none;  
+           -ms-overflow-style: none;
+        }
+        /* ESCONDE SCROLLBAR NO CHROME/SAFARI/EDGE */
+        .papiro-body-real::-webkit-scrollbar { 
+           display: none; 
+        }
+
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
 
