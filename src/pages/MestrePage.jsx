@@ -99,7 +99,6 @@ export default function MestrePage() {
 
   return (
     <div className="mestre-container">
-      {/* Imagem de Fundo Restaurada em sua Íntegra */}
       <div className="mestre-bg-image-full" style={{backgroundImage: `url(${fundoMestre})`}}></div>
       
       <div className="mestre-content">
@@ -111,9 +110,8 @@ export default function MestrePage() {
         </div>
         
         <div className="mestre-grid">
-          {/* COLUNA 1: QUADRO DE MISSÕES (CONSERVEI O BOARD ORIGINAL) */}
           <div className="ff-card board-column">
-            <div className="card-header">
+            <div className="card-header no-border">
               <h3>QUADRO DE MISSÕES</h3>
               <button className="ff-add-btn" onClick={() => setShowModal(true)}><span>+</span> ADICIONAR CARTAZ</button>
             </div>
@@ -135,10 +133,9 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: BOARD DO SANCHEZ - REFORMULADO */}
           <div className="ff-card sanchez-card board-column">
             <div className="sanchez-fade-oval" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-            <div className="sanchez-header-top">
+            <div className="sanchez-header-top no-border">
               <h3>RESENHA DO SANCHEZ</h3>
               <button className="ff-add-btn-gold-small" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
             </div>
@@ -156,9 +153,8 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 3: SESSÕES DE JOGO */}
           <div className="ff-card board-column">
-            <div className="card-header">
+            <div className="card-header no-border">
               <h3>SESSÕES DE JOGO</h3>
               <button className="ff-add-btn small-btn">INICIAR NOVA SESSÃO</button>
             </div>
@@ -167,7 +163,6 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- MODAL NOVA MISSÃO (ESTILO REPARADO COM CAMPOS OMITIDOS) --- */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -233,7 +228,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL NOVA RESENHA (ESTILO FINAL FANTASY DARK) --- */}
       {showResenhaModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -264,7 +258,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL DETALHES (GIL + ESPECIARIAS FIXO) --- */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
@@ -290,7 +283,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- VISUALIZAÇÃO PAPIRO COM SANCHEZ EM FADE --- */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -304,7 +296,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- LIGHTBOX CARTAZ --- */}
       {viewImage && (
         <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
           <div className="lightbox-wrap">
@@ -323,6 +314,7 @@ export default function MestrePage() {
         
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .card-header.no-border { border-bottom: none; }
         .board-column { height: 600px; display: flex; flex-direction: column; }
 
         .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; }
@@ -336,6 +328,7 @@ export default function MestrePage() {
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-fade-oval { position: absolute; top: 15px; right: 15px; width: 150px; height: 150px; background-size: cover; background-position: center; border-radius: 50%; mask-image: radial-gradient(circle, black 40%, transparent 100%); opacity: 0.7; z-index: 0; pointer-events: none; }
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
 
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.94); z-index: 99999; display: flex; align-items: center; justify-content: center; }
@@ -353,15 +346,17 @@ export default function MestrePage() {
         
         .tall-area-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; height: 110px; resize: none; font-family: 'serif'; outline: none; }
         .tall-area-ff-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #fff; padding: 15px; height: 250px; resize: none; font-family: 'serif'; outline: none; font-size: 16px; border-radius: 4px; }
-        .tall-area-white { width: 100%; height: 260px; background: #fff; color: #000; padding: 18px; border-radius: 4px; resize: none; font-family: 'serif'; font-size: 16px; outline: none; }
-
+        
         .detail-view-main { width: 550px; background: #000c1d; border: 2px solid #ffcc00; padding: 30px; }
         .rank-tag-main { color: #ffcc00; font-size: 18px; font-weight: bold; display: block; margin-bottom: 5px; }
-        .papiro-real-container { width: 750px; height: 550px; background-size: 100% 100%; background-repeat: no-repeat; padding: 85px 120px; color: #3b2b1a; position: relative; }
+        
+        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
+        .papiro-real-container { width: 750px; height: 550px; background-size: 100% 100%; background-repeat: no-repeat; padding: 85px 120px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; mask-image: radial-gradient(circle, black 55%, transparent 100%); margin-left: 20px; }
         .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
-        .papiro-body-real { margin-top: 25px; height: 230px; overflow-y: auto; line-height: 1.6; font-size: 18px; }
-        .papiro-close-btn { position: absolute; bottom: 50px; right: 120px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 10px 25px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; }
+        .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
+        .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
 
         .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
         .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
@@ -380,6 +375,11 @@ export default function MestrePage() {
         .mission-timer { font-size: 12px; color: #00f2ff; display: block; margin-top: 10px; font-weight: bold; letter-spacing: 1px; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Lightbox do Cartaz */
+        .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
+        .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
+        .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
       `}</style>
     </div>
   );
