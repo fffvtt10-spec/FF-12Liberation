@@ -29,16 +29,15 @@ const Timer = ({ expiry }) => {
 };
 
 export default function MestrePage() {
-  // --- ESTADOS GERAIS ---
+  // Estados para Missões e Modais
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
-  const [showModal, setShowModal] = useState(false); // Modal Nova Missão
-  const [showResenhaModal, setShowResenhaModal] = useState(false); // Modal Nova Resenha
-  const [showDetails, setShowDetails] = useState(null); // Modal Detalhes Missão
-  const [viewResenha, setViewResenha] = useState(null); // Modal Papiro
-  const [viewImage, setViewImage] = useState(null); // Lightbox Cartaz
-
-  // --- ESTADOS DE CRIAÇÃO ---
+  const [showModal, setShowModal] = useState(false);
+  const [showResenhaModal, setShowResenhaModal] = useState(false);
+  const [showDetails, setShowDetails] = useState(null);
+  const [viewResenha, setViewResenha] = useState(null); 
+  const [viewImage, setViewImage] = useState(null);
+  
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
@@ -48,7 +47,7 @@ export default function MestrePage() {
     nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
 
-  // --- PERSISTÊNCIA DA ASSINATURA ---
+  // PERSISTÊNCIA DA ASSINATURA
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
   });
@@ -57,7 +56,7 @@ export default function MestrePage() {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // --- SINCRONIZAÇÃO FIREBASE ---
+  // SINCRONIZAÇÃO FIREBASE
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     if (!auth.currentUser) return;
@@ -71,7 +70,6 @@ export default function MestrePage() {
     return () => { unsubM(); unsubR(); };
   }, []);
 
-  // --- LOGICA DE CRIAÇÃO ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
@@ -114,11 +112,12 @@ export default function MestrePage() {
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
-              <button className="ff-add-btn" onClick={() => setShowModal(true)}><span>+</span> ADICIONAR CARTAZ</button>
+              <button className="ff-add-btn" onClick={() => setShowModal(true)}>+ ADICIONAR CARTAZ</button>
             </div>
             <div className="mission-scroll">
               {missoes.map(m => (
                 <div key={m.id} className={`mission-poster rank-${m.rank}`}>
+                  <div className="poster-rank-label">{m.rank}</div>
                   <span className="mestre-tag">Narrador: {m.mestreNome}</span>
                   <h4>{m.nome}</h4>
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
@@ -154,7 +153,7 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* SESSÕES DE JOGO */}
+          {/* SESSÕES */}
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>SESSÕES DE JOGO</h3>
@@ -165,7 +164,7 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- MODAL NOVA MISSÃO --- */}
+      {/* MODAL NOVA MISSÃO */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal ff-card">
@@ -195,7 +194,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL NOVA RESENHA --- */}
+      {/* MODAL NOVA RESENHA */}
       {showResenhaModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal ff-card">
@@ -220,7 +219,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL DETALHES MISSÃO --- */}
+      {/* MODAL DETALHES */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view" onClick={e => e.stopPropagation()}>
@@ -231,14 +230,14 @@ export default function MestrePage() {
             <div className="recompensa-list">
               <strong>RECOMPENSAS:</strong>
               <p>💰 {showDetails.gilRecompensa} Gil</p>
-              <ul>{showDetails.recompensa.split('\n').map((r,i) => <li key={i}>{r}</li>)}</ul>
+              <ul>{showDetails.recompensa?.split('\n').map((r,i) => <li key={i}>{r}</li>)}</ul>
             </div>
             <button className="ff-submit-gold" onClick={() => setShowDetails(null)}>FECHAR</button>
           </div>
         </div>
       )}
 
-      {/* --- VISUALIZAÇÃO NO PAPIRO --- */}
+      {/* PAPIRO VISUALIZAÇÃO */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -246,13 +245,13 @@ export default function MestrePage() {
               <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
               <p className="papiro-mestre-sub">Narrador: {viewResenha.mestre}</p>
               <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }}></div>
-              <div className="papiro-dest-list"><strong>DESTINADO A:</strong> {viewResenha.destinatarios.join(", ")}</div>
+              <div className="papiro-dest-list"><strong>DESTINADO A:</strong> {viewResenha.destinatarios?.join(", ")}</div>
               <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
            </div>
         </div>
       )}
 
-      {/* --- LIGHTBOX CARTAZ --- */}
+      {/* LIGHTBOX CARTAZ */}
       {viewImage && (
         <div className="ff-image-viewer-fixed" onClick={() => setViewImage(null)}>
           <button className="close-viewer">×</button>
@@ -261,56 +260,57 @@ export default function MestrePage() {
       )}
 
       <style>{`
-        /* LAYOUT BASE */
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; }
-        .mestre-bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(${fundoMestre}) no-repeat center center; background-size: cover; z-index: 0; }
+        .mestre-bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url(${fundoMestre}) no-repeat center top; background-size: cover; z-index: 0; }
         .mestre-content { position: relative; z-index: 1; padding: 30px; }
-        .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; letter-spacing: 4px; }
-        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+        .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; margin-bottom: 40px; }
+        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
 
         /* IDENTIDADE NARRADOR */
-        .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border: 1px solid #ffcc00; padding: 10px 15px; background: rgba(0, 10, 30, 0.8); max-width: 450px; position: relative; z-index: 2; }
-        .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
+        .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; z-index: 2; position: relative; }
+        .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 4px 8px; font-weight: bold; font-family: 'serif'; outline: none; }
 
-        /* SANCHEZ ESTILO OVAL */
-        .sanchez-card { position: relative; overflow: hidden; }
-        .sanchez-fade-oval { position: absolute; top: 10px; right: 10px; width: 140px; height: 140px; background-size: cover; background-position: center; border-radius: 50%; mask-image: radial-gradient(circle, black 40%, transparent 100%); opacity: 0.6; z-index: 0; }
-        .sanchez-header { position: relative; z-index: 1; }
-        .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 12px; margin-top: 10px; border-radius: 4px; }
+        /* QUADRO MISSÕES */
+        .mission-scroll { height: 450px; overflow-y: auto; padding-right: 5px; }
+        .mission-poster { background: rgba(255,255,255,0.03); border: 1px solid #444; margin-bottom: 15px; padding: 15px; border-left: 4px solid #00f2ff; position: relative; }
+        .poster-rank-label { position: absolute; top: 10px; right: 15px; font-size: 24px; color: #ffcc00; opacity: 0.3; font-weight: bold; }
+        .mestre-tag { color: #ffcc00; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* MODAIS E Z-INDEX */
-        .ff-modal-overlay-fixed, .ff-image-viewer-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .ff-modal { width: 450px; max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; border: 1px solid #ffcc00; }
-        .tall-area-white { width: 100%; height: 200px; background: #fff; color: #000; padding: 15px; border-radius: 4px; resize: none; font-family: 'serif'; outline: none; }
-        .ff-modal-input-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; margin-bottom: 15px; outline: none; }
+        /* SANCHEZ OVAL */
+        .sanchez-card { position: relative; overflow: hidden; padding-top: 10px; }
+        .sanchez-fade-oval { position: absolute; top: 15px; right: 15px; width: 140px; height: 140px; background-size: cover; background-position: center; border-radius: 50%; mask-image: radial-gradient(circle, black 40%, transparent 100%); opacity: 0.7; z-index: 0; }
+        .sanchez-header { position: relative; z-index: 1; min-height: 140px; display: flex; flex-direction: column; justify-content: space-between; }
 
-        /* PAPIRO REAL */
-        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .papiro-real-container { width: 650px; height: 480px; background-size: 100% 100%; background-repeat: no-repeat; padding: 60px 80px; color: #3b2b1a; position: relative; }
-        .sanchez-oval-view-no-border { width: 100px; height: 100px; float: right; border-radius: 50%; background-size: cover; mask-image: radial-gradient(circle, black 50%, transparent 100%); margin-left: 20px; }
-        .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 26px; }
-        .papiro-body-real { margin-top: 20px; line-height: 1.5; font-size: 16px; height: 180px; overflow-y: auto; }
-        .papiro-close-btn { position: absolute; bottom: 40px; right: 80px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; }
+        /* MODAL FIX */
+        .ff-modal-overlay-fixed, .ff-image-viewer-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 99999; display: flex; align-items: center; justify-content: center; }
+        .ff-modal { width: 480px; max-height: 85vh; overflow-y: auto; background: #000a1e; border: 2px solid #ffcc00; padding: 25px; box-shadow: 0 0 30px rgba(255,204,0,0.2); }
+        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; height: 80px; resize: none; margin-bottom: 12px; outline: none; }
+        .tall-area-white { width: 100%; height: 220px; background: #fff; color: #000; padding: 15px; border-radius: 4px; resize: none; font-family: 'serif'; font-size: 15px; outline: none; }
 
-        /* BOTÕES E LISTAGEM */
-        .mission-scroll { height: 400px; overflow-y: auto; padding-right: 5px; }
-        .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; padding: 6px 14px; cursor: pointer; font-weight: bold; }
-        .ff-add-btn-gold { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 12px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
-        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 4px 10px; background: transparent; cursor: pointer; margin-right: 5px; font-size: 10px; }
-        .btn-red { border: 1px solid #f44; color: #f44; padding: 4px 10px; background: transparent; cursor: pointer; font-size: 10px; }
-        .poster-actions { display: flex; gap: 5px; margin-top: 10px; }
-        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
-        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; }
+        /* PAPIRO VISUALIZAÇÃO */
+        .papiro-real-container { width: 700px; height: 500px; background-size: 100% 100%; background-repeat: no-repeat; padding: 75px 100px; color: #3b2b1a; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; mask-image: radial-gradient(circle, black 50%, transparent 100%); margin-left: 20px; }
+        .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 28px; }
+        .papiro-body-real { margin-top: 20px; height: 200px; overflow-y: auto; line-height: 1.6; font-size: 16px; }
 
-        /* UTILITÁRIOS */
-        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; height: 80px; resize: none; margin-bottom: 10px; outline: none; }
-        .destinatarios-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .chip-label { background: rgba(255,204,0,0.1); border: 1px solid #ffcc00; padding: 4px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; }
-        .fade-in { animation: fadeIn 1s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* BOTÕES NEON */
+        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; }
+        .ff-add-btn-gold { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 12px; cursor: pointer; font-weight: bold; width: 100%; align-self: flex-start; }
+        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 5px 12px; background: transparent; cursor: pointer; font-size: 10px; margin-right: 8px; }
+        .btn-red { border: 1px solid #f44; color: #f44; padding: 5px 12px; background: transparent; cursor: pointer; font-size: 10px; }
+        .btn-group { display: flex; gap: 15px; margin-top: 20px; }
+        .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; }
+        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 12px; cursor: pointer; text-align: center; }
+
+        /* LIGHTBOX */
+        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+        .image-frame img { width: 100%; max-height: 75vh; display: block; object-fit: contain; }
+        
+        .mission-timer { font-size: 11px; color: #00f2ff; display: block; margin-top: 8px; font-weight: bold; }
+        .chip-label { background: rgba(255,204,0,0.1); border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; display: inline-block; margin: 4px; }
       `}</style>
     </div>
   );
