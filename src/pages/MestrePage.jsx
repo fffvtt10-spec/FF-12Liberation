@@ -4,7 +4,7 @@ import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, 
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
-import papiroImg from '../assets/papiro.jpg'; // Imagem solicitada
+import papiroImg from '../assets/papiro.png'; // Imagem solicitada
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
