@@ -39,7 +39,7 @@ export default function MestrePage() {
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     
-    // Listener com ordem decrescente (Exige índice composto no Firebase)
+    // Listener em tempo real com ordem decrescente (Exige índice composto no Firebase)
     const q = query(
       collection(db, "missoes"), 
       where("mestreId", "==", auth.currentUser.uid), 
@@ -101,7 +101,6 @@ export default function MestrePage() {
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
-              {/* Botão Adicionar Melhorado */}
               <button className="ff-add-btn" onClick={() => setShowModal(true)}>
                 <span>+</span> ADICIONAR CARTAZ
               </button>
@@ -116,7 +115,6 @@ export default function MestrePage() {
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa || 0} Gil</p>
                   <Timer expiry={m.expiraEm} />
                   <div className="poster-actions">
-                    {/* Nome do botão alterado para CARTAZ */}
                     <button onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
                     <button onClick={() => setShowDetails(m)}>DETALHES</button>
                     <button className="del" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
@@ -153,7 +151,8 @@ export default function MestrePage() {
             <h3 className="modal-title">NOVA MISSÃO</h3>
             <form onSubmit={handleCreateMission}>
               <input placeholder="Nome da Missão" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
-              <textarea placeholder="Descrição" value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} />
+              {/* Descrição corrigida para textarea (tall-area) */}
+              <textarea placeholder="Descrição" className="tall-area" value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} />
               <textarea placeholder="Objetivos" className="tall-area" value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
               <textarea placeholder="Requisitos" className="tall-area" value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
               
@@ -240,22 +239,14 @@ export default function MestrePage() {
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         h3 { color: #ffcc00; font-size: 12px; margin: 0; letter-spacing: 1px; }
 
-        /* ESTILO DO BOTÃO ADICIONAR CARTAZ */
         .ff-add-btn { 
-          background: rgba(0, 242, 255, 0.05); 
-          border: 1px solid #00f2ff; 
-          color: #00f2ff; 
-          font-size: 10px; 
-          padding: 6px 14px; 
-          cursor: pointer; 
-          letter-spacing: 1px; 
-          font-weight: bold; 
-          transition: 0.4s; 
-          text-transform: uppercase;
+          background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; 
+          font-size: 10px; padding: 6px 14px; cursor: pointer; letter-spacing: 1px; 
+          font-weight: bold; transition: 0.4s; text-transform: uppercase;
           box-shadow: inset 0 0 5px rgba(0, 242, 255, 0.1);
         }
         .ff-add-btn span { font-size: 14px; margin-right: 6px; vertical-align: middle; }
-        .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff, 0 0 40px rgba(0, 242, 255, 0.2); }
+        .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
         .small-btn { padding: 4px 10px; font-size: 9px; }
 
         .mission-scroll { height: 280px; overflow-y: auto; padding-right: 5px; }
@@ -273,16 +264,14 @@ export default function MestrePage() {
         .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.3s; }
         .poster-actions button:hover { background: #00f2ff; color: #000; }
         .poster-actions button.del { border-color: #f44; color: #f44; }
-        .poster-actions button.del:hover { background: #f44; color: #fff; }
 
         .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .ff-submit-gold:hover { background: #ffcc00; color: #000; }
         
-        /* MODAL E LIGHTBOX */
         .ff-modal-overlay, .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .ff-image-viewer { z-index: 2000; cursor: zoom-out; }
         .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
-        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; box-shadow: 0 0 30px rgba(255, 204, 0, 0.3); background: #000; cursor: default; }
+        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; box-shadow: 0 0 30px rgba(255, 204, 0, 0.3); background: #000; }
         .image-frame img { max-width: 100%; max-height: 80vh; display: block; }
 
         .ff-modal { width: 420px; padding: 25px; border: 1px solid #ffcc00; max-height: 90vh; overflow-y: auto; }
@@ -292,7 +281,6 @@ export default function MestrePage() {
 
         .btn-group { display: flex; gap: 10px; margin-top: 15px; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-forjar:hover { background: #fff; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
 
         .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
