@@ -38,8 +38,7 @@ export default function MestrePage() {
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     
-    // Listener em tempo real
-    // DICA: Se não aparecer, verifique o console (F12) para clicar no link de criação de índice do Firebase
+    // Query com filtro e ordenação [Necessita de Índice no Firebase Console]
     const q = query(
       collection(db, "missoes"), 
       where("mestreId", "==", auth.currentUser.uid), 
@@ -51,6 +50,9 @@ export default function MestrePage() {
       setMissoes(data);
     }, (error) => {
       console.error("Erro no Firestore: ", error);
+      // Fallback para mostrar missões mesmo sem índice enquanto você não cria no console
+      const fallbackQ = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid));
+      onSnapshot(fallbackQ, (s) => setMissoes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     });
     return () => unsubscribe();
   }, []);
@@ -68,12 +70,11 @@ export default function MestrePage() {
       const msToAdd = parseDuration(form.duracao);
       const expiraEm = new Date(new Date().getTime() + msToAdd);
       
-      // Adição do serverTimestamp para garantir ordenação correta
       await addDoc(collection(db, "missoes"), {
         ...form, 
         mestreNome: mestreIdentidade, 
         mestreId: auth.currentUser.uid, 
-        createdAt: serverTimestamp(), 
+        createdAt: serverTimestamp(), // Uso de serverTimestamp para evitar erros de delay
         expiraEm: expiraEm.toISOString()
       });
       
@@ -96,7 +97,6 @@ export default function MestrePage() {
         </div>
         
         <div className="mestre-grid">
-          {/* QUADRO DE MISSÕES */}
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
@@ -121,7 +121,6 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* RESENHA DO SANCHES */}
           <div className="ff-card fade-in">
             <h3>RESENHA DO SANCHES</h3>
             <div className="sanches-header">
@@ -132,7 +131,6 @@ export default function MestrePage() {
             <button className="ff-submit-gold">PUBLICAR RESENHA</button>
           </div>
 
-          {/* SESSÕES DE JOGO */}
           <div className="ff-card fade-in">
             <h3>SESSÕES DE JOGO</h3>
             <button className="ff-btn-small">INICIAR NOVA SESSÃO</button>
@@ -141,7 +139,6 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL DE CRIAÇÃO */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
@@ -159,7 +156,7 @@ export default function MestrePage() {
                 </select>
               </div>
 
-              <textarea placeholder="Recompensas (Itens)" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
+              <textarea placeholder="Recompensas (Bolinhas)" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               
               <div className="row">
                 <input 
@@ -183,7 +180,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE DETALHES */}
       {showDetails && (
         <div className="ff-modal-overlay" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view" onClick={e => e.stopPropagation()}>
@@ -193,7 +189,7 @@ export default function MestrePage() {
             <p><strong>OBJETIVOS:</strong> {showDetails.objetivo}</p>
             <div className="recompensa-list">
               <strong>RECOMPENSAS:</strong>
-              <p>💰 Recompensa: {showDetails.gilRecompensa} Gil</p>
+              <p className="gil-txt">💰 {showDetails.gilRecompensa} Gil</p>
               <ul>{showDetails.recompensa.split('\n').filter(r => r.trim() !== "").map((r,i) => <li key={i}>{r}</li>)}</ul>
             </div>
             <button className="ff-submit-gold" onClick={() => setShowDetails(null)}>FECHAR</button>
@@ -237,13 +233,13 @@ export default function MestrePage() {
         .sanches-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .sanches-photo { width: 40px; height: 40px; border: 1px solid #ffcc00; border-radius: 50%; background: #222; }
         textarea { width: 100%; background: rgba(0,0,0,0.6); border: 1px solid #444; color: #fff; padding: 10px; height: 120px; resize: none; outline: none; font-size: 12px; }
-        .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; }
+        .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         
         .ff-btn-small { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; font-size: 9px; padding: 4px 8px; cursor: pointer; }
 
         .ff-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .ff-modal { width: 400px; padding: 25px; border: 1px solid #ffcc00; max-height: 90vh; overflow-y: auto; }
-        .modal-title { color: #fff; margin-bottom: 20px; text-align: left; }
+        .ff-modal { width: 420px; padding: 25px; border: 1px solid #ffcc00; max-height: 90vh; overflow-y: auto; }
+        .modal-title { color: #ffcc00; margin-bottom: 20px; text-align: left; letter-spacing: 2px; }
         .ff-modal input, .ff-modal select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; outline: none; }
         .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
         .ff-modal input:focus, .tall-area:focus { border-color: #ffcc00; }
@@ -252,9 +248,9 @@ export default function MestrePage() {
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
 
-        /* Estilo Gil Recompensa: Sem setas laterais */
         .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .gil-input { -moz-appearance: textfield; }
+        .gil-txt { color: #ffcc00; font-weight: bold; margin-bottom: 5px; }
 
         .rank-tag { display: inline-block; padding: 2px 8px; background: #fff; color: #000; font-size: 10px; font-weight: bold; margin-bottom: 10px; }
         .fade-in { animation: fadeIn 1s ease-out; }
