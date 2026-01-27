@@ -76,8 +76,8 @@ export default function MestrePage() {
     e.preventDefault();
     try {
       const msToAdd = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000 + 
-                     (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000 + 
-                     (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
+                      (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000 + 
+                      (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
       await addDoc(collection(db, "missoes"), {
         ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
       });
@@ -99,6 +99,7 @@ export default function MestrePage() {
 
   return (
     <div className="mestre-container">
+      {/* Imagem de Fundo Restaurada na Íntegra */}
       <div className="mestre-bg-image-full" style={{backgroundImage: `url(${fundoMestre})`}}></div>
       
       <div className="mestre-content">
@@ -166,7 +167,7 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- MODAL NOVA MISSÃO (ESTILO E ESPAÇAMENTO CORRIGIDOS) --- */}
+      {/* --- MODAL NOVA MISSÃO (ESTILO E GRIDS REPARADOS) --- */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -185,6 +186,7 @@ export default function MestrePage() {
                 <textarea className="tall-area-dark" placeholder="O que deve ser feito..." value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
               </div>
               
+              {/* Grid de Grupo e Rank Corrigido */}
               <div className="row-double-ff">
                 <div className="field-group">
                   <label>GRUPO</label>
@@ -203,6 +205,7 @@ export default function MestrePage() {
                 <textarea className="tall-area-dark" placeholder="Itens, equipamentos..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               </div>
 
+              {/* Grid de Gil e Duração Corrigido */}
               <div className="row-double-ff">
                 <div className="field-group">
                   <label>GIL</label>
@@ -259,7 +262,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL DETALHES --- */}
+      {/* --- MODAL DETALHES (GIL + ESPECIARIAS FIXO) --- */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
@@ -299,7 +302,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- LIGHTBOX CARTAZ --- */}
+      {/* --- LIGHTBOX CARTAZ (MODAL EXCLUSIVO) --- */}
       {viewImage && (
         <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
           <div className="lightbox-wrap">
@@ -311,7 +314,10 @@ export default function MestrePage() {
 
       <style>{`
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
-        .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.3; z-index: 0; filter: contrast(120%) brightness(80%); }
+        
+        /* Fundo Restaurado Integra */
+        .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
+        
         .mestre-content { position: relative; z-index: 1; padding: 30px; }
         .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; margin-bottom: 30px; font-size: 2.5rem; }
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
@@ -346,8 +352,9 @@ export default function MestrePage() {
         .modal-input-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
         .modal-input-group input { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; font-size: 14px; }
         
+        /* Grids de Input Corrigidos */
         .row-double-ff { display: flex; gap: 20px; margin-bottom: 20px; }
-        .field-group { flex: 1; }
+        .field-group { flex: 1; display: flex; flex-direction: column; }
         .field-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; }
         .field-group input, .field-group select { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; font-family: 'serif'; outline: none; }
         
@@ -357,7 +364,6 @@ export default function MestrePage() {
         /* DETALHES */
         .detail-view-main { width: 550px; background: #000c1d; border: 2px solid #ffcc00; padding: 30px; }
         .rank-tag-main { color: #ffcc00; font-size: 18px; font-weight: bold; display: block; margin-bottom: 5px; }
-        .detail-title { font-size: 28px; border-bottom: 2px solid #ffcc00; padding-bottom: 12px; margin-top: 0; }
         .detail-body-main p { font-size: 15px; line-height: 1.6; margin: 10px 0 20px 0; color: #ccc; }
         .recompensa-final-box { background: rgba(255,255,255,0.03); padding: 15px; border: 1px dashed #444; }
         .primary-reward { font-size: 18px; color: #ffcc00; font-weight: bold; margin: 5px 0 !important; }
