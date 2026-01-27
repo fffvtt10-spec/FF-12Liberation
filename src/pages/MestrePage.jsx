@@ -32,8 +32,10 @@ export default function MestrePage() {
   // --- ESTADOS GERAIS ---
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
+  const [sessoes, setSessoes] = useState([]); // NOVO: Estado para Sessões
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
+  const [showSessionModal, setShowSessionModal] = useState(false); // NOVO: Modal de Sessão
   const [showDetails, setShowDetails] = useState(null); 
   const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
@@ -42,22 +44,21 @@ export default function MestrePage() {
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
+  const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); // NOVO: Players da sessão
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
 
-  // FORM ATUALIZADO COM NOVOS CAMPOS
+  // FORM MISSÃO
   const [form, setForm] = useState({
-    nome: '', 
-    local: '',           // Antigo descrição dos feitos
-    contratante: '',     // Antigo objetivos principais
-    descricaoMissao: '', // Novo campo texto
-    objetivosMissao: '', // Novo campo texto
-    requisitos: '', 
-    grupo: '', 
-    recompensa: '', 
-    rank: 'E', 
-    imagem: '', 
-    duracao: '', 
-    gilRecompensa: ''
+    nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
+  });
+
+  // FORM SESSÃO (NOVO)
+  const [sessionForm, setSessionForm] = useState({
+    missaoId: '',
+    dataInicio: '',
+    cenarios: [], // Array de {name, data}
+    tokens: [],
+    musicas: []
   });
 
   // --- PERSISTÊNCIA DA ASSINATURA ---
@@ -74,13 +75,24 @@ export default function MestrePage() {
     if (backgroundMusic) backgroundMusic.pause();
     if (!auth.currentUser) return;
 
+    // Queries existentes
     const qM = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
     const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     const qR = query(collection(db, "resenhas"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
     const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => { unsubM(); unsubR(); };
+    // Query NOVA para Sessões
+    const qS = query(collection(db, "sessoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("dataInicio", "asc"));
+    const unsubS = onSnapshot(qS, (snap) => {
+        const now = new Date();
+        const loadedSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Opcional: Auto-excluir visualmente se passar de 24h (Logica de backend seria ideal para delete real)
+        setSessoes(loadedSessoes);
+    });
+
+    return () => { unsubM(); unsubR(); unsubS(); };
   }, []);
 
   // --- LOGICA DE CRIAÇÃO ---
@@ -94,7 +106,6 @@ export default function MestrePage() {
         ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
       });
       setShowModal(false);
-      // Reset form completo
       setForm({ nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz."); }
   };
@@ -108,6 +119,65 @@ export default function MestrePage() {
       });
       setShowResenhaModal(false); setResenha(""); setTituloResenha(""); setDestinatarios([]);
     } catch (e) { alert("Erro ao publicar."); }
+  };
+
+  // --- LOGICA DA SESSÃO ---
+  const handleFileSelect = async (e, type) => {
+      const files = Array.from(e.target.files);
+      const promises = files.map(file => {
+          return new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.readAsDataURL(file);
+              reader.onload = () => resolve({ name: file.name, data: reader.result });
+              reader.onerror = error => reject(error);
+          });
+      });
+      
+      try {
+          const results = await Promise.all(promises);
+          setSessionForm(prev => ({
+              ...prev,
+              [type]: [...prev[type], ...results]
+          }));
+      } catch (err) {
+          console.error("Erro ao ler arquivos", err);
+      }
+  };
+
+  const criarSessao = async (e) => {
+      e.preventDefault();
+      if (!sessionForm.missaoId || !sessionForm.dataInicio) return alert("Selecione a missão e o horário!");
+      
+      try {
+        const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
+        const inicio = new Date(sessionForm.dataInicio);
+        const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); // +24 horas
+
+        await addDoc(collection(db, "sessoes"), {
+            missaoId: sessionForm.missaoId,
+            missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
+            mestreId: auth.currentUser.uid,
+            dataInicio: sessionForm.dataInicio,
+            expiraEm: fim.toISOString(),
+            participantes: sessaoDestinatarios,
+            cenarios: sessionForm.cenarios,
+            tokens: sessionForm.tokens,
+            musicas: sessionForm.musicas,
+            createdAt: serverTimestamp()
+        });
+        
+        setShowSessionModal(false);
+        setSessionForm({ missaoId: '', dataInicio: '', cenarios: [], tokens: [], musicas: [] });
+        setSessaoDestinatarios([]);
+      } catch (err) {
+          alert("Erro ao agendar sessão.");
+          console.error(err);
+      }
+  };
+
+  const enterVTT = (sessao) => {
+      alert(`Entrando no VTT do Mestre para a sessão: ${sessao.missaoNome}\nCarregando ${sessao.cenarios?.length || 0} cenários e ${sessao.musicas?.length || 0} músicas...`);
+      // Aqui entraria a lógica de navegação real para a rota do VTT
   };
 
   return (
@@ -167,13 +237,35 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 3: SESSÕES */}
+          {/* COLUNA 3: SESSÕES (ATUALIZADA) */}
           <div className="ff-card board-column">
             <div className="card-header no-border">
               <h3>SESSÕES DE JOGO</h3>
-              <button className="ff-add-btn small-btn">INICIAR NOVA SESSÃO</button>
+              <button className="ff-add-btn small-btn" onClick={() => setShowSessionModal(true)}>INICIAR NOVA SESSÃO</button>
             </div>
-            <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
+            <div className="mission-scroll">
+               {sessoes.length === 0 ? (
+                   <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
+               ) : (
+                   sessoes.map(s => (
+                       <div key={s.id} className="sessao-card">
+                           <div className="sessao-status">🔴 AO VIVO / AGENDADA</div>
+                           <h4 className="sessao-title">{s.missaoNome}</h4>
+                           <div className="sessao-info">
+                               <span>📅 {new Date(s.dataInicio).toLocaleString()}</span>
+                               <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
+                           </div>
+                           <div className="sessao-assets-count">
+                               🖼️ {s.cenarios?.length || 0} Cenários • 🎵 {s.musicas?.length || 0} Faixas
+                           </div>
+                           <div className="poster-actions" style={{marginTop: '15px'}}>
+                               <button className="btn-play-vtt" onClick={() => enterVTT(s)}>▶ ACESSAR VTT</button>
+                               <button className="btn-red" onClick={() => deleteDoc(doc(db, "sessoes", s.id))}>CANCELAR</button>
+                           </div>
+                       </div>
+                   ))
+               )}
+            </div>
           </div>
         </div>
       </div>
@@ -188,8 +280,6 @@ export default function MestrePage() {
                 <label>NOME DA MISSÃO</label>
                 <input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
               </div>
-              
-              {/* NOVOS CAMPOS CURTOS */}
               <div className="modal-input-group">
                 <label>LOCAL</label>
                 <input placeholder="Onde ocorre..." value={form.local} onChange={e=>setForm({...form, local: e.target.value})} />
@@ -198,8 +288,6 @@ export default function MestrePage() {
                 <label>CONTRATANTE</label>
                 <input placeholder="Quem paga..." value={form.contratante} onChange={e=>setForm({...form, contratante: e.target.value})} />
               </div>
-
-              {/* NOVOS CAMPOS DE TEXTO LONGO */}
               <div className="modal-input-group">
                 <label>DESCRIÇÃO DA MISSÃO</label>
                 <textarea className="tall-area-dark" placeholder="Detalhes da história e contexto..." value={form.descricaoMissao} onChange={e=>setForm({...form, descricaoMissao: e.target.value})} />
@@ -208,12 +296,10 @@ export default function MestrePage() {
                 <label>OBJETIVOS DA MISSÃO</label>
                 <textarea className="tall-area-dark" placeholder="O que deve ser feito passo a passo..." value={form.objetivosMissao} onChange={e=>setForm({...form, objetivosMissao: e.target.value})} />
               </div>
-
               <div className="modal-input-group">
                 <label>REQUISITOS DA MISSÃO</label>
                 <textarea className="tall-area-dark" placeholder="O que é necessário para aceitar..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
               </div>
-              
               <div className="row-double-ff">
                 <div className="field-group">
                   <label>GRUPO MÁXIMO</label>
@@ -226,12 +312,10 @@ export default function MestrePage() {
                   </select>
                 </div>
               </div>
-
               <div className="modal-input-group">
                 <label>RECOMPENSAS EXTRAS (TEXTO)</label>
                 <textarea className="tall-area-dark" placeholder="Itens, especiarias, equipamentos..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               </div>
-
               <div className="row-double-ff">
                 <div className="field-group">
                   <label>GIL</label>
@@ -242,12 +326,10 @@ export default function MestrePage() {
                   <input placeholder="Ex: 1d 10h" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
                 </div>
               </div>
-
               <div className="modal-input-group">
                 <label>URL DA IMAGEM DO CARTAZ</label>
                 <input placeholder="Link Imgur..." value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
               </div>
-
               <div className="btn-group-ff">
                 <button type="submit" className="btn-forjar-main">FORJAR MISSÃO</button>
                 <button type="button" className="btn-cancelar-main" onClick={() => setShowModal(false)}>FECHAR</button>
@@ -288,11 +370,71 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE DETALHES (ATUALIZADO COM NOVOS CAMPOS) */}
+      {/* MODAL DE CRIAÇÃO DE SESSÃO (NOVO) */}
+      {showSessionModal && (
+          <div className="ff-modal-overlay-fixed">
+              <div className="ff-modal-scrollable ff-card">
+                  <h3 className="modal-title-ff">CRIAR NOVA SESSÃO</h3>
+                  <form onSubmit={criarSessao}>
+                      <div className="modal-input-group">
+                          <label>SELECIONAR MISSÃO (OBJETIVO)</label>
+                          <select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required>
+                              <option value="">-- Escolha uma missão --</option>
+                              {missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}
+                          </select>
+                      </div>
+
+                      <div className="modal-input-group">
+                          <label>DATA E HORÁRIO DE INÍCIO</label>
+                          <input type="datetime-local" className="ff-input-dark" value={sessionForm.dataInicio} onChange={e => setSessionForm({...sessionForm, dataInicio: e.target.value})} required />
+                      </div>
+
+                      <div className="player-selector-box-fixed">
+                          <label>PERSONAGENS PERMITIDOS:</label>
+                          <div className="destinatarios-grid-fixed">
+                              {personagensDisponiveis.map(p => (
+                                  <label key={p} className="chip-label-ff">
+                                      <input type="checkbox" checked={sessaoDestinatarios.includes(p)} onChange={() => sessaoDestinatarios.includes(p) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p)) : setSessaoDestinatarios([...sessaoDestinatarios, p])} /> {p}
+                                  </label>
+                              ))}
+                          </div>
+                      </div>
+
+                      <div className="upload-section-box">
+                          <h4 className="upload-section-title">ASSETS DO VTT</h4>
+                          
+                          <div className="modal-input-group">
+                              <label>IMAGENS DE CENÁRIO (Mapas/Backgrounds)</label>
+                              <input type="file" multiple accept="image/*" onChange={(e) => handleFileSelect(e, 'cenarios')} />
+                              <div className="file-count-tag">{sessionForm.cenarios.length} arquivos selecionados</div>
+                          </div>
+
+                          <div className="modal-input-group">
+                              <label>TOKENS DE MONSTROS/NPCs</label>
+                              <input type="file" multiple accept="image/*" onChange={(e) => handleFileSelect(e, 'tokens')} />
+                              <div className="file-count-tag">{sessionForm.tokens.length} arquivos selecionados</div>
+                          </div>
+
+                          <div className="modal-input-group">
+                              <label>MÚSICAS E EFEITOS (Soundboard)</label>
+                              <input type="file" multiple accept="audio/*" onChange={(e) => handleFileSelect(e, 'musicas')} />
+                              <div className="file-count-tag">{sessionForm.musicas.length} arquivos selecionados</div>
+                          </div>
+                      </div>
+
+                      <div className="btn-group-ff">
+                          <button type="submit" className="btn-forjar-main">AGENDAR SESSÃO</button>
+                          <button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL DE DETALHES */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
-            
             <div className="detail-header-modern">
                 <div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div>
                 <div className="detail-title-col">
@@ -300,9 +442,7 @@ export default function MestrePage() {
                     <span className="detail-narrator">Narrador: {showDetails.mestreNome}</span>
                 </div>
             </div>
-
             <div className="detail-body-grid">
-               {/* INFO ROW: Local e Contratante */}
                <div className="detail-info-row">
                    <div className="info-item">
                        <label>🌍 LOCAL</label>
@@ -313,22 +453,18 @@ export default function MestrePage() {
                        <span>{showDetails.contratante || "Anônimo"}</span>
                    </div>
                </div>
-
                <div className="detail-section">
                    <label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label>
                    <p className="section-text">{showDetails.descricaoMissao || "Sem descrição."}</p>
                </div>
-
                <div className="detail-section">
                    <label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label>
                    <p className="section-text">{showDetails.objetivosMissao || "Sem objetivos definidos."}</p>
                </div>
-
                <div className="detail-section">
                    <label className="section-label">⚡ REQUISITOS</label>
                    <p className="section-text">{showDetails.requisitos || "Sem requisitos especiais."}</p>
                </div>
-
                <div className="detail-section reward-section">
                     <label className="section-label">💎 RECOMPENSAS</label>
                     <div className="reward-content-box">
@@ -346,7 +482,6 @@ export default function MestrePage() {
                     </div>
                </div>
             </div>
-
             <button className="ff-final-close-btn" onClick={() => setShowDetails(null)}>FECHAR RELATÓRIO</button>
           </div>
         </div>
@@ -400,6 +535,24 @@ export default function MestrePage() {
         .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
 
+        /* SESSÃO CARD STYLES */
+        .sessao-card { background: linear-gradient(135deg, rgba(20,20,50,0.9), rgba(0,0,20,0.9)); border: 1px solid #00f2ff; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,242,255,0.1); }
+        .sessao-status { font-size: 10px; color: #f44; font-weight: bold; margin-bottom: 8px; animation: pulse 2s infinite; }
+        .sessao-title { color: #fff; font-size: 18px; margin: 0 0 10px 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        .sessao-info { display: flex; justify-content: space-between; font-size: 12px; color: #aaa; margin-bottom: 10px; }
+        .sessao-assets-count { font-size: 11px; color: #ffcc00; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; display: inline-block; }
+        .btn-play-vtt { background: #00f2ff; color: #000; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; flex: 1; margin-right: 10px; transition: 0.3s; }
+        .btn-play-vtt:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
+        
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        /* UPLOAD STYLES */
+        .upload-section-box { border: 1px dashed #444; padding: 15px; margin: 20px 0; background: rgba(0,0,0,0.3); }
+        .upload-section-title { color: #00f2ff; font-size: 12px; margin-bottom: 15px; border-bottom: 1px solid #00f2ff; padding-bottom: 5px; display: inline-block; }
+        .file-count-tag { font-size: 10px; color: #aaa; margin-top: 3px; font-style: italic; }
+        .ff-select-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; }
+        .ff-input-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; color-scheme: dark; }
+
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.94); z-index: 99999; display: flex; align-items: center; justify-content: center; }
         .ff-modal-scrollable { width: 550px; max-height: 90vh; overflow-y: auto; background: #000c1d; border: 2px solid #ffcc00; padding: 35px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
         .modal-title-ff { color: #fff; font-size: 22px; border-bottom: 1px solid #ffcc00; padding-bottom: 10px; margin-bottom: 20px; letter-spacing: 2px; }
@@ -416,71 +569,32 @@ export default function MestrePage() {
         .tall-area-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; height: 110px; resize: none; font-family: 'serif'; outline: none; }
         .tall-area-ff-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #fff; padding: 15px; height: 250px; resize: none; font-family: 'serif'; outline: none; font-size: 16px; border-radius: 4px; }
         
-        /* --- ESTILOS DO NOVO DETAIL VIEW --- */
         .detail-view-main { width: 600px; background: #000814; border: 1px solid #ffcc00; padding: 0; box-shadow: 0 0 40px rgba(255, 204, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; }
-        
         .detail-header-modern { background: linear-gradient(90deg, #1a1a1a 0%, #000 100%); padding: 25px 30px; display: flex; align-items: center; border-bottom: 1px solid #333; gap: 20px; }
         .detail-rank-badge { font-size: 32px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); border: 2px solid #ffcc00; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.5); }
         .detail-title-col h2 { margin: 0; font-size: 24px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
         .detail-narrator { color: #00f2ff; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 4px; display: block; }
-
         .detail-body-grid { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
-        
-        /* NOVA LINHA DE INFO (LOCAL E CONTRATANTE) */
         .detail-info-row { display: flex; gap: 25px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 15px; }
         .info-item { flex: 1; }
         .info-item label { color: #ffcc00; font-size: 10px; display: block; margin-bottom: 5px; font-weight: bold; opacity: 0.8; }
         .info-item span { color: #fff; font-size: 14px; font-weight: bold; letter-spacing: 0.5px; }
-
         .detail-section { margin-bottom: 5px; }
         .section-label { color: #ffcc00; font-size: 11px; font-weight: bold; display: block; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
         .section-text { font-size: 15px; line-height: 1.5; color: #ddd; margin: 0; white-space: pre-wrap; }
-
         .reward-section { margin-top: 10px; background: rgba(255,204,0,0.05); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,204,0,0.2); }
         .gil-display-row { display: flex; align-items: center; gap: 10px; font-size: 18px; color: #ffcc00; font-weight: bold; margin-bottom: 8px; }
         .extra-rewards-list { margin-top: 8px; padding-left: 5px; }
         .reward-item { color: #aaa; font-size: 14px; margin-bottom: 4px; font-style: italic; }
-
         .ff-final-close-btn { width: 100%; background: #111; color: #fff; border: none; border-top: 1px solid #333; padding: 20px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; transition: 0.2s; }
         .ff-final-close-btn:hover { background: #222; color: #ffcc00; }
         
-        /* --- ESTILOS DO PAPIRO --- */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
-        
-        .papiro-real-container { 
-            width: 1000px; 
-            height: 800px; 
-            max-width: 95vw;
-            max-height: 95vh;
-            background-size: 100% 100%; 
-            background-repeat: no-repeat; 
-            padding: 110px 160px; 
-            color: #3b2b1a; 
-            position: relative; 
-            display: flex; 
-            flex-direction: column; 
-        }
-        
-        .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; 
-           mask-image: radial-gradient(circle, black 60%, transparent 100%); 
-           -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); 
-           opacity: 0.9;
-        }
-        
+        .papiro-real-container { width: 1000px; height: 800px; max-width: 95vw; max-height: 95vh; background-size: 100% 100%; background-repeat: no-repeat; padding: 110px 160px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
+        .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); opacity: 0.9; }
         .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
-        
-        .papiro-body-real { 
-           margin-top: 25px; 
-           flex: 1; 
-           overflow-y: auto; 
-           line-height: 1.6; 
-           font-size: 18px; 
-           padding-right: 10px;
-           scrollbar-width: none;  
-           -ms-overflow-style: none;
-        }
+        .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; scrollbar-width: none; -ms-overflow-style: none; }
         .papiro-body-real::-webkit-scrollbar { display: none; }
-
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
 
