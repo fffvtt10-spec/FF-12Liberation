@@ -360,7 +360,21 @@ This typically indicates that your device does not have a healthy Internet conne
         
         /* --- ESTILOS DO PAPIRO --- */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
-        .papiro-real-container { width: 750px; height: 550px; background-size: 100% 100%; background-repeat: no-repeat; padding: 85px 120px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
+        
+        /* AUMENTO DA DIMENSÃO DO PAPIRO AQUI */
+        .papiro-real-container { 
+            width: 1000px; 
+            height: 800px; 
+            max-width: 95vw;
+            max-height: 95vh;
+            background-size: 100% 100%; 
+            background-repeat: no-repeat; 
+            padding: 85px 120px; 
+            color: #3b2b1a; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column; 
+        }
         
         /* Foto do Sanchez no papiro com fade suave */
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; 
