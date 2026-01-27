@@ -28,6 +28,7 @@ export default function MestrePage() {
   const [missoes, setMissoes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
+  const [viewImage, setViewImage] = useState(null); // Lightbox do Cartaz
   const [resenha, setResenha] = useState("");
   const [mestreIdentidade, setMestreIdentidade] = useState(auth.currentUser?.email?.split('@')[0] || "Narrador");
 
@@ -38,7 +39,7 @@ export default function MestrePage() {
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     
-    // Query com filtro e ordenação [Necessita de Índice no Firebase Console]
+    // Listener com ordem decrescente (Exige índice composto no Firebase)
     const q = query(
       collection(db, "missoes"), 
       where("mestreId", "==", auth.currentUser.uid), 
@@ -46,13 +47,12 @@ export default function MestrePage() {
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setMissoes(data);
+      setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (error) => {
-      console.error("Erro no Firestore: ", error);
-      // Fallback para mostrar missões mesmo sem índice enquanto você não cria no console
+      console.warn("Aguardando índice composto do Firebase...");
+      // Fallback: se o índice não estiver pronto, mostra sem ordem para não ficar vazio
       const fallbackQ = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid));
-      onSnapshot(fallbackQ, (s) => setMissoes(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+      onSnapshot(fallbackQ, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     });
     return () => unsubscribe();
   }, []);
@@ -74,7 +74,7 @@ export default function MestrePage() {
         ...form, 
         mestreNome: mestreIdentidade, 
         mestreId: auth.currentUser.uid, 
-        createdAt: serverTimestamp(), // Uso de serverTimestamp para evitar erros de delay
+        createdAt: serverTimestamp(), // Garante visibilidade no listener orderBy
         expiraEm: expiraEm.toISOString()
       });
       
@@ -97,6 +97,7 @@ export default function MestrePage() {
         </div>
         
         <div className="mestre-grid">
+          {/* QUADRO DE MISSÕES */}
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
@@ -112,7 +113,7 @@ export default function MestrePage() {
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa || 0} Gil</p>
                   <Timer expiry={m.expiraEm} />
                   <div className="poster-actions">
-                    <button onClick={() => window.open(m.imagem, '_blank')}>IMAGEM</button>
+                    <button onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
                     <button onClick={() => setShowDetails(m)}>DETALHES</button>
                     <button className="del" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
                   </div>
@@ -121,6 +122,7 @@ export default function MestrePage() {
             </div>
           </div>
 
+          {/* RESENHA DO SANCHES */}
           <div className="ff-card fade-in">
             <h3>RESENHA DO SANCHES</h3>
             <div className="sanches-header">
@@ -131,6 +133,7 @@ export default function MestrePage() {
             <button className="ff-submit-gold">PUBLICAR RESENHA</button>
           </div>
 
+          {/* SESSÕES DE JOGO */}
           <div className="ff-card fade-in">
             <h3>SESSÕES DE JOGO</h3>
             <button className="ff-btn-small">INICIAR NOVA SESSÃO</button>
@@ -139,6 +142,7 @@ export default function MestrePage() {
         </div>
       </div>
 
+      {/* MODAL DE CRIAÇÃO */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
@@ -169,7 +173,7 @@ export default function MestrePage() {
                 <input placeholder="Duração (Ex: 1w 2d 10h)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
               </div>
 
-              <input placeholder="URL da Imagem" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
+              <input placeholder="URL do Cartaz (Imgur Link)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
 
               <div className="btn-group">
                 <button type="submit" className="btn-forjar">FORJAR</button>
@@ -180,19 +184,36 @@ export default function MestrePage() {
         </div>
       )}
 
+      {/* MODAL DE DETALHES */}
       {showDetails && (
         <div className="ff-modal-overlay" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view" onClick={e => e.stopPropagation()}>
             <div className={`rank-tag rank-${showDetails.rank}`}>RANK {showDetails.rank}</div>
             <h2>{showDetails.nome}</h2>
-            <p><strong>REQUISITOS:</strong> {showDetails.requisitos}</p>
-            <p><strong>OBJETIVOS:</strong> {showDetails.objetivo}</p>
+            <div className="detail-section">
+              <strong>REQUISITOS:</strong>
+              <p>{showDetails.requisitos}</p>
+            </div>
+            <div className="detail-section">
+              <strong>OBJETIVOS:</strong>
+              <p>{showDetails.objetivo}</p>
+            </div>
             <div className="recompensa-list">
               <strong>RECOMPENSAS:</strong>
               <p className="gil-txt">💰 {showDetails.gilRecompensa} Gil</p>
               <ul>{showDetails.recompensa.split('\n').filter(r => r.trim() !== "").map((r,i) => <li key={i}>{r}</li>)}</ul>
             </div>
             <button className="ff-submit-gold" onClick={() => setShowDetails(null)}>FECHAR</button>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX DO CARTAZ (NOVO) */}
+      {viewImage && (
+        <div className="ff-image-viewer" onClick={() => setViewImage(null)}>
+          <button className="close-viewer">×</button>
+          <div className="image-frame" onClick={e => e.stopPropagation()}>
+            <img src={viewImage} alt="Cartaz da Missão" />
           </div>
         </div>
       )}
@@ -206,7 +227,7 @@ export default function MestrePage() {
         .mestre-content { position: relative; z-index: 10; padding: 30px; }
         .ff-title { color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 30px; text-shadow: 0 0 10px #ffcc00; }
         
-        .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border-color: #ffcc00; padding: 10px 15px; background: rgba(0,0,0,0.4); max-width: 450px; border: 1px solid #ffcc00; }
+        .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border-color: #ffcc00; padding: 10px 15px; background: rgba(0, 10, 30, 0.8); max-width: 450px; border: 1px solid #ffcc00; }
         .mestre-identity-box label { font-size: 11px; color: #fff; letter-spacing: 1px; }
         .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
 
@@ -228,31 +249,38 @@ export default function MestrePage() {
         
         .poster-actions { display: flex; gap: 5px; }
         .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; }
+        .poster-actions button:hover { background: #00f2ff; color: #000; }
         .poster-actions button.del { border-color: #f44; color: #f44; }
 
         .sanches-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .sanches-photo { width: 40px; height: 40px; border: 1px solid #ffcc00; border-radius: 50%; background: #222; }
         textarea { width: 100%; background: rgba(0,0,0,0.6); border: 1px solid #444; color: #fff; padding: 10px; height: 120px; resize: none; outline: none; font-size: 12px; }
-        .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; }
         
-        .ff-btn-small { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; font-size: 9px; padding: 4px 8px; cursor: pointer; }
-
         .ff-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .ff-modal { width: 420px; padding: 25px; border: 1px solid #ffcc00; max-height: 90vh; overflow-y: auto; }
         .modal-title { color: #ffcc00; margin-bottom: 20px; text-align: left; letter-spacing: 2px; }
         .ff-modal input, .ff-modal select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; outline: none; }
         .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
-        .ff-modal input:focus, .tall-area:focus { border-color: #ffcc00; }
         
         .btn-group { display: flex; gap: 10px; margin-top: 15px; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
 
+        /* Estilo Gil Recompensa: Sem setas laterais */
         .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .gil-input { -moz-appearance: textfield; }
         .gil-txt { color: #ffcc00; font-weight: bold; margin-bottom: 5px; }
 
+        /* IMAGE VIEWER (LIGHTBOX) */
+        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+        .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
+        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; box-shadow: 0 0 30px rgba(255, 204, 0, 0.3); background: #000; cursor: default; }
+        .image-frame img { max-width: 100%; max-height: 80vh; display: block; }
+
         .rank-tag { display: inline-block; padding: 2px 8px; background: #fff; color: #000; font-size: 10px; font-weight: bold; margin-bottom: 10px; }
+        .detail-section { margin-bottom: 15px; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        .detail-section strong { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 5px; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
