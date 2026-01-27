@@ -4,7 +4,7 @@ import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, 
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
-import papiroImg from '../assets/papiro.png'; // Imagem solicitada
+import papiroImg from '../assets/papiro.png'; // Verifique se é .jpg ou .png no seu arquivo real
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
@@ -31,11 +31,11 @@ const Timer = ({ expiry }) => {
 export default function MestrePage() {
   // Estados para Missões e Modais
   const [missoes, setMissoes] = useState([]);
-  const [resenhas, setResenhas] = useState([]); // Lista de resenhas salvas
+  const [resenhas, setResenhas] = useState([]); 
   const [showModal, setShowModal] = useState(false);
-  const [showResenhaModal, setShowResenhaModal] = useState(false); // Modal de criação
+  const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showDetails, setShowDetails] = useState(null);
-  const [viewResenha, setViewResenha] = useState(null); // Visualização no papiro
+  const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null);
   
   // Estados para Resenha do Sanches
@@ -101,7 +101,7 @@ export default function MestrePage() {
     if (!tituloResenha || !resenha) return alert("Título e texto são obrigatórios!");
     try {
       const expiraEm = new Date();
-      expiraEm.setDate(expiraEm.getDate() + 1); // Dura exatamente 1 dia
+      expiraEm.setDate(expiraEm.getDate() + 1); 
       await addDoc(collection(db, "resenhas"), {
         titulo: tituloResenha,
         conteudo: resenha,
@@ -134,7 +134,7 @@ export default function MestrePage() {
         </div>
         
         <div className="mestre-grid">
-          {/* COLUNA 1: QUADRO DE MISSÕES */}
+          {/* QUADRO DE MISSÕES */}
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
@@ -158,7 +158,7 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: RESENHA DO SANCHES - REFORMULADO */}
+          {/* RESENHA DO SANCHES */}
           <div className="ff-card fade-in sanchez-card">
             <div className="sanchez-fade-portrait" style={{backgroundImage: `url(${sanchezImg})`}}></div>
             <div className="sanchez-header">
@@ -210,7 +210,6 @@ export default function MestrePage() {
               value={resenha} 
               onChange={(e) => setResenha(e.target.value)}
             />
-            
             <div className="player-selector-box">
               <label>DESTINATÁRIOS:</label>
               <div className="destinatarios-grid">
@@ -225,7 +224,6 @@ export default function MestrePage() {
                 ))}
               </div>
             </div>
-
             <div className="btn-group">
               <button className="btn-forjar" onClick={publicarResenha}>PUBLICAR</button>
               <button className="btn-cancelar" onClick={() => setShowResenhaModal(false)}>CANCELAR</button>
@@ -234,7 +232,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE VISUALIZAÇÃO NO PAPIRO (IMAGEM) */}
+      {/* VISUALIZAÇÃO NO PAPIRO */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -242,17 +240,16 @@ export default function MestrePage() {
               <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
               <p className="papiro-mestre-sub">Escrito por: {viewResenha.mestre}</p>
               <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: renderFormattedText(viewResenha.conteudo) }}></div>
-              
               <div className="papiro-dest-list">
                  <strong>ENVIADO PARA:</strong>
-                 <p>{viewResenha.destinatarios.join(", ")}</p>
+                 <p>{viewResenha.destinatarios.join(", ") || "Ninguém selecionado"}</p>
               </div>
               <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
            </div>
         </div>
       )}
 
-      {/* MODAIS DE MISSÃO (MANTIDOS) */}
+      {/* MODAIS DE MISSÃO */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
@@ -300,6 +297,10 @@ export default function MestrePage() {
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
         
+        /* NOME DO NARRADOR FIXO */
+        .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border: 1px solid #ffcc00; padding: 10px 15px; background: rgba(0, 10, 30, 0.8); max-width: 450px; }
+        .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
+
         /* SANCHEZ PORTRAIT OVAL */
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-fade-portrait { 
@@ -309,44 +310,47 @@ export default function MestrePage() {
           opacity: 0.6; z-index: 0;
         }
         .sanchez-header { position: relative; z-index: 1; margin-bottom: 20px; }
-        .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 12px; margin-bottom: 10px; }
-        .resenha-info h4 { margin: 0; color: #ffcc00; }
+        .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 12px; margin-bottom: 10px; border-radius: 4px; }
 
         /* PAPIRO REAL CONTAINER */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: flex; align-items: center; justify-content: center; }
         .papiro-real-container { 
           width: 600px; height: 450px; background-size: 100% 100%; padding: 60px 80px; 
-          position: relative; color: #3b2b1a; box-shadow: 0 0 50px black;
+          position: relative; color: #3b2b1a; box-shadow: 0 0 50px black; background-repeat: no-repeat;
         }
         .sanchez-oval-view { 
           width: 90px; height: 90px; float: right; border-radius: 50%; 
           background-size: cover; border: 2px solid #3b2b1a; margin-left: 20px;
         }
         .papiro-title-real { border-bottom: 1px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 24px; }
-        .papiro-mestre-sub { font-size: 12px; font-style: italic; margin-top: -10px; }
         .papiro-body-real { margin-top: 20px; line-height: 1.5; font-size: 15px; height: 180px; overflow-y: auto; }
-        .papiro-dest-list { margin-top: 20px; font-size: 11px; border-top: 1px dashed #3b2b1a; padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 40px; right: 80px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 5px 15px; cursor: pointer; font-weight: bold; }
 
-        /* MODAL STYLES */
+        /* ESTILOS MODAL */
         .ff-modal-input-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; margin-bottom: 10px; outline: none; }
         .tall-area-white { width: 100%; height: 200px; background: #fff; color: #000; padding: 15px; border-radius: 4px; resize: none; outline: none; font-family: 'serif'; }
-        .player-selector-box { margin: 15px 0; border-top: 1px solid #333; padding-top: 10px; }
         .destinatarios-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         .chip-label { background: rgba(255,204,0,0.1); border: 1px solid #ffcc00; padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer; }
 
         .ff-add-btn-gold { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px 20px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.3s; }
         .ff-add-btn-gold:hover { background: #ffcc00; color: #000; }
         
-        /* MANTIDOS */
+        /* QUADRO MISSÕES */
+        .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; text-transform: uppercase; }
+        .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
         .mission-scroll { height: 350px; overflow-y: auto; }
         .mission-poster { background: rgba(0,0,0,0.5); border: 1px solid #444; margin-bottom: 12px; padding: 12px; border-left: 3px solid #00f2ff; position: relative; }
-        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; cursor: pointer; font-weight: bold; margin-right: 5px; }
+        .poster-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; cursor: pointer; font-weight: bold; }
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; }
         .btn-red { border: 1px solid #f44; color: #f44; }
+
         .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; }
+        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .fade-in { animation: fadeIn 1s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );
