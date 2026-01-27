@@ -38,6 +38,7 @@ export default function MestrePage() {
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [previewPapiro, setPreviewPapiro] = useState(false);
+  const [showDestinatarios, setShowDestinatarios] = useState(false); // Estado para o menu flutuante
 
   // --- PERSISTÊNCIA DA ASSINATURA (LOCAL STORAGE) ---
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
@@ -121,6 +122,7 @@ export default function MestrePage() {
       });
       alert("A crônica foi enviada!");
       setResenha(""); setTituloResenha(""); setDestinatarios([]);
+      setShowDestinatarios(false);
     } catch (e) { alert("Erro ao publicar."); }
   };
 
@@ -170,7 +172,7 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: RESENHA DO SANCHES - RESTAURAÇÃO ESTÉTICA COMPLETA */}
+          {/* COLUNA 2: RESENHA DO SANCHES */}
           <div className="ff-card fade-in sanchez-card">
             <div className="sanchez-bg-fade" style={{backgroundImage: `url(${sanchezImg})`}}></div>
             <h3>RESENHA DO SANCHES</h3>
@@ -185,15 +187,24 @@ export default function MestrePage() {
               />
             </div>
 
-            <div className="destinatarios-box">
-              <span>ENVIAR PARA:</span>
-              <div className="destinatarios-list">
-                {personagensDisponiveis.map(p => (
-                  <label key={p} className="chip">
-                    <input type="checkbox" checked={destinatarios.includes(p)} onChange={() => destinatarios.includes(p) ? setDestinatarios(destinatarios.filter(x=>x!==p)) : setDestinatarios([...destinatarios, p])} /> {p}
-                  </label>
-                ))}
-              </div>
+            {/* Menu Flutuante de Destinatários */}
+            <div className="dropdown-destinatarios">
+              <button className="dropdown-toggle" onClick={() => setShowDestinatarios(!showDestinatarios)}>
+                ENVIAR PARA: {destinatarios.length > 0 ? `(${destinatarios.length})` : "SELECIONAR"}
+              </button>
+              {showDestinatarios && (
+                <div className="dropdown-menu">
+                  {personagensDisponiveis.map(p => (
+                    <label key={p} className="dropdown-item">
+                      <input 
+                        type="checkbox" 
+                        checked={destinatarios.includes(p)} 
+                        onChange={() => destinatarios.includes(p) ? setDestinatarios(destinatarios.filter(x=>x!==p)) : setDestinatarios([...destinatarios, p])} 
+                      /> {p}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="btn-group-column">
@@ -223,29 +234,18 @@ export default function MestrePage() {
               <textarea placeholder="Descrição" className="tall-area" value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} />
               <textarea placeholder="Objetivos" className="tall-area" value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
               <textarea placeholder="Requisitos" className="tall-area" value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
-              
               <div className="row">
                 <input placeholder="Grupo (ex: até 6)" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} />
                 <select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>
                   {['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}
                 </select>
               </div>
-
               <textarea placeholder="Recompensas" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
-              
               <div className="row">
-                <input 
-                  type="text" 
-                  className="gil-input"
-                  placeholder="Gil de Recompensa (Ex: 5000)" 
-                  value={form.gilRecompensa} 
-                  onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} 
-                />
+                <input type="text" className="gil-input" placeholder="Gil de Recompensa (Ex: 5000)" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
                 <input placeholder="Duração (Ex: 1w 2d 10h)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
               </div>
-
-              <input placeholder="URL Cartaz (Imgur Link)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
-
+              <input placeholder="URL do Cartaz (Imgur Link)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
               <div className="btn-group">
                 <button type="submit" className="btn-forjar">FORJAR</button>
                 <button type="button" className="btn-cancelar" onClick={() => setShowModal(false)}>CANCELAR</button>
@@ -323,6 +323,14 @@ export default function MestrePage() {
         .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; z-index: 1; }
         .btn-group-column { display: flex; flex-direction: column; gap: 8px; z-index: 1; }
 
+        /* Menu Flutuante Estilizado */
+        .dropdown-destinatarios { position: relative; margin: 10px 0; z-index: 10; }
+        .dropdown-toggle { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px; cursor: pointer; font-size: 10px; font-weight: bold; text-align: left; }
+        .dropdown-menu { position: absolute; bottom: 100%; left: 0; width: 100%; background: #000c1d; border: 1px solid #ffcc00; max-height: 150px; overflow-y: auto; padding: 10px; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
+        .dropdown-item { display: block; padding: 5px 0; font-size: 11px; cursor: pointer; border-bottom: 1px solid #112a45; }
+        .dropdown-item:last-child { border-bottom: none; }
+        .dropdown-item input { margin-right: 10px; }
+
         /* --- PAPIRO ANIMADO --- */
         .papiro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
         .papiro-container { width: 450px; position: relative; }
@@ -364,9 +372,6 @@ export default function MestrePage() {
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        .destinatarios-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
-        .chip { background: rgba(255,204,0,0.1); padding: 4px 10px; border-radius: 15px; border: 1px solid #ffcc00; cursor: pointer; font-size: 10px; }
       `}</style>
     </div>
   );
