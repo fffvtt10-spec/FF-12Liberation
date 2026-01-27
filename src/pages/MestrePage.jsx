@@ -163,7 +163,7 @@ export default function MestrePage() {
                 </select>
               </div>
 
-              <textarea placeholder="Recompensas (Bolinhas)" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
+              <textarea placeholder="Recompensas" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               
               <div className="row">
                 <input 
