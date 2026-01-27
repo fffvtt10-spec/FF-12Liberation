@@ -47,10 +47,10 @@ export default function MestrePage() {
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMissoes(data);
     }, (error) => {
       console.warn("Aguardando índice composto do Firebase...");
-      // Fallback: se o índice não estiver pronto, mostra sem ordem para não ficar vazio
       const fallbackQ = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid));
       onSnapshot(fallbackQ, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     });
@@ -74,7 +74,7 @@ export default function MestrePage() {
         ...form, 
         mestreNome: mestreIdentidade, 
         mestreId: auth.currentUser.uid, 
-        createdAt: serverTimestamp(), // Garante visibilidade no listener orderBy
+        createdAt: serverTimestamp(), 
         expiraEm: expiraEm.toISOString()
       });
       
@@ -101,7 +101,10 @@ export default function MestrePage() {
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
-              <button className="ff-btn-small" onClick={() => setShowModal(true)}>ADICIONAR CARTAZ</button>
+              {/* Botão Adicionar Melhorado */}
+              <button className="ff-add-btn" onClick={() => setShowModal(true)}>
+                <span>+</span> ADICIONAR CARTAZ
+              </button>
             </div>
             <div className="mission-scroll">
               {missoes.length === 0 && <p className="empty-msg">Gerencie seus cartazes de caça aqui.</p>}
@@ -113,6 +116,7 @@ export default function MestrePage() {
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa || 0} Gil</p>
                   <Timer expiry={m.expiraEm} />
                   <div className="poster-actions">
+                    {/* Nome do botão alterado para CARTAZ */}
                     <button onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
                     <button onClick={() => setShowDetails(m)}>DETALHES</button>
                     <button className="del" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
@@ -136,7 +140,7 @@ export default function MestrePage() {
           {/* SESSÕES DE JOGO */}
           <div className="ff-card fade-in">
             <h3>SESSÕES DE JOGO</h3>
-            <button className="ff-btn-small">INICIAR NOVA SESSÃO</button>
+            <button className="ff-add-btn small-btn">INICIAR NOVA SESSÃO</button>
             <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
           </div>
         </div>
@@ -208,7 +212,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* LIGHTBOX DO CARTAZ (NOVO) */}
+      {/* LIGHTBOX DO CARTAZ (MODAL DE IMAGEM) */}
       {viewImage && (
         <div className="ff-image-viewer" onClick={() => setViewImage(null)}>
           <button className="close-viewer">×</button>
@@ -236,6 +240,24 @@ export default function MestrePage() {
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         h3 { color: #ffcc00; font-size: 12px; margin: 0; letter-spacing: 1px; }
 
+        /* ESTILO DO BOTÃO ADICIONAR CARTAZ */
+        .ff-add-btn { 
+          background: rgba(0, 242, 255, 0.05); 
+          border: 1px solid #00f2ff; 
+          color: #00f2ff; 
+          font-size: 10px; 
+          padding: 6px 14px; 
+          cursor: pointer; 
+          letter-spacing: 1px; 
+          font-weight: bold; 
+          transition: 0.4s; 
+          text-transform: uppercase;
+          box-shadow: inset 0 0 5px rgba(0, 242, 255, 0.1);
+        }
+        .ff-add-btn span { font-size: 14px; margin-right: 6px; vertical-align: middle; }
+        .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff, 0 0 40px rgba(0, 242, 255, 0.2); }
+        .small-btn { padding: 4px 10px; font-size: 9px; }
+
         .mission-scroll { height: 280px; overflow-y: auto; padding-right: 5px; }
         .mission-scroll::-webkit-scrollbar { width: 3px; }
         .mission-scroll::-webkit-scrollbar-thumb { background: #ffcc00; }
@@ -248,39 +270,36 @@ export default function MestrePage() {
         .mission-timer { font-size: 10px; color: #00f2ff; display: block; margin-bottom: 10px; }
         
         .poster-actions { display: flex; gap: 5px; }
-        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; }
+        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.3s; }
         .poster-actions button:hover { background: #00f2ff; color: #000; }
         .poster-actions button.del { border-color: #f44; color: #f44; }
+        .poster-actions button.del:hover { background: #f44; color: #fff; }
 
-        .sanches-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
-        .sanches-photo { width: 40px; height: 40px; border: 1px solid #ffcc00; border-radius: 50%; background: #222; }
-        textarea { width: 100%; background: rgba(0,0,0,0.6); border: 1px solid #444; color: #fff; padding: 10px; height: 120px; resize: none; outline: none; font-size: 12px; }
-        .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; }
+        .ff-submit-gold { width: 100%; margin-top: 10px; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .ff-submit-gold:hover { background: #ffcc00; color: #000; }
         
-        .ff-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .ff-modal { width: 420px; padding: 25px; border: 1px solid #ffcc00; max-height: 90vh; overflow-y: auto; }
-        .modal-title { color: #ffcc00; margin-bottom: 20px; text-align: left; letter-spacing: 2px; }
-        .ff-modal input, .ff-modal select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; outline: none; }
-        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
-        
-        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
-        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-
-        /* Estilo Gil Recompensa: Sem setas laterais */
-        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .gil-input { -moz-appearance: textfield; }
-        .gil-txt { color: #ffcc00; font-weight: bold; margin-bottom: 5px; }
-
-        /* IMAGE VIEWER (LIGHTBOX) */
-        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+        /* MODAL E LIGHTBOX */
+        .ff-modal-overlay, .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .ff-image-viewer { z-index: 2000; cursor: zoom-out; }
         .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
         .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; box-shadow: 0 0 30px rgba(255, 204, 0, 0.3); background: #000; cursor: default; }
         .image-frame img { max-width: 100%; max-height: 80vh; display: block; }
 
+        .ff-modal { width: 420px; padding: 25px; border: 1px solid #ffcc00; max-height: 90vh; overflow-y: auto; }
+        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
+        .ff-modal input, .ff-modal select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; outline: none; }
+        .ff-modal input:focus, .tall-area:focus { border-color: #ffcc00; }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-forjar:hover { background: #fff; }
+        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .rank-tag { display: inline-block; padding: 2px 8px; background: #fff; color: #000; font-size: 10px; font-weight: bold; margin-bottom: 10px; }
-        .detail-section { margin-bottom: 15px; border-bottom: 1px solid #222; padding-bottom: 10px; }
-        .detail-section strong { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 5px; }
+        .detail-section { margin-bottom: 12px; }
+        .detail-section strong { color: #ffcc00; font-size: 11px; }
+
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
