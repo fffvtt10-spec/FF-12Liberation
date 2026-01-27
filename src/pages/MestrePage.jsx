@@ -61,8 +61,6 @@ export default function MestrePage() {
   // --- BUSCA DE MISSÕES EM TEMPO REAL ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
-    
-    // Fallback de segurança para garantir que auth.currentUser existe
     if (!auth.currentUser) return;
 
     const q = query(
@@ -108,7 +106,7 @@ export default function MestrePage() {
 
   // --- PUBLICAÇÃO DA RESENHA ---
   const publicarResenha = async () => {
-    if (!tituloResenha || !resenha) return alert("Título e texto são obrigatórios!");
+    if (!tituloResenha || !resenha) return alert("Sanches exige título e texto!");
     try {
       const expiraEm = new Date();
       expiraEm.setDate(expiraEm.getDate() + 1); 
@@ -148,7 +146,7 @@ export default function MestrePage() {
         </div>
         
         <div className="mestre-grid">
-          {/* QUADRO DE MISSÕES */}
+          {/* COLUNA 1: QUADRO DE MISSÕES */}
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
@@ -163,26 +161,25 @@ export default function MestrePage() {
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa || 0} Gil</p>
                   <Timer expiry={m.expiraEm} />
                   <div className="poster-actions">
-                    <button onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
-                    <button onClick={() => setShowDetails(m)}>DETALHES</button>
-                    <button className="del" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
+                    <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
+                    <button className="btn-cyan" onClick={() => setShowDetails(m)}>DETALHES</button>
+                    <button className="btn-red" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* RESENHA DO SANCHES - CORREÇÃO DE TELA PRETA */}
+          {/* COLUNA 2: RESENHA DO SANCHES - RESTAURAÇÃO ESTÉTICA COMPLETA */}
           <div className="ff-card fade-in sanchez-card">
             <div className="sanchez-bg-fade" style={{backgroundImage: `url(${sanchezImg})`}}></div>
             <h3>RESENHA DO SANCHES</h3>
             <input className="sanchez-title-input" placeholder="Título da Crônica..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
             
             <div className="editor-container">
-              {/* Substituído ReactQuill por Textarea blindado para evitarTypeError */}
               <textarea 
                 className="ff-resenha-input"
-                placeholder="Escreva a história aqui... Use **texto** para Negrito." 
+                placeholder="Escreva a história aqui... Use **texto** para Negrito e *texto* para Itálico." 
                 value={resenha} 
                 onChange={(e) => setResenha(e.target.value)}
               />
@@ -199,16 +196,18 @@ export default function MestrePage() {
               </div>
             </div>
 
-            <div className="btn-group">
+            <div className="btn-group-column">
               <button className="ff-submit-gold" onClick={publicarResenha}>PUBLICAR</button>
               <button className="ff-btn-preview" onClick={() => setPreviewPapiro(true)}>VISUALIZAR</button>
             </div>
           </div>
 
-          {/* SESSÕES */}
+          {/* COLUNA 3: SESSÕES */}
           <div className="ff-card fade-in">
-            <h3>SESSÕES DE JOGO</h3>
-            <button className="ff-add-btn small-btn">INICIAR NOVA SESSÃO</button>
+            <div className="card-header">
+              <h3>SESSÕES DE JOGO</h3>
+              <button className="ff-add-btn small-btn">INICIAR NOVA SESSÃO</button>
+            </div>
             <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
           </div>
         </div>
@@ -317,14 +316,12 @@ export default function MestrePage() {
         .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
 
         /* --- SANCHEZ CARD --- */
-        .sanchez-card { position: relative; overflow: hidden; }
+        .sanchez-card { position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .sanchez-bg-fade { position: absolute; top: 0; right: 0; width: 150px; height: 100%; background-size: cover; background-position: center; opacity: 0.15; mask-image: radial-gradient(circle at right, black, transparent 80%); z-index: 0; }
-        
-        /* CORREÇÃO DO EDITOR: Substituí o Quill quebrado por CSS estável */
-        .editor-container { background: #fff; color: #000; border-radius: 4px; height: 180px; margin: 10px 0; border: 1px solid #444; overflow: hidden; }
-        .ff-resenha-input { width: 100%; height: 100%; border: none; padding: 10px; resize: none; outline: none; font-family: 'serif'; font-size: 14px; color: #000; }
-
-        .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; }
+        .editor-container { background: #fff; border-radius: 4px; height: 200px; margin: 10px 0; border: 1px solid #444; overflow: hidden; z-index: 1; }
+        .ff-resenha-input { width: 100%; height: 100%; border: none; padding: 12px; resize: none; outline: none; font-family: 'serif'; font-size: 14px; color: #000; background: #fff; }
+        .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; z-index: 1; }
+        .btn-group-column { display: flex; flex-direction: column; gap: 8px; z-index: 1; }
 
         /* --- PAPIRO ANIMADO --- */
         .papiro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
@@ -338,18 +335,23 @@ export default function MestrePage() {
         /* --- ESTILOS DE MISSÕES --- */
         .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; text-transform: uppercase; }
         .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
-        .mission-scroll { height: 280px; overflow-y: auto; padding-right: 5px; }
+        .mission-scroll { height: 320px; overflow-y: auto; padding-right: 5px; }
         .mission-poster { background: rgba(0,0,0,0.5); border: 1px solid #444; margin-bottom: 12px; padding: 12px; border-left: 3px solid #00f2ff; position: relative; }
         .mestre-tag { font-size: 8px; color: #ffcc00; display: block; margin-bottom: 5px; text-transform: uppercase; }
-        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
-        .gil-txt { color: #ffcc00; font-weight: bold; }
+        .poster-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; cursor: pointer; font-weight: bold; }
+        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; }
+        .btn-cyan:hover { background: #00f2ff; color: #000; }
+        .btn-red { border: 1px solid #f44; color: #f44; }
+        .btn-red:hover { background: #f44; color: #fff; }
 
+        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
+        
         /* --- BOTÕES --- */
         .ff-submit-gold { width: 100%; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .ff-submit-gold:hover { background: #ffcc00; color: #000; }
-        .ff-btn-preview { width: 100%; margin-top: 5px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 10px; font-weight: bold; }
-        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-        .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+        .ff-btn-preview { width: 100%; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .ff-btn-preview:hover { background: #00f2ff; color: #000; }
 
         /* --- LIGHTBOX --- */
         .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
@@ -358,6 +360,8 @@ export default function MestrePage() {
         .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
 
         .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         
