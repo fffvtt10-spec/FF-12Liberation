@@ -1,15 +1,10 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp } from "firebase/firestore";
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 
-// Importação dinâmica protegida para evitar tela preta no carregamento
-const ReactQuill = React.lazy(() => import('react-quill'));
-import 'react-quill/dist/quill.snow.css';
-
-// Componente de Cronômetro (MANTIDO TODOS OS RECURSOS)
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
@@ -37,19 +32,15 @@ export default function MestrePage() {
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [previewPapiro, setPreviewPapiro] = useState(false);
-  const [montado, setMontado] = useState(false); // Segurança de montagem
 
-  // PERSISTÊNCIA DA ASSINATURA (MANTIDO)
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
   });
 
   useEffect(() => {
-    setMontado(true);
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // Placeholder para personagens
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
   const [destinatarios, setDestinatarios] = useState([]);
 
@@ -57,11 +48,9 @@ export default function MestrePage() {
     nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
 
-  // LISTENER DE MISSÕES
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     if (!auth.currentUser) return;
-
     const q = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -72,28 +61,23 @@ export default function MestrePage() {
     return () => unsubscribe();
   }, []);
 
-  const parseDuration = (str) => {
-    const weeks = (str.match(/(\d+)w/) || [0, 0])[1] * 604800000;
-    const days = (str.match(/(\d+)d/) || [0, 0])[1] * 86400000;
-    const hours = (str.match(/(\d+)h/) || [0, 0])[1] * 3600000;
-    return weeks + days + hours || 3600000;
-  };
-
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
-      const msToAdd = parseDuration(form.duracao);
-      const expiraEm = new Date(Date.now() + msToAdd);
+      const weeks = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000;
+      const days = (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000;
+      const hours = (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
+      const expiraEm = new Date(Date.now() + (weeks + days + hours || 3600000));
       await addDoc(collection(db, "missoes"), {
         ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
       });
       setShowModal(false);
       setForm({ nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
-    } catch (err) { alert("Erro ao forjar."); }
+    } catch (err) { alert("Erro ao forjar cartaz."); }
   };
 
   const publicarResenha = async () => {
-    if (!tituloResenha || !resenha) return alert("Sanches exige título e texto!");
+    if (!tituloResenha || !resenha) return alert("Título e texto são obrigatórios!");
     try {
       const expiraEm = new Date();
       expiraEm.setDate(expiraEm.getDate() + 1); 
@@ -105,8 +89,13 @@ export default function MestrePage() {
     } catch (e) { alert("Erro ao publicar."); }
   };
 
-  // Se não estiver montado, renderiza apenas o fundo para evitar erro de hidratação
-  if (!montado) return <div className="mestre-container" style={{background: '#000'}}></div>;
+  // Função para converter texto em negrito/itálico básico manualmente (Estilo VTT)
+  const formatText = (text) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br/>');
+  };
 
   return (
     <div className="mestre-container">
@@ -146,16 +135,18 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* RESENHA DO SANCHES - PROTEGIDA */}
+          {/* RESENHA DO SANCHES - EDITOR ESTÁVEL SEM BLOQUEIO */}
           <div className="ff-card fade-in sanchez-card">
             <div className="sanchez-bg-fade" style={{backgroundImage: `url(${sanchezImg})`}}></div>
             <h3>RESENHA DO SANCHES</h3>
             <input className="sanchez-title-input" placeholder="Título da Crônica..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
             
-            <div className="editor-container">
-              <Suspense fallback={<div style={{color: '#000', padding: '20px'}}>Sintonizando editor...</div>}>
-                <ReactQuill theme="snow" value={resenha} onChange={setResenha} placeholder="Escreva a história aqui..." />
-              </Suspense>
+            <div className="editor-container-vtt">
+              <textarea 
+                placeholder="Dica: Use **texto** para negrito e *texto* para itálico." 
+                value={resenha} 
+                onChange={(e) => setResenha(e.target.value)}
+              />
             </div>
 
             <div className="destinatarios-box">
@@ -184,7 +175,7 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL CRIAÇÃO (SIMETRIA TALL-AREA) */}
+      {/* MODAL CRIAÇÃO MISSÃO */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
@@ -203,7 +194,7 @@ export default function MestrePage() {
               <textarea placeholder="Recompensas" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               <div className="row">
                 <input type="text" className="gil-input" placeholder="Gil" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
-                <input placeholder="Duração" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
+                <input placeholder="Duração (1w 2d)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
               </div>
               <input placeholder="URL Cartaz" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
               <div className="btn-group">
@@ -224,7 +215,7 @@ export default function MestrePage() {
               <div className="sanchez-portrait-oval" style={{backgroundImage: `url(${sanchezImg})`}}></div>
               <h2 className="papiro-title">{tituloResenha || "Crônica"}</h2>
               <p className="papiro-mestre-tag">Escrito por: {mestreIdentidade}</p>
-              <div className="papiro-text" dangerouslySetInnerHTML={{ __html: resenha }}></div>
+              <div className="papiro-text" dangerouslySetInnerHTML={{ __html: formatText(resenha) }}></div>
               <button className="close-papiro" onClick={() => setPreviewPapiro(false)}>FECHAR</button>
             </div>
             <div className="papiro-scroll-bottom"></div>
@@ -255,7 +246,14 @@ export default function MestrePage() {
 
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-bg-fade { position: absolute; top: 0; right: 0; width: 150px; height: 100%; background-size: cover; background-position: center; opacity: 0.15; mask-image: radial-gradient(circle at right, black, transparent 80%); z-index: 0; }
-        .editor-container { background: #fff; color: #000; border-radius: 4px; height: 180px; overflow-y: auto; margin: 10px 0; border: 1px solid #444; }
+        
+        /* EDITOR ESTILO VTT (ESTÁVEL) */
+        .editor-container-vtt textarea { 
+          width: 100%; height: 180px; background: rgba(0,0,0,0.5); border: 1px solid #444; 
+          color: #fff; padding: 10px; resize: none; outline: none; font-size: 13px; 
+          border-radius: 4px; margin: 10px 0; font-family: 'serif';
+        }
+        .editor-container-vtt textarea:focus { border-color: #ffcc00; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; }
 
         .papiro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
@@ -268,24 +266,19 @@ export default function MestrePage() {
 
         .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; text-transform: uppercase; }
         .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
-        .mission-scroll { height: 300px; overflow-y: auto; padding-right: 5px; }
-        .mission-poster { background: rgba(0,0,0,0.5); border: 1px solid #444; margin-bottom: 12px; padding: 12px; border-left: 3px solid #00f2ff; position: relative; }
         .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
-        
         .ff-submit-gold { width: 100%; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; }
         .ff-btn-preview { width: 100%; margin-top: 5px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 10px; }
         
         .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
-        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; }
         .image-frame img { max-width: 100%; max-height: 80vh; }
         .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
-
+        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
-        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
         .destinatarios-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
         .chip { background: rgba(255,204,0,0.1); padding: 4px 10px; border-radius: 15px; border: 1px solid #ffcc00; cursor: pointer; font-size: 10px; }
       `}</style>
