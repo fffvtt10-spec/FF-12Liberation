@@ -4,6 +4,7 @@ import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, 
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
+import papiroImg from '../assets/papiro.jpg'; // Imagem solicitada
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
@@ -30,15 +31,16 @@ const Timer = ({ expiry }) => {
 export default function MestrePage() {
   // Estados para Missões e Modais
   const [missoes, setMissoes] = useState([]);
+  const [resenhas, setResenhas] = useState([]); // Lista de resenhas salvas
   const [showModal, setShowModal] = useState(false);
+  const [showResenhaModal, setShowResenhaModal] = useState(false); // Modal de criação
   const [showDetails, setShowDetails] = useState(null);
+  const [viewResenha, setViewResenha] = useState(null); // Visualização no papiro
   const [viewImage, setViewImage] = useState(null);
   
   // Estados para Resenha do Sanches
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
-  const [previewPapiro, setPreviewPapiro] = useState(false);
-  const [showDestinatarios, setShowDestinatarios] = useState(false); // Estado para o menu flutuante
 
   // --- PERSISTÊNCIA DA ASSINATURA (LOCAL STORAGE) ---
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
@@ -50,7 +52,7 @@ export default function MestrePage() {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // Personagens (Conexão futura)
+  // Personagens Disponíveis
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
   const [destinatarios, setDestinatarios] = useState([]);
 
@@ -59,25 +61,20 @@ export default function MestrePage() {
     nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
 
-  // --- BUSCA DE MISSÕES EM TEMPO REAL ---
+  // --- BUSCA DE DADOS EM TEMPO REAL ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
     if (!auth.currentUser) return;
 
-    const q = query(
-      collection(db, "missoes"), 
-      where("mestreId", "==", auth.currentUser.uid), 
-      orderBy("createdAt", "desc")
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (error) => {
-      console.warn("Aguardando índice composto...");
-      const fallbackQ = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid));
-      onSnapshot(fallbackQ, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    });
-    return () => unsubscribe();
+    // Listener Missões
+    const qM = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
+    const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    // Listener Resenhas
+    const qR = query(collection(db, "resenhas"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
+    const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => { unsubM(); unsubR(); };
   }, []);
 
   const parseDuration = (str) => {
@@ -87,30 +84,24 @@ export default function MestrePage() {
     return weeks + days + hours || 3600000;
   };
 
-  // --- CRIAÇÃO DE MISSÃO ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
       const msToAdd = parseDuration(form.duracao);
       const expiraEm = new Date(Date.now() + msToAdd);
       await addDoc(collection(db, "missoes"), {
-        ...form, 
-        mestreNome: mestreIdentidade, 
-        mestreId: auth.currentUser.uid, 
-        createdAt: serverTimestamp(), 
-        expiraEm: expiraEm.toISOString()
+        ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
       });
       setShowModal(false);
       setForm({ nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz."); }
   };
 
-  // --- PUBLICAÇÃO DA RESENHA ---
   const publicarResenha = async () => {
-    if (!tituloResenha || !resenha) return alert("Sanches exige título e texto!");
+    if (!tituloResenha || !resenha) return alert("Título e texto são obrigatórios!");
     try {
       const expiraEm = new Date();
-      expiraEm.setDate(expiraEm.getDate() + 1); 
+      expiraEm.setDate(expiraEm.getDate() + 1); // Dura exatamente 1 dia
       await addDoc(collection(db, "resenhas"), {
         titulo: tituloResenha,
         conteudo: resenha,
@@ -120,18 +111,13 @@ export default function MestrePage() {
         createdAt: serverTimestamp(),
         expiraEm: expiraEm.toISOString()
       });
-      alert("A crônica foi enviada!");
+      setShowResenhaModal(false);
       setResenha(""); setTituloResenha(""); setDestinatarios([]);
-      setShowDestinatarios(false);
     } catch (e) { alert("Erro ao publicar."); }
   };
 
-  // Função interna para processar negrito e itálico na visualização
   const renderFormattedText = (text) => {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br/>');
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br/>');
   };
 
   return (
@@ -172,44 +158,27 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: RESENHA DO SANCHES */}
+          {/* COLUNA 2: RESENHA DO SANCHES - REFORMULADO */}
           <div className="ff-card fade-in sanchez-card">
-            <div className="sanchez-bg-fade" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-            <h3>RESENHA DO SANCHES</h3>
-            <input className="sanchez-title-input" placeholder="Título da Crônica..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
+            <div className="sanchez-fade-portrait" style={{backgroundImage: `url(${sanchezImg})`}}></div>
+            <div className="sanchez-header">
+              <h3>RESENHA DO SANCHES</h3>
+              <button className="ff-add-btn-gold" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
+            </div>
             
-            <div className="editor-container">
-              <textarea 
-                className="ff-resenha-input"
-                placeholder="Escreva a história aqui... Use **texto** para Negrito e *texto* para Itálico." 
-                value={resenha} 
-                onChange={(e) => setResenha(e.target.value)}
-              />
-            </div>
-
-            {/* Menu Flutuante de Destinatários */}
-            <div className="dropdown-destinatarios">
-              <button className="dropdown-toggle" onClick={() => setShowDestinatarios(!showDestinatarios)}>
-                ENVIAR PARA: {destinatarios.length > 0 ? `(${destinatarios.length})` : "SELECIONAR"}
-              </button>
-              {showDestinatarios && (
-                <div className="dropdown-menu">
-                  {personagensDisponiveis.map(p => (
-                    <label key={p} className="dropdown-item">
-                      <input 
-                        type="checkbox" 
-                        checked={destinatarios.includes(p)} 
-                        onChange={() => destinatarios.includes(p) ? setDestinatarios(destinatarios.filter(x=>x!==p)) : setDestinatarios([...destinatarios, p])} 
-                      /> {p}
-                    </label>
-                  ))}
+            <div className="mission-scroll">
+              {resenhas.map(r => (
+                <div key={r.id} className="resenha-item-card">
+                  <div className="resenha-info">
+                    <h4>{r.titulo}</h4>
+                    <Timer expiry={r.expiraEm} />
+                  </div>
+                  <div className="poster-actions">
+                    <button className="btn-cyan" onClick={() => setViewResenha(r)}>VISUALIZAR</button>
+                    <button className="btn-red" onClick={() => deleteDoc(doc(db, "resenhas", r.id))}>EXCLUIR</button>
+                  </div>
                 </div>
-              )}
-            </div>
-
-            <div className="btn-group-column">
-              <button className="ff-submit-gold" onClick={publicarResenha}>PUBLICAR</button>
-              <button className="ff-btn-preview" onClick={() => setPreviewPapiro(true)}>VISUALIZAR</button>
+              ))}
             </div>
           </div>
 
@@ -224,28 +193,86 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL DE CRIAÇÃO MISSÃO */}
+      {/* MODAL CRIAÇÃO RESENHA */}
+      {showResenhaModal && (
+        <div className="ff-modal-overlay">
+          <div className="ff-modal ff-card">
+            <h3 className="modal-title">ESCREVER CRÔNICA</h3>
+            <input 
+              className="ff-modal-input-dark" 
+              placeholder="Título da Crônica..." 
+              value={tituloResenha} 
+              onChange={(e)=>setTituloResenha(e.target.value)} 
+            />
+            <textarea 
+              className="tall-area-white"
+              placeholder="Use **texto** para negrito..." 
+              value={resenha} 
+              onChange={(e) => setResenha(e.target.value)}
+            />
+            
+            <div className="player-selector-box">
+              <label>DESTINATÁRIOS:</label>
+              <div className="destinatarios-grid">
+                {personagensDisponiveis.map(p => (
+                  <label key={p} className="chip-label">
+                    <input 
+                      type="checkbox" 
+                      checked={destinatarios.includes(p)} 
+                      onChange={() => destinatarios.includes(p) ? setDestinatarios(destinatarios.filter(x=>x!==p)) : setDestinatarios([...destinatarios, p])} 
+                    /> {p}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="btn-group">
+              <button className="btn-forjar" onClick={publicarResenha}>PUBLICAR</button>
+              <button className="btn-cancelar" onClick={() => setShowResenhaModal(false)}>CANCELAR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE VISUALIZAÇÃO NO PAPIRO (IMAGEM) */}
+      {viewResenha && (
+        <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
+           <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
+              <div className="sanchez-oval-view" style={{backgroundImage: `url(${sanchezImg})`}}></div>
+              <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
+              <p className="papiro-mestre-sub">Escrito por: {viewResenha.mestre}</p>
+              <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: renderFormattedText(viewResenha.conteudo) }}></div>
+              
+              <div className="papiro-dest-list">
+                 <strong>ENVIADO PARA:</strong>
+                 <p>{viewResenha.destinatarios.join(", ")}</p>
+              </div>
+              <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
+           </div>
+        </div>
+      )}
+
+      {/* MODAIS DE MISSÃO (MANTIDOS) */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
             <h3 className="modal-title">NOVA MISSÃO</h3>
             <form onSubmit={handleCreateMission}>
-              <input placeholder="Nome da Missão" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
+              <input placeholder="Nome" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
               <textarea placeholder="Descrição" className="tall-area" value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} />
               <textarea placeholder="Objetivos" className="tall-area" value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
-              <textarea placeholder="Requisitos" className="tall-area" value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
               <div className="row">
-                <input placeholder="Grupo (ex: até 6)" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} />
+                <input placeholder="Grupo" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} />
                 <select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>
                   {['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}
                 </select>
               </div>
               <textarea placeholder="Recompensas" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               <div className="row">
-                <input type="text" className="gil-input" placeholder="Gil de Recompensa (Ex: 5000)" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
-                <input placeholder="Duração (Ex: 1w 2d 10h)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
+                <input type="text" className="gil-input" placeholder="Gil" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
+                <input placeholder="1w 2d 10h" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
               </div>
-              <input placeholder="URL do Cartaz (Imgur Link)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
+              <input placeholder="URL do Cartaz" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
               <div className="btn-group">
                 <button type="submit" className="btn-forjar">FORJAR</button>
                 <button type="button" className="btn-cancelar" onClick={() => setShowModal(false)}>CANCELAR</button>
@@ -255,53 +282,15 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE DETALHES MISSÃO */}
-      {showDetails && (
-        <div className="ff-modal-overlay" onClick={() => setShowDetails(null)}>
-          <div className="ff-modal ff-card detail-view" onClick={e => e.stopPropagation()}>
-            <div className={`rank-tag rank-${showDetails.rank}`}>RANK {showDetails.rank}</div>
-            <h2>{showDetails.nome}</h2>
-            <div className="detail-section"><strong>REQUISITOS:</strong><p>{showDetails.requisitos}</p></div>
-            <div className="detail-section"><strong>OBJETIVOS:</strong><p>{showDetails.objetivo}</p></div>
-            <div className="recompensa-list">
-              <strong>RECOMPENSAS:</strong>
-              <p className="gil-txt">💰 {showDetails.gilRecompensa} Gil</p>
-              <ul>{showDetails.recompensa.split('\n').filter(r => r.trim() !== "").map((r,i) => <li key={i}>{r}</li>)}</ul>
-            </div>
-            <button className="ff-submit-gold" onClick={() => setShowDetails(null)}>FECHAR</button>
-          </div>
-        </div>
-      )}
-
-      {/* LIGHTBOX DO CARTAZ */}
+      {/* LIGHTBOX IMAGEM */}
       {viewImage && (
         <div className="ff-image-viewer" onClick={() => setViewImage(null)}>
           <button className="close-viewer">×</button>
-          <div className="image-frame" onClick={e => e.stopPropagation()}>
-            <img src={viewImage} alt="Cartaz da Missão" />
-          </div>
-        </div>
-      )}
-
-      {/* PAPIRO ANIMADO DE VISUALIZAÇÃO */}
-      {previewPapiro && (
-        <div className="papiro-overlay" onClick={() => setPreviewPapiro(false)}>
-          <div className="papiro-container" onClick={e=>e.stopPropagation()}>
-            <div className="papiro-scroll-top"></div>
-            <div className="papiro-content">
-              <div className="sanchez-portrait-oval" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-              <h2 className="papiro-title">{tituloResenha || "Crônica"}</h2>
-              <p className="papiro-mestre-tag">Escrito por: {mestreIdentidade}</p>
-              <div className="papiro-text" dangerouslySetInnerHTML={{ __html: renderFormattedText(resenha) }}></div>
-              <button className="close-papiro" onClick={() => setPreviewPapiro(false)}>FECHAR</button>
-            </div>
-            <div className="papiro-scroll-bottom"></div>
-          </div>
+          <div className="image-frame"><img src={viewImage} alt="Cartaz" /></div>
         </div>
       )}
 
       <style>{`
-        /* --- ESTILOS GERAIS --- */
         .mestre-container { background: #000; min-height: 100vh; position: relative; overflow: hidden; color: #fff; font-family: 'serif'; }
         .mestre-bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(${fundoMestre}) no-repeat center center; background-size: cover; z-index: 0; }
         .ether-vortex-gold { position: absolute; top: -100%; left: -100%; width: 300%; height: 300%; background: conic-gradient(from 0deg, transparent, rgba(255, 204, 0, 0.03), transparent); animation: rotateEther 40s linear infinite; z-index: 1; pointer-events: none; }
@@ -309,69 +298,55 @@ export default function MestrePage() {
         .mestre-content { position: relative; z-index: 10; padding: 30px; }
         .ff-title { color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 30px; text-shadow: 0 0 10px #ffcc00; }
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        .ff-card { background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
         
-        .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border: 1px solid #ffcc00; padding: 10px 15px; background: rgba(0, 10, 30, 0.8); max-width: 450px; }
-        .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
+        /* SANCHEZ PORTRAIT OVAL */
+        .sanchez-card { position: relative; overflow: hidden; }
+        .sanchez-fade-portrait { 
+          position: absolute; top: 10px; right: 10px; width: 120px; height: 150px; 
+          background-size: cover; background-position: center; border-radius: 50%;
+          mask-image: radial-gradient(circle, black 40%, transparent 100%);
+          opacity: 0.6; z-index: 0;
+        }
+        .sanchez-header { position: relative; z-index: 1; margin-bottom: 20px; }
+        .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 12px; margin-bottom: 10px; }
+        .resenha-info h4 { margin: 0; color: #ffcc00; }
 
-        /* --- SANCHEZ CARD --- */
-        .sanchez-card { position: relative; overflow: hidden; display: flex; flex-direction: column; }
-        .sanchez-bg-fade { position: absolute; top: 0; right: 0; width: 150px; height: 100%; background-size: cover; background-position: center; opacity: 0.15; mask-image: radial-gradient(circle at right, black, transparent 80%); z-index: 0; }
-        .editor-container { background: #fff; border-radius: 4px; height: 200px; margin: 10px 0; border: 1px solid #444; overflow: hidden; z-index: 1; }
-        .ff-resenha-input { width: 100%; height: 100%; border: none; padding: 12px; resize: none; outline: none; font-family: 'serif'; font-size: 14px; color: #000; background: #fff; }
-        .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; z-index: 1; }
-        .btn-group-column { display: flex; flex-direction: column; gap: 8px; z-index: 1; }
+        /* PAPIRO REAL CONTAINER */
+        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: flex; align-items: center; justify-content: center; }
+        .papiro-real-container { 
+          width: 600px; height: 450px; background-size: 100% 100%; padding: 60px 80px; 
+          position: relative; color: #3b2b1a; box-shadow: 0 0 50px black;
+        }
+        .sanchez-oval-view { 
+          width: 90px; height: 90px; float: right; border-radius: 50%; 
+          background-size: cover; border: 2px solid #3b2b1a; margin-left: 20px;
+        }
+        .papiro-title-real { border-bottom: 1px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 24px; }
+        .papiro-mestre-sub { font-size: 12px; font-style: italic; margin-top: -10px; }
+        .papiro-body-real { margin-top: 20px; line-height: 1.5; font-size: 15px; height: 180px; overflow-y: auto; }
+        .papiro-dest-list { margin-top: 20px; font-size: 11px; border-top: 1px dashed #3b2b1a; padding-top: 10px; }
+        .papiro-close-btn { position: absolute; bottom: 40px; right: 80px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 5px 15px; cursor: pointer; font-weight: bold; }
 
-        /* Menu Flutuante Estilizado */
-        .dropdown-destinatarios { position: relative; margin: 10px 0; z-index: 10; }
-        .dropdown-toggle { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px; cursor: pointer; font-size: 10px; font-weight: bold; text-align: left; }
-        .dropdown-menu { position: absolute; bottom: 100%; left: 0; width: 100%; background: #000c1d; border: 1px solid #ffcc00; max-height: 150px; overflow-y: auto; padding: 10px; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
-        .dropdown-item { display: block; padding: 5px 0; font-size: 11px; cursor: pointer; border-bottom: 1px solid #112a45; }
-        .dropdown-item:last-child { border-bottom: none; }
-        .dropdown-item input { margin-right: 10px; }
+        /* MODAL STYLES */
+        .ff-modal-input-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; margin-bottom: 10px; outline: none; }
+        .tall-area-white { width: 100%; height: 200px; background: #fff; color: #000; padding: 15px; border-radius: 4px; resize: none; outline: none; font-family: 'serif'; }
+        .player-selector-box { margin: 15px 0; border-top: 1px solid #333; padding-top: 10px; }
+        .destinatarios-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .chip-label { background: rgba(255,204,0,0.1); border: 1px solid #ffcc00; padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer; }
 
-        /* --- PAPIRO ANIMADO --- */
-        .papiro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
-        .papiro-container { width: 450px; position: relative; }
-        .papiro-content { background: #f4e4bc; color: #3b2b1a; padding: 40px; border-left: 2px solid #d4a373; border-right: 2px solid #d4a373; animation: openScroll 1.2s forwards; max-height: 80vh; overflow-y: auto; }
-        @keyframes openScroll { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-        .papiro-scroll-top, .papiro-scroll-bottom { height: 30px; background: #d4a373; border-radius: 15px; width: 106%; margin-left: -3%; z-index: 10; position: relative; }
-        .sanchez-portrait-oval { width: 80px; height: 100px; float: right; margin-left: 15px; background-size: cover; background-position: center; border-radius: 50%; border: 2px solid #3b2b1a; }
-        .papiro-mestre-tag { font-size: 10px; font-style: italic; margin-bottom: 10px; color: #3b2b1a; opacity: 0.7; }
-
-        /* --- ESTILOS DE MISSÕES --- */
-        .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; text-transform: uppercase; }
-        .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
-        .mission-scroll { height: 320px; overflow-y: auto; padding-right: 5px; }
+        .ff-add-btn-gold { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px 20px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.3s; }
+        .ff-add-btn-gold:hover { background: #ffcc00; color: #000; }
+        
+        /* MANTIDOS */
+        .mission-scroll { height: 350px; overflow-y: auto; }
         .mission-poster { background: rgba(0,0,0,0.5); border: 1px solid #444; margin-bottom: 12px; padding: 12px; border-left: 3px solid #00f2ff; position: relative; }
-        .mestre-tag { font-size: 8px; color: #ffcc00; display: block; margin-bottom: 5px; text-transform: uppercase; }
-        .poster-actions { display: flex; gap: 5px; margin-top: 10px; }
-        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; cursor: pointer; font-weight: bold; }
+        .poster-actions button { font-size: 8px; padding: 4px 8px; background: transparent; cursor: pointer; font-weight: bold; margin-right: 5px; }
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; }
-        .btn-cyan:hover { background: #00f2ff; color: #000; }
         .btn-red { border: 1px solid #f44; color: #f44; }
-        .btn-red:hover { background: #f44; color: #fff; }
-
-        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
-        
-        /* --- BOTÕES --- */
-        .ff-submit-gold { width: 100%; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .ff-submit-gold:hover { background: #ffcc00; color: #000; }
-        .ff-btn-preview { width: 100%; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 11px; font-weight: bold; }
-        .ff-btn-preview:hover { background: #00f2ff; color: #000; }
-
-        /* --- LIGHTBOX --- */
-        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
-        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-        .image-frame img { max-width: 100%; max-height: 80vh; display: block; }
-        .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
-
-        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
-        .fade-in { animation: fadeIn 1s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; }
       `}</style>
     </div>
   );
