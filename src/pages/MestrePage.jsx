@@ -44,8 +44,20 @@ export default function MestrePage() {
   const [destinatarios, setDestinatarios] = useState([]);
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
 
+  // FORM ATUALIZADO COM NOVOS CAMPOS
   const [form, setForm] = useState({
-    nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
+    nome: '', 
+    local: '',           // Antigo descrição dos feitos
+    contratante: '',     // Antigo objetivos principais
+    descricaoMissao: '', // Novo campo texto
+    objetivosMissao: '', // Novo campo texto
+    requisitos: '', 
+    grupo: '', 
+    recompensa: '', 
+    rank: 'E', 
+    imagem: '', 
+    duracao: '', 
+    gilRecompensa: ''
   });
 
   // --- PERSISTÊNCIA DA ASSINATURA ---
@@ -82,7 +94,8 @@ export default function MestrePage() {
         ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
       });
       setShowModal(false);
-      setForm({ nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
+      // Reset form completo
+      setForm({ nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz."); }
   };
 
@@ -134,7 +147,7 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: RESENHAS (IMAGEM REMOVIDA DAQUI) */}
+          {/* COLUNA 2: RESENHAS */}
           <div className="ff-card sanchez-card board-column">
             <div className="sanchez-header-top no-border">
               <h3>RESENHA DO SANCHEZ</h3>
@@ -175,17 +188,30 @@ export default function MestrePage() {
                 <label>NOME DA MISSÃO</label>
                 <input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
               </div>
+              
+              {/* NOVOS CAMPOS CURTOS */}
               <div className="modal-input-group">
-                <label>DESCRIÇÃO DOS FEITOS</label>
-                <textarea className="tall-area-dark" placeholder="O que aconteceu..." value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} />
+                <label>LOCAL</label>
+                <input placeholder="Onde ocorre..." value={form.local} onChange={e=>setForm({...form, local: e.target.value})} />
               </div>
               <div className="modal-input-group">
-                <label>OBJETIVOS PRINCIPAIS</label>
-                <textarea className="tall-area-dark" placeholder="O que deve ser feito..." value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
+                <label>CONTRATANTE</label>
+                <input placeholder="Quem paga..." value={form.contratante} onChange={e=>setForm({...form, contratante: e.target.value})} />
               </div>
+
+              {/* NOVOS CAMPOS DE TEXTO LONGO */}
+              <div className="modal-input-group">
+                <label>DESCRIÇÃO DA MISSÃO</label>
+                <textarea className="tall-area-dark" placeholder="Detalhes da história e contexto..." value={form.descricaoMissao} onChange={e=>setForm({...form, descricaoMissao: e.target.value})} />
+              </div>
+              <div className="modal-input-group">
+                <label>OBJETIVOS DA MISSÃO</label>
+                <textarea className="tall-area-dark" placeholder="O que deve ser feito passo a passo..." value={form.objetivosMissao} onChange={e=>setForm({...form, objetivosMissao: e.target.value})} />
+              </div>
+
               <div className="modal-input-group">
                 <label>REQUISITOS DA MISSÃO</label>
-                <textarea className="tall-area-dark" placeholder="O que é necessário..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
+                <textarea className="tall-area-dark" placeholder="O que é necessário para aceitar..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
               </div>
               
               <div className="row-double-ff">
@@ -262,7 +288,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE DETALHES (NOVO UX MELHORADO) */}
+      {/* MODAL DE DETALHES (ATUALIZADO COM NOVOS CAMPOS) */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
@@ -276,14 +302,31 @@ export default function MestrePage() {
             </div>
 
             <div className="detail-body-grid">
+               {/* INFO ROW: Local e Contratante */}
+               <div className="detail-info-row">
+                   <div className="info-item">
+                       <label>🌍 LOCAL</label>
+                       <span>{showDetails.local || "Desconhecido"}</span>
+                   </div>
+                   <div className="info-item">
+                       <label>👤 CONTRATANTE</label>
+                       <span>{showDetails.contratante || "Anônimo"}</span>
+                   </div>
+               </div>
+
+               <div className="detail-section">
+                   <label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label>
+                   <p className="section-text">{showDetails.descricaoMissao || "Sem descrição."}</p>
+               </div>
+
+               <div className="detail-section">
+                   <label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label>
+                   <p className="section-text">{showDetails.objetivosMissao || "Sem objetivos definidos."}</p>
+               </div>
+
                <div className="detail-section">
                    <label className="section-label">⚡ REQUISITOS</label>
                    <p className="section-text">{showDetails.requisitos || "Sem requisitos especiais."}</p>
-               </div>
-               
-               <div className="detail-section">
-                   <label className="section-label">🎯 OBJETIVOS</label>
-                   <p className="section-text">{showDetails.objetivo}</p>
                </div>
 
                <div className="detail-section reward-section">
@@ -309,7 +352,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* PAPIRO DA RESENHA (COM FOTO E FADE) */}
+      {/* PAPIRO DA RESENHA */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -353,7 +396,6 @@ export default function MestrePage() {
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
 
         .sanchez-card { position: relative; overflow: hidden; }
-        /* Sanchez removido do board, mantendo apenas CSS estrutural do card */
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
@@ -383,6 +425,13 @@ export default function MestrePage() {
         .detail-narrator { color: #00f2ff; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 4px; display: block; }
 
         .detail-body-grid { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* NOVA LINHA DE INFO (LOCAL E CONTRATANTE) */
+        .detail-info-row { display: flex; gap: 25px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+        .info-item { flex: 1; }
+        .info-item label { color: #ffcc00; font-size: 10px; display: block; margin-bottom: 5px; font-weight: bold; opacity: 0.8; }
+        .info-item span { color: #fff; font-size: 14px; font-weight: bold; letter-spacing: 0.5px; }
+
         .detail-section { margin-bottom: 5px; }
         .section-label { color: #ffcc00; font-size: 11px; font-weight: bold; display: block; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
         .section-text { font-size: 15px; line-height: 1.5; color: #ddd; margin: 0; white-space: pre-wrap; }
@@ -405,7 +454,6 @@ export default function MestrePage() {
             max-height: 95vh;
             background-size: 100% 100%; 
             background-repeat: no-repeat; 
-            /* AUMENTADO DE 85px 120px PARA 110px 160px PARA FORÇAR O TEXTO PARA DENTRO */
             padding: 110px 160px; 
             color: #3b2b1a; 
             position: relative; 
@@ -413,7 +461,6 @@ export default function MestrePage() {
             flex-direction: column; 
         }
         
-        /* Foto do Sanchez no papiro com fade suave */
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; 
            mask-image: radial-gradient(circle, black 60%, transparent 100%); 
            -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); 
@@ -429,14 +476,10 @@ export default function MestrePage() {
            line-height: 1.6; 
            font-size: 18px; 
            padding-right: 10px;
-           /* ESCONDE SCROLLBAR NO FIREFOX */
            scrollbar-width: none;  
            -ms-overflow-style: none;
         }
-        /* ESCONDE SCROLLBAR NO CHROME/SAFARI/EDGE */
-        .papiro-body-real::-webkit-scrollbar { 
-           display: none; 
-        }
+        .papiro-body-real::-webkit-scrollbar { display: none; }
 
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
@@ -458,7 +501,6 @@ export default function MestrePage() {
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Lightbox do Cartaz */
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
