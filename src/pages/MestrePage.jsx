@@ -5,14 +5,17 @@ import { backgroundMusic } from './LandingPage';
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 
+// --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date().getTime();
       const distance = new Date(expiry).getTime() - now;
-      if (distance < 0) { setTimeLeft("EXPIRADA"); clearInterval(interval); }
-      else {
+      if (distance < 0) { 
+        setTimeLeft("EXPIRADA"); 
+        clearInterval(interval); 
+      } else {
         const days = Math.floor(distance / (1000 * 60 * 60 * 24));
         const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const mins = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
@@ -25,72 +28,106 @@ const Timer = ({ expiry }) => {
 };
 
 export default function MestrePage() {
+  // Estados para Missões e Modais
   const [missoes, setMissoes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showDetails, setShowDetails] = useState(null);
   const [viewImage, setViewImage] = useState(null);
+  
+  // Estados para Resenha do Sanches
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [previewPapiro, setPreviewPapiro] = useState(false);
 
+  // --- PERSISTÊNCIA DA ASSINATURA (LOCAL STORAGE) ---
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
-    return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
+    const salva = localStorage.getItem('mestreAssinatura');
+    return salva || auth.currentUser?.email?.split('@')[0] || "Narrador";
   });
 
   useEffect(() => {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
+  // Personagens (Conexão futura)
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
   const [destinatarios, setDestinatarios] = useState([]);
 
+  // Formulário da Missão
   const [form, setForm] = useState({
     nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
 
+  // --- BUSCA DE MISSÕES EM TEMPO REAL ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
+    
+    // Fallback de segurança para garantir que auth.currentUser existe
     if (!auth.currentUser) return;
-    const q = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
+
+    const q = query(
+      collection(db, "missoes"), 
+      where("mestreId", "==", auth.currentUser.uid), 
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (error) => {
+      console.warn("Aguardando índice composto...");
       const fallbackQ = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid));
       onSnapshot(fallbackQ, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     });
     return () => unsubscribe();
   }, []);
 
+  const parseDuration = (str) => {
+    const weeks = (str.match(/(\d+)w/) || [0, 0])[1] * 604800000;
+    const days = (str.match(/(\d+)d/) || [0, 0])[1] * 86400000;
+    const hours = (str.match(/(\d+)h/) || [0, 0])[1] * 3600000;
+    return weeks + days + hours || 3600000;
+  };
+
+  // --- CRIAÇÃO DE MISSÃO ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
-      const weeks = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000;
-      const days = (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000;
-      const hours = (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
-      const expiraEm = new Date(Date.now() + (weeks + days + hours || 3600000));
+      const msToAdd = parseDuration(form.duracao);
+      const expiraEm = new Date(Date.now() + msToAdd);
       await addDoc(collection(db, "missoes"), {
-        ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
+        ...form, 
+        mestreNome: mestreIdentidade, 
+        mestreId: auth.currentUser.uid, 
+        createdAt: serverTimestamp(), 
+        expiraEm: expiraEm.toISOString()
       });
       setShowModal(false);
       setForm({ nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz."); }
   };
 
+  // --- PUBLICAÇÃO DA RESENHA ---
   const publicarResenha = async () => {
     if (!tituloResenha || !resenha) return alert("Título e texto são obrigatórios!");
     try {
       const expiraEm = new Date();
       expiraEm.setDate(expiraEm.getDate() + 1); 
       await addDoc(collection(db, "resenhas"), {
-        titulo: tituloResenha, conteudo: resenha, mestre: mestreIdentidade, mestreId: auth.currentUser.uid, destinatarios, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
+        titulo: tituloResenha,
+        conteudo: resenha,
+        mestre: mestreIdentidade,
+        mestreId: auth.currentUser.uid,
+        destinatarios,
+        createdAt: serverTimestamp(),
+        expiraEm: expiraEm.toISOString()
       });
       alert("A crônica foi enviada!");
       setResenha(""); setTituloResenha(""); setDestinatarios([]);
     } catch (e) { alert("Erro ao publicar."); }
   };
 
-  // Função para converter texto em negrito/itálico básico manualmente (Estilo VTT)
-  const formatText = (text) => {
+  // Função interna para processar negrito e itálico na visualização
+  const renderFormattedText = (text) => {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -135,15 +172,17 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* RESENHA DO SANCHES - EDITOR ESTÁVEL SEM BLOQUEIO */}
+          {/* RESENHA DO SANCHES - CORREÇÃO DE TELA PRETA */}
           <div className="ff-card fade-in sanchez-card">
             <div className="sanchez-bg-fade" style={{backgroundImage: `url(${sanchezImg})`}}></div>
             <h3>RESENHA DO SANCHES</h3>
             <input className="sanchez-title-input" placeholder="Título da Crônica..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
             
-            <div className="editor-container-vtt">
+            <div className="editor-container">
+              {/* Substituído ReactQuill por Textarea blindado para evitarTypeError */}
               <textarea 
-                placeholder="Dica: Use **texto** para negrito e *texto* para itálico." 
+                className="ff-resenha-input"
+                placeholder="Escreva a história aqui... Use **texto** para Negrito." 
                 value={resenha} 
                 onChange={(e) => setResenha(e.target.value)}
               />
@@ -175,7 +214,7 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL CRIAÇÃO MISSÃO */}
+      {/* MODAL DE CRIAÇÃO MISSÃO */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
@@ -185,18 +224,29 @@ export default function MestrePage() {
               <textarea placeholder="Descrição" className="tall-area" value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} />
               <textarea placeholder="Objetivos" className="tall-area" value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
               <textarea placeholder="Requisitos" className="tall-area" value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
+              
               <div className="row">
-                <input placeholder="Grupo" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} />
+                <input placeholder="Grupo (ex: até 6)" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} />
                 <select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>
                   {['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}
                 </select>
               </div>
+
               <textarea placeholder="Recompensas" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
+              
               <div className="row">
-                <input type="text" className="gil-input" placeholder="Gil" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
-                <input placeholder="Duração (1w 2d)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
+                <input 
+                  type="text" 
+                  className="gil-input"
+                  placeholder="Gil de Recompensa (Ex: 5000)" 
+                  value={form.gilRecompensa} 
+                  onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} 
+                />
+                <input placeholder="Duração (Ex: 1w 2d 10h)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
               </div>
-              <input placeholder="URL Cartaz" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
+
+              <input placeholder="URL Cartaz (Imgur Link)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
+
               <div className="btn-group">
                 <button type="submit" className="btn-forjar">FORJAR</button>
                 <button type="button" className="btn-cancelar" onClick={() => setShowModal(false)}>CANCELAR</button>
@@ -206,7 +256,35 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* PAPIRO ANIMADO */}
+      {/* MODAL DE DETALHES MISSÃO */}
+      {showDetails && (
+        <div className="ff-modal-overlay" onClick={() => setShowDetails(null)}>
+          <div className="ff-modal ff-card detail-view" onClick={e => e.stopPropagation()}>
+            <div className={`rank-tag rank-${showDetails.rank}`}>RANK {showDetails.rank}</div>
+            <h2>{showDetails.nome}</h2>
+            <div className="detail-section"><strong>REQUISITOS:</strong><p>{showDetails.requisitos}</p></div>
+            <div className="detail-section"><strong>OBJETIVOS:</strong><p>{showDetails.objetivo}</p></div>
+            <div className="recompensa-list">
+              <strong>RECOMPENSAS:</strong>
+              <p className="gil-txt">💰 {showDetails.gilRecompensa} Gil</p>
+              <ul>{showDetails.recompensa.split('\n').filter(r => r.trim() !== "").map((r,i) => <li key={i}>{r}</li>)}</ul>
+            </div>
+            <button className="ff-submit-gold" onClick={() => setShowDetails(null)}>FECHAR</button>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX DO CARTAZ */}
+      {viewImage && (
+        <div className="ff-image-viewer" onClick={() => setViewImage(null)}>
+          <button className="close-viewer">×</button>
+          <div className="image-frame" onClick={e => e.stopPropagation()}>
+            <img src={viewImage} alt="Cartaz da Missão" />
+          </div>
+        </div>
+      )}
+
+      {/* PAPIRO ANIMADO DE VISUALIZAÇÃO */}
       {previewPapiro && (
         <div className="papiro-overlay" onClick={() => setPreviewPapiro(false)}>
           <div className="papiro-container" onClick={e=>e.stopPropagation()}>
@@ -215,7 +293,7 @@ export default function MestrePage() {
               <div className="sanchez-portrait-oval" style={{backgroundImage: `url(${sanchezImg})`}}></div>
               <h2 className="papiro-title">{tituloResenha || "Crônica"}</h2>
               <p className="papiro-mestre-tag">Escrito por: {mestreIdentidade}</p>
-              <div className="papiro-text" dangerouslySetInnerHTML={{ __html: formatText(resenha) }}></div>
+              <div className="papiro-text" dangerouslySetInnerHTML={{ __html: renderFormattedText(resenha) }}></div>
               <button className="close-papiro" onClick={() => setPreviewPapiro(false)}>FECHAR</button>
             </div>
             <div className="papiro-scroll-bottom"></div>
@@ -223,39 +301,32 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* LIGHTBOX CARTAZ */}
-      {viewImage && (
-        <div className="ff-image-viewer" onClick={() => setViewImage(null)}>
-          <button className="close-viewer">×</button>
-          <div className="image-frame"><img src={viewImage} alt="Cartaz" /></div>
-        </div>
-      )}
-
       <style>{`
+        /* --- ESTILOS GERAIS --- */
         .mestre-container { background: #000; min-height: 100vh; position: relative; overflow: hidden; color: #fff; font-family: 'serif'; }
         .mestre-bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(${fundoMestre}) no-repeat center center; background-size: cover; z-index: 0; }
         .ether-vortex-gold { position: absolute; top: -100%; left: -100%; width: 300%; height: 300%; background: conic-gradient(from 0deg, transparent, rgba(255, 204, 0, 0.03), transparent); animation: rotateEther 40s linear infinite; z-index: 1; pointer-events: none; }
         @keyframes rotateEther { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .mestre-content { position: relative; z-index: 10; padding: 30px; }
+        .ff-title { color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 30px; text-shadow: 0 0 10px #ffcc00; }
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         .ff-card { background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
-        .ff-title { color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 30px; text-shadow: 0 0 10px #ffcc00; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         
         .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border: 1px solid #ffcc00; padding: 10px 15px; background: rgba(0, 10, 30, 0.8); max-width: 450px; }
         .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
 
+        /* --- SANCHEZ CARD --- */
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-bg-fade { position: absolute; top: 0; right: 0; width: 150px; height: 100%; background-size: cover; background-position: center; opacity: 0.15; mask-image: radial-gradient(circle at right, black, transparent 80%); z-index: 0; }
         
-        /* EDITOR ESTILO VTT (ESTÁVEL) */
-        .editor-container-vtt textarea { 
-          width: 100%; height: 180px; background: rgba(0,0,0,0.5); border: 1px solid #444; 
-          color: #fff; padding: 10px; resize: none; outline: none; font-size: 13px; 
-          border-radius: 4px; margin: 10px 0; font-family: 'serif';
-        }
-        .editor-container-vtt textarea:focus { border-color: #ffcc00; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
+        /* CORREÇÃO DO EDITOR: Substituí o Quill quebrado por CSS estável */
+        .editor-container { background: #fff; color: #000; border-radius: 4px; height: 180px; margin: 10px 0; border: 1px solid #444; overflow: hidden; }
+        .ff-resenha-input { width: 100%; height: 100%; border: none; padding: 10px; resize: none; outline: none; font-family: 'serif'; font-size: 14px; color: #000; }
+
         .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; }
 
+        /* --- PAPIRO ANIMADO --- */
         .papiro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
         .papiro-container { width: 450px; position: relative; }
         .papiro-content { background: #f4e4bc; color: #3b2b1a; padding: 40px; border-left: 2px solid #d4a373; border-right: 2px solid #d4a373; animation: openScroll 1.2s forwards; max-height: 80vh; overflow-y: auto; }
@@ -264,21 +335,32 @@ export default function MestrePage() {
         .sanchez-portrait-oval { width: 80px; height: 100px; float: right; margin-left: 15px; background-size: cover; background-position: center; border-radius: 50%; border: 2px solid #3b2b1a; }
         .papiro-mestre-tag { font-size: 10px; font-style: italic; margin-bottom: 10px; color: #3b2b1a; opacity: 0.7; }
 
+        /* --- ESTILOS DE MISSÕES --- */
         .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; text-transform: uppercase; }
         .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
+        .mission-scroll { height: 280px; overflow-y: auto; padding-right: 5px; }
+        .mission-poster { background: rgba(0,0,0,0.5); border: 1px solid #444; margin-bottom: 12px; padding: 12px; border-left: 3px solid #00f2ff; position: relative; }
+        .mestre-tag { font-size: 8px; color: #ffcc00; display: block; margin-bottom: 5px; text-transform: uppercase; }
         .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
-        .ff-submit-gold { width: 100%; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; }
-        .ff-btn-preview { width: 100%; margin-top: 5px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 10px; }
-        
-        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
-        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; }
-        .image-frame img { max-width: 100%; max-height: 80vh; }
-        .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
-        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .gil-txt { color: #ffcc00; font-weight: bold; }
+
+        /* --- BOTÕES --- */
+        .ff-submit-gold { width: 100%; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .ff-submit-gold:hover { background: #ffcc00; color: #000; }
+        .ff-btn-preview { width: 100%; margin-top: 5px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 10px; font-weight: bold; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+
+        /* --- LIGHTBOX --- */
+        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        .image-frame img { max-width: 100%; max-height: 80vh; display: block; }
+        .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
+
+        .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
         .destinatarios-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
         .chip { background: rgba(255,204,0,0.1); padding: 4px 10px; border-radius: 15px; border: 1px solid #ffcc00; cursor: pointer; font-size: 10px; }
       `}</style>
