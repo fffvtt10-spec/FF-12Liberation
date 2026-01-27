@@ -99,7 +99,6 @@ export default function MestrePage() {
 
   return (
     <div className="mestre-container">
-      {/* Imagem de Fundo Restaurada na Íntegra */}
       <div className="mestre-bg-image-full" style={{backgroundImage: `url(${fundoMestre})`}}></div>
       
       <div className="mestre-content">
@@ -135,12 +134,12 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* RESENHA DO SANCHES */}
+          {/* BOARD DO SANCHEZ - REFORMULADO */}
           <div className="ff-card sanchez-card board-column">
             <div className="sanchez-fade-oval" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-            <div className="sanchez-header">
+            <div className="sanchez-header-top">
               <h3>RESENHA DO SANCHES</h3>
-              <button className="ff-add-btn-gold" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
+              <button className="ff-add-btn-gold-small" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
             </div>
             <div className="mission-scroll">
               {resenhas.map(r => (
@@ -167,7 +166,7 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- MODAL NOVA MISSÃO (ESTILO E GRIDS REPARADOS) --- */}
+      {/* --- MODAL NOVA MISSÃO (ESTILO E ESPAÇAMENTO CORRIGIDOS) --- */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -186,7 +185,6 @@ export default function MestrePage() {
                 <textarea className="tall-area-dark" placeholder="O que deve ser feito..." value={form.objetivo} onChange={e=>setForm({...form, objetivo: e.target.value})} />
               </div>
               
-              {/* Grid de Grupo e Rank Corrigido */}
               <div className="row-double-ff">
                 <div className="field-group">
                   <label>GRUPO</label>
@@ -205,7 +203,6 @@ export default function MestrePage() {
                 <textarea className="tall-area-dark" placeholder="Itens, equipamentos..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               </div>
 
-              {/* Grid de Gil e Duração Corrigido */}
               <div className="row-double-ff">
                 <div className="field-group">
                   <label>GIL</label>
@@ -231,7 +228,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL NOVA RESENHA --- */}
+      {/* --- MODAL NOVA RESENHA (ESTILO FINAL FANTASY) --- */}
       {showResenhaModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -242,13 +239,13 @@ export default function MestrePage() {
             </div>
             <div className="modal-input-group">
                <label>CORPO DO TEXTO</label>
-               <textarea className="tall-area-white" placeholder="Use **texto** para negrito." value={resenha} onChange={(e) => setResenha(e.target.value)} />
+               <textarea className="tall-area-ff-dark" placeholder="Use **texto** para negrito." value={resenha} onChange={(e) => setResenha(e.target.value)} />
             </div>
-            <div className="player-selector-box">
-              <label>DESTINATÁRIOS:</label>
-              <div className="destinatarios-grid">
+            <div className="player-selector-box-fixed">
+              <label>DESTINATÁRIOS (LISTA FIXA):</label>
+              <div className="destinatarios-grid-fixed">
                 {personagensDisponiveis.map(p => (
-                  <label key={p} className="chip-label">
+                  <label key={p} className="chip-label-ff">
                     <input type="checkbox" checked={destinatarios.includes(p)} onChange={() => destinatarios.includes(p) ? setDestinatarios(destinatarios.filter(x=>x!==p)) : setDestinatarios([...destinatarios, p])} /> {p}
                   </label>
                 ))}
@@ -262,7 +259,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- MODAL DETALHES (GIL + ESPECIARIAS FIXO) --- */}
+      {/* --- MODAL DETALHES --- */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
@@ -302,7 +299,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- LIGHTBOX CARTAZ (MODAL EXCLUSIVO) --- */}
+      {/* --- LIGHTBOX CARTAZ --- */}
       {viewImage && (
         <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
           <div className="lightbox-wrap">
@@ -314,36 +311,28 @@ export default function MestrePage() {
 
       <style>{`
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
-        
-        /* Fundo Restaurado Integra */
-        .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
-        
+        .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.3; z-index: 0; filter: contrast(120%) brightness(80%); }
         .mestre-content { position: relative; z-index: 1; padding: 30px; }
         .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; margin-bottom: 30px; font-size: 2.5rem; }
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
         
-        /* CARDS */
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
         .board-column { height: 600px; display: flex; flex-direction: column; }
 
-        /* IDENTIDADE */
         .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; }
         .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 5px 10px; font-weight: bold; font-family: 'serif'; outline: none; }
 
-        /* MISSÕES BOARD */
         .mission-scroll { flex: 1; overflow-y: auto; padding-right: 8px; }
         .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
         .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
 
-        /* SANCHEZ BOARD */
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-fade-oval { position: absolute; top: 15px; right: 15px; width: 150px; height: 150px; background-size: cover; background-position: center; border-radius: 50%; mask-image: radial-gradient(circle, black 40%, transparent 100%); opacity: 0.7; z-index: 0; pointer-events: none; }
-        .sanchez-header { position: relative; z-index: 1; margin-bottom: 25px; }
+        .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
 
-        /* MODAIS RECONSTRUIDOS */
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.94); z-index: 99999; display: flex; align-items: center; justify-content: center; }
         .ff-modal-scrollable { width: 550px; max-height: 90vh; overflow-y: auto; background: #000c1d; border: 2px solid #ffcc00; padding: 35px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
         .modal-title-ff { color: #fff; font-size: 22px; border-bottom: 1px solid #ffcc00; padding-bottom: 10px; margin-bottom: 20px; letter-spacing: 2px; }
@@ -352,47 +341,47 @@ export default function MestrePage() {
         .modal-input-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
         .modal-input-group input { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; font-size: 14px; }
         
-        /* Grids de Input Corrigidos */
         .row-double-ff { display: flex; gap: 20px; margin-bottom: 20px; }
         .field-group { flex: 1; display: flex; flex-direction: column; }
         .field-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; }
         .field-group input, .field-group select { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; font-family: 'serif'; outline: none; }
         
         .tall-area-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; height: 110px; resize: none; font-family: 'serif'; outline: none; }
+        .tall-area-ff-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #fff; padding: 15px; height: 250px; resize: none; font-family: 'serif'; outline: none; font-size: 16px; border-radius: 4px; }
         .tall-area-white { width: 100%; height: 260px; background: #fff; color: #000; padding: 18px; border-radius: 4px; resize: none; font-family: 'serif'; font-size: 16px; outline: none; }
 
-        /* DETALHES */
         .detail-view-main { width: 550px; background: #000c1d; border: 2px solid #ffcc00; padding: 30px; }
         .rank-tag-main { color: #ffcc00; font-size: 18px; font-weight: bold; display: block; margin-bottom: 5px; }
+        .detail-title { font-size: 28px; border-bottom: 2px solid #ffcc00; padding-bottom: 12px; margin-top: 0; }
         .detail-body-main p { font-size: 15px; line-height: 1.6; margin: 10px 0 20px 0; color: #ccc; }
         .recompensa-final-box { background: rgba(255,255,255,0.03); padding: 15px; border: 1px dashed #444; }
         .primary-reward { font-size: 18px; color: #ffcc00; font-weight: bold; margin: 5px 0 !important; }
         .ff-final-close-btn { width: 100%; background: #fff; color: #000; border: none; padding: 15px; font-weight: bold; margin-top: 25px; cursor: pointer; font-size: 14px; text-transform: uppercase; }
 
-        /* PAPIRO REAL */
         .papiro-real-container { width: 750px; height: 550px; background-size: 100% 100%; background-repeat: no-repeat; padding: 85px 120px; color: #3b2b1a; position: relative; }
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; mask-image: radial-gradient(circle, black 55%, transparent 100%); margin-left: 20px; }
         .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
         .papiro-body-real { margin-top: 25px; height: 230px; overflow-y: auto; line-height: 1.6; font-size: 18px; }
         .papiro-close-btn { position: absolute; bottom: 50px; right: 120px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 10px 25px; cursor: pointer; font-weight: bold; font-size: 14px; }
 
-        /* LIGHTBOX */
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
         .cartaz-full-view { max-width: 100%; max-height: 85vh; border: 4px solid #ffcc00; box-shadow: 0 0 60px rgba(0,0,0,1); object-fit: contain; }
         .close-lightbox { position: absolute; top: -60px; right: 0; font-size: 70px; color: #ffcc00; background: none; border: none; cursor: pointer; }
 
-        /* BOTÕES GERAIS */
         .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .ff-add-btn-gold { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 14px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.4s; }
-        .ff-add-btn-gold:hover { background: #ffcc00; color: #000; box-shadow: 0 0 25px #ffcc00; }
+        .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
+        .ff-add-btn-gold-small:hover { background: #ffcc00; color: #000; box-shadow: 0 0 15px #ffcc00; }
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; margin-right: 10px; font-weight: bold; }
         .btn-red { border: 1px solid #f44; color: #f44; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; font-weight: bold; }
         .btn-group-ff { display: flex; gap: 20px; margin-top: 25px; }
         .btn-forjar-main { flex: 1; background: #ffcc00; color: #000; border: none; padding: 14px; font-weight: bold; cursor: pointer; font-size: 14px; text-transform: uppercase; }
         .btn-cancelar-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
 
+        .player-selector-box-fixed { margin: 25px 0; border-top: 1px solid #333; padding-top: 15px; }
+        .destinatarios-grid-fixed { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+        .chip-label-ff { background: rgba(0, 10, 30, 0.8); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 18px; border-radius: 4px; font-size: 12px; cursor: pointer; display: inline-block; }
+
         .mission-timer { font-size: 12px; color: #00f2ff; display: block; margin-top: 10px; font-weight: bold; letter-spacing: 1px; }
-        .chip-label { background: rgba(255,204,0,0.1); border: 1px solid #ffcc00; padding: 8px 18px; border-radius: 25px; font-size: 12px; cursor: pointer; display: inline-block; margin: 5px; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
