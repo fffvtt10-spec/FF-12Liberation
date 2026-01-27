@@ -7,6 +7,7 @@ import { backgroundMusic } from './LandingPage';
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 
+// Componente de Cronômetro
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function MestrePage() {
   const [tituloResenha, setTituloResenha] = useState("");
   const [previewPapiro, setPreviewPapiro] = useState(false);
 
-  // PERSISTÊNCIA DA ASSINATURA: Salva no navegador para não resetar no F5
+  // PERSISTÊNCIA DA ASSINATURA: Resolvendo o problema de resetar no F5
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
   });
@@ -44,7 +45,7 @@ export default function MestrePage() {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // Lista de personagens (Placeholder para conexão futura)
+  // Lista de personagens (Futura conexão)
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
   const [destinatarios, setDestinatarios] = useState([]);
 
@@ -54,10 +55,18 @@ export default function MestrePage() {
 
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
-    const q = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
+    
+    // Listener das missões com fallback para evitar tela vazia sem índice
+    const q = query(
+      collection(db, "missoes"), 
+      where("mestreId", "==", auth.currentUser.uid), 
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMissoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (error) => {
+      console.warn("Aguardando índice composto...");
       const fallbackQ = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid));
       onSnapshot(fallbackQ, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     });
@@ -68,17 +77,23 @@ export default function MestrePage() {
     const weeks = (str.match(/(\d+)w/) || [0, 0])[1] * 604800000;
     const days = (str.match(/(\d+)d/) || [0, 0])[1] * 86400000;
     const hours = (str.match(/(\d+)h/) || [0, 0])[1] * 3600000;
-    return weeks + days + hours;
+    return weeks + days + hours || 3600000;
   };
 
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
       const msToAdd = parseDuration(form.duracao);
-      const expiraEm = new Date(new Date().getTime() + msToAdd);
+      const expiraEm = new Date(Date.now() + msToAdd);
+      
       await addDoc(collection(db, "missoes"), {
-        ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
+        ...form, 
+        mestreNome: mestreIdentidade, 
+        mestreId: auth.currentUser.uid, 
+        createdAt: serverTimestamp(), 
+        expiraEm: expiraEm.toISOString()
       });
+      
       setShowModal(false);
       setForm({ nome: '', descricao: '', objetivo: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz."); }
@@ -92,7 +107,7 @@ export default function MestrePage() {
       await addDoc(collection(db, "resenhas"), {
         titulo: tituloResenha,
         conteudo: resenha,
-        mestre: mestreIdentidade,
+        mestre: mestreIdentidade, // Tag do mestre salva aqui
         mestreId: auth.currentUser.uid,
         destinatarios,
         createdAt: serverTimestamp(),
@@ -121,7 +136,9 @@ export default function MestrePage() {
           <div className="ff-card fade-in">
             <div className="card-header">
               <h3>QUADRO DE MISSÕES</h3>
-              <button className="ff-add-btn" onClick={() => setShowModal(true)}><span>+</span> ADICIONAR CARTAZ</button>
+              <button className="ff-add-btn" onClick={() => setShowModal(true)}>
+                <span>+</span> ADICIONAR CARTAZ
+              </button>
             </div>
             <div className="mission-scroll">
               {missoes.map(m => (
@@ -177,7 +194,7 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL DE CRIAÇÃO */}
+      {/* MODAL DE CRIAÇÃO (TODOS OS CAMPOS SYMMETRIC) */}
       {showModal && (
         <div className="ff-modal-overlay">
           <div className="ff-modal ff-card">
@@ -198,11 +215,17 @@ export default function MestrePage() {
               <textarea placeholder="Recompensas" className="tall-area" value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
               
               <div className="row">
-                <input type="text" className="gil-input" placeholder="Gil" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
-                <input placeholder="Duração" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
+                <input 
+                  type="text" 
+                  className="gil-input"
+                  placeholder="Gil de Recompensa (Ex: 5000)" 
+                  value={form.gilRecompensa} 
+                  onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} 
+                />
+                <input placeholder="Duração (Ex: 1w 2d 10h)" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
               </div>
 
-              <input placeholder="URL Cartaz" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
+              <input placeholder="URL Cartaz (Imgur Link)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
 
               <div className="btn-group">
                 <button type="submit" className="btn-forjar">FORJAR</button>
@@ -235,11 +258,13 @@ export default function MestrePage() {
       {viewImage && (
         <div className="ff-image-viewer" onClick={() => setViewImage(null)}>
           <button className="close-viewer">×</button>
-          <div className="image-frame"><img src={viewImage} alt="Cartaz" /></div>
+          <div className="image-frame" onClick={e => e.stopPropagation()}>
+            <img src={viewImage} alt="Cartaz da Missão" />
+          </div>
         </div>
       )}
 
-      {/* PAPIRO ANIMADO */}
+      {/* PAPIRO ANIMADO DE VISUALIZAÇÃO */}
       {previewPapiro && (
         <div className="papiro-overlay" onClick={() => setPreviewPapiro(false)}>
           <div className="papiro-container" onClick={e=>e.stopPropagation()}>
@@ -271,11 +296,11 @@ export default function MestrePage() {
         .mestre-identity-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border: 1px solid #ffcc00; padding: 10px 15px; background: rgba(0, 10, 30, 0.8); max-width: 450px; }
         .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #ffcc00; color: #ffcc00; font-weight: bold; width: 180px; outline: none; }
 
-        /* SÁNCHEZ E PAPIRO */
+        /* SANCHEZ E PAPIRO */
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-bg-fade { position: absolute; top: 0; right: 0; width: 150px; height: 100%; background-size: cover; background-position: center; opacity: 0.15; mask-image: radial-gradient(circle at right, black, transparent 80%); z-index: 0; }
         .editor-container { background: #fff; color: #000; border-radius: 4px; height: 150px; overflow-y: auto; margin: 10px 0; }
-        .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; }
+        .sanchez-title-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #444; color: #ffcc00; font-weight: bold; outline: none; margin-bottom: 5px; }
 
         .papiro-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
         .papiro-container { width: 450px; position: relative; }
@@ -285,22 +310,28 @@ export default function MestrePage() {
         .sanchez-portrait-oval { width: 80px; height: 100px; float: right; margin-left: 15px; background-size: cover; background-position: center; border-radius: 50%; border: 2px solid #3b2b1a; }
         .papiro-mestre-tag { font-size: 10px; font-style: italic; margin-bottom: 10px; color: #555; }
 
-        /* ESTILOS GERAIS */
-        .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; }
+        /* ESTILOS DE MISSÕES */
+        .ff-add-btn { background: rgba(0, 242, 255, 0.05); border: 1px solid #00f2ff; color: #00f2ff; font-size: 10px; padding: 6px 14px; cursor: pointer; font-weight: bold; transition: 0.4s; text-transform: uppercase; }
         .ff-add-btn:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
         .mission-scroll { height: 280px; overflow-y: auto; padding-right: 5px; }
         .mission-poster { background: rgba(0,0,0,0.5); border: 1px solid #444; margin-bottom: 12px; padding: 12px; border-left: 3px solid #00f2ff; position: relative; }
         .mestre-tag { font-size: 8px; color: #ffcc00; display: block; margin-bottom: 5px; text-transform: uppercase; }
         .tall-area { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 80px; resize: none; outline: none; }
+        .gil-txt { color: #ffcc00; font-weight: bold; }
+
+        /* BUTTONS */
         .ff-submit-gold { width: 100%; background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .ff-submit-gold:hover { background: #ffcc00; color: #000; }
-        .ff-btn-preview { width: 100%; margin-top: 5px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 10px; }
-        
-        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; }
-        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; }
-        .image-frame img { max-width: 100%; max-height: 80vh; }
+        .ff-btn-preview { width: 100%; margin-top: 5px; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; cursor: pointer; font-size: 10px; font-weight: bold; }
         .btn-cancelar { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 10px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 12px; }
         .btn-forjar { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+
+        /* LIGHTBOX */
+        .ff-image-viewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+        .image-frame { max-width: 85%; max-height: 85%; border: 2px solid #ffcc00; background: #000; cursor: default; }
+        .image-frame img { max-width: 100%; max-height: 80vh; display: block; }
+        .close-viewer { position: absolute; top: 20px; right: 40px; background: none; border: none; color: #ffcc00; font-size: 60px; cursor: pointer; }
+
         .gil-input::-webkit-outer-spin-button, .gil-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
