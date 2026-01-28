@@ -46,7 +46,7 @@
     {
       "id": "moogles",
       "name": "Moogles",
-      "image": "races/moogles.png",
+      "image": "races/moogle.png",
       "description": "Pequenos, adoráveis e envoltos em mistério. Possuem corpos peludos, antenas com pompons flutuantes e pequenas asas de morcego. Não possuem gênero definido.",
       "characteristics": "Extremamente inteligentes e obcecados por tecnologia e invenções, misturando ciência com feitiçaria. Carregam um estranho 'magnetismo da sorte'.",
       "racial_bonus": {
@@ -129,7 +129,7 @@
     {
       "id": "nu_mou",
       "name": "Nu Mou",
-      "image": "races/nu_mou.png",
+      "image": "races/nu-mou.png",
       "description": "Pequenos em estatura, com aparência canina e pelagem espessa, mas imensos em conhecimento. São magos natos que vivem séculos acumulando sabedoria.",
       "characteristics": "Frequentemente ocupam cargos de conselheiros. Possuem empatia natural com a vida selvagem, comunicando-se com monstros e animais.",
       "racial_bonus": {
