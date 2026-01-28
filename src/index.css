@@ -1,4 +1,6 @@
 /* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@300;400;700&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -8,227 +10,211 @@
 body, html, #root {
   width: 100%;
   height: 100%;
-  overflow: hidden; /* Remove as barras de scroll */
-  background-color: black;
+  overflow: hidden;
+  background-color: #050505;
+  font-family: 'Lato', sans-serif;
 }
 
+/* --- Fundo Genérico --- */
 .landing-container {
   width: 100vw;
   height: 100vh;
-  background-image: url('./assets/fundo-rpg.jpg'); /* Verifique o caminho da sua imagem */
-  background-size: cover; /* Faz a imagem cobrir a tela toda */
+  background-image: url('./assets/fundo-rpg.jpg');
+  background-size: cover;
   background-position: center;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
 }
 
-/* Animação de Fade Suave */
-.fade-in {
-  animation: fadeIn 3s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* --- FFT Theme & Ether Animations --- */
-
-/* Fundo do Éter (Azul Brilhante Animado) */
-@keyframes etherFlow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
+/* --- Tema Éter (Mantido) --- */
 .ether-bg {
-  background: linear-gradient(-45deg, #0a1a3f, #1e3c72, #2a5298, #00d2ff);
-  background-size: 400% 400%;
-  animation: etherFlow 15s ease infinite;
+  background: radial-gradient(circle at center, #1a2a40 0%, #000000 100%);
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  top: 0; left: 0; width: 100%; height: 100%;
   z-index: -1;
-  overflow: hidden;
 }
 
-/* Efeito de partículas (Simulado com radial gradients) */
 .ether-particles {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0; width: 100%; height: 100%;
   background-image: 
-    radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
-    radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
-    radial-gradient(rgba(255,255,255,.4), rgba(255,255,255,.1) 2px, transparent 3px);
-  background-size: 550px 550px, 350px 350px, 250px 250px;
-  background-position: 0 0, 40px 60px, 130px 270px;
-  animation: particleMove 60s linear infinite;
-  opacity: 0.6;
+    radial-gradient(white, rgba(255,255,255,.1) 1px, transparent 2px),
+    radial-gradient(rgba(100,200,255,.3), transparent 2px);
+  background-size: 300px 300px;
+  animation: starsMove 100s linear infinite;
+  opacity: 0.4;
 }
 
-@keyframes particleMove {
-  from { transform: translateY(0); }
-  to { transform: translateY(-500px); }
+@keyframes starsMove {
+  from { background-position: 0 0; }
+  to { background-position: 0 1000px; }
 }
 
-/* Intro Blur Overlay */
-.intro-blur {
-  position: fixed;
-  top: 0;
-  left: 0;
+/* --- ESTILO DE CRIAÇÃO DE PERSONAGEM (NOVO) --- */
+
+/* Tipografia de Título RPG */
+.rpg-title {
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  background: linear-gradient(to bottom, #ffd700, #b8860b);
+  -webkit-background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+}
+
+/* Efeito de Fade nas Bordas das Imagens */
+.image-fade-mask {
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 70%);
+  transition: all 0.5s ease;
+}
+
+/* Carousel Container */
+.carousel-container {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 2rem;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  height: 60vh;
+  /* Esconder Scrollbar */
+  scrollbar-width: none; 
+  -ms-overflow-style: none;
+}
+.carousel-container::-webkit-scrollbar { display: none; }
+
+/* Cards do Carousel */
+.fantasy-card {
+  min-width: 250px;
+  height: 400px;
+  position: relative;
+  transition: all 0.4s ease;
+  cursor: pointer;
+  opacity: 0.5;
+  transform: scale(0.9);
+  border-radius: 8px;
+}
+
+.fantasy-card:hover {
+  opacity: 0.8;
+  transform: scale(0.95);
+}
+
+.fantasy-card.active {
+  opacity: 1;
+  transform: scale(1.1);
+  z-index: 10;
+  filter: drop-shadow(0 0 20px rgba(0, 150, 255, 0.4));
+}
+
+.fantasy-card img {
   width: 100%;
   height: 100%;
-  backdrop-filter: blur(15px);
-  background-color: rgba(10, 26, 63, 0.6);
-  z-index: 50;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: opacity 1s ease-in-out, visibility 1s;
-  cursor: pointer;
+  object-fit: cover;
+  border-radius: 8px;
+  /* Aplica o fade nas bordas */
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
 }
 
-.intro-blur.hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.press-start-text {
-  font-family: 'Courier New', Courier, monospace; /* Ideal usar uma fonte pixelada se tiver */
-  font-size: 2rem;
-  color: white;
-  text-shadow: 0 0 10px #00d2ff, 0 0 20px #00d2ff;
-  animation: pulse 1.5s infinite;
-  text-transform: uppercase;
-  letter-spacing: 5px;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.95); }
-}
-
-/* Janelas estilo FFT */
-.fft-window {
-  background: linear-gradient(to bottom, #2b3f66, #162038);
-  border: 2px solid #aebfd6;
-  border-radius: 4px;
-  box-shadow: 
-    0 0 0 2px #4a5d85,
-    0 0 10px rgba(0,0,0,0.5);
-  color: #fff;
-  padding: 1rem;
-  position: relative;
-}
-
-.fft-window::before {
-  /* Detalhe dos cantos estilo FFT */
-  content: '';
+.card-name {
   position: absolute;
-  top: 2px; left: 2px; right: 2px; bottom: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  pointer-events: none;
+  bottom: 20px;
+  width: 100%;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  color: #fff;
+  font-size: 1.5rem;
+  text-shadow: 0 2px 4px black;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
-.fft-button {
-  background: linear-gradient(to bottom, #4c669f, #192b5f);
-  border: 1px solid #8ba4d6;
-  color: white;
-  padding: 8px 16px;
+.fantasy-card.active .card-name {
+  opacity: 1;
+}
+
+/* --- Layout de Detalhes (Fase 2) --- */
+.details-layout {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0,0,0,0.4);
+}
+
+.details-image-col {
+  width: 40%;
+  height: 100%;
+  position: relative;
+  animation: slideInLeft 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.details-image-col img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Fade lateral suave para fundir com o texto */
+  mask-image: linear-gradient(to right, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 60%, transparent 100%);
+}
+
+.details-content-col {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  animation: fadeIn 1s ease-in;
+}
+
+/* Painéis de Informação */
+.info-panel {
+  background: linear-gradient(to right, rgba(20, 30, 50, 0.9), rgba(0,0,0,0));
+  border-left: 3px solid #b8860b;
+  padding: 20px;
+  margin-bottom: 20px;
+  color: #e0e0e0;
+}
+
+/* Botões de Classe (Gamificados) */
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.class-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #444;
+  padding: 15px;
+  text-align: center;
   cursor: pointer;
-  text-transform: uppercase;
-  font-weight: bold;
-  transition: all 0.2s;
-  text-shadow: 1px 1px 0 #000;
+  transition: all 0.3s;
+  border-radius: 4px;
 }
 
-.fft-button:hover {
-  background: linear-gradient(to bottom, #6b8ecf, #2a4585);
-  box-shadow: 0 0 8px #00d2ff;
-}
-
-.fft-button:disabled {
-  background: #333;
-  border-color: #555;
-  color: #888;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.race-card {
-  transition: transform 0.2s, box-shadow 0.2s;
-  cursor: pointer;
-}
-.race-card:hover, .race-card.selected {
-  transform: translateY(-2px);
-  box-shadow: 0 0 15px #00d2ff;
+.class-btn:hover {
+  background: rgba(255,255,255,0.1);
   border-color: #fff;
 }
 
-/* --- NOVOS ESTILOS: SELEÇÃO DE PERSONAGEM (CAROUSEL & DETALHES) --- */
-
-/* Fundo estilo Grid Cibernético/Éter Moderno */
-.fighting-bg {
-  background: 
-    linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.9)),
-    url('https://www.transparenttextures.com/patterns/cubes.png'), 
-    linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-  background-attachment: fixed;
-  background-size: auto, auto, 400% 400%;
-  animation: gradientBG 15s ease infinite;
+.class-btn.selected {
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  border-color: #00d2ff;
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
 }
 
-@keyframes gradientBG {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* Recortes Diagonais (Estilo Persona/Fighting Games) */
-.slant-container {
-  clip-path: polygon(0 0, 100% 0, 95% 100%, 0% 100%);
-}
-
-.slant-reverse {
-  clip-path: polygon(5% 0, 100% 0, 100% 100%, 0% 100%);
-}
-
-/* Card do Carousel */
-.racer-card {
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-  filter: grayscale(80%) brightness(0.6);
-  transform: scale(0.9);
-}
-
-.racer-card.active {
-  filter: grayscale(0%) brightness(1.1);
-  transform: scale(1.1);
-  z-index: 10;
-  box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);
-  border: 2px solid #fff;
-}
-
-/* Texto estilo Arcade */
-.arcade-font {
-  font-family: 'Impact', sans-serif; /* Use uma fonte mais grossa se tiver */
+.class-role {
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  font-style: italic;
+  color: #888;
+  display: block;
+  margin-top: 5px;
 }
 
-/* Scrollbar invisível para o carousel */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.class-btn.selected .class-role { color: #8ecfff; }
+
+/* Animações */
+@keyframes slideInLeft {
+  from { transform: translateX(-50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
