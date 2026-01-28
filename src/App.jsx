@@ -9,7 +9,7 @@ import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminPage from './pages/AdminPage';
 import MestrePage from './pages/MestrePage';
-import CharacterCreation from './CharacterCreation'; // Importação mantida
+import CharacterCreation from './pages/CharacterCreation'; // Importação mantida
 
 // Rota do Jogador (Mantenha o recurso conforme solicitado)
 const JogadorPage = () => <div style={{color: 'white', padding: '50px'}}>PÁGINA DO JOGADOR EM CONSTRUÇÃO</div>;
