@@ -15,7 +15,6 @@ const CharacterCreation = () => {
   const [selectedRace, setSelectedRace] = useState(null); 
   const [selectedGender, setSelectedGender] = useState('female');
   const [selectedClass, setSelectedClass] = useState(null);
-  const [characterName, setCharacterName] = useState('');
 
   const races = racesData.races;
 
@@ -111,25 +110,8 @@ const CharacterCreation = () => {
   };
 
   const handleBack = () => {
-    if (viewState === 'naming') {
-        setViewState('details');
-    } else {
-        setViewState('carousel');
-        setSelectedClass(null);
-    }
-  };
-
-  const handleFinalizeCreation = () => {
-    setViewState('naming');
-  };
-
-  const handleConfirmName = () => {
-    if (characterName.trim().length < 3) {
-        alert("O nome deve ter pelo menos 3 caracteres.");
-        return;
-    }
-    // Aqui você pode salvar os dados antes de navegar
-    navigate('/vtt');
+    setViewState('carousel');
+    setSelectedClass(null);
   };
 
   const activeRace = races[activeIndex];
@@ -151,9 +133,9 @@ const CharacterCreation = () => {
             {viewState === 'carousel' ? 'Determine sua Linhagem Ancestral' : `${selectedRace?.name} // Customização`}
           </p>
         </div>
-        {(viewState === 'details' || viewState === 'naming') && (
+        {viewState === 'details' && (
           <button onClick={handleBack} className="nav-back-btn">
-            <span>←</span> {viewState === 'naming' ? 'Ajustar Detalhes' : 'Seleção'}
+            <span>←</span> Seleção
           </button>
         )}
       </header>
@@ -195,8 +177,8 @@ const CharacterCreation = () => {
       )}
 
       {/* --- FASE 2: DETALHES --- */}
-      {(viewState === 'details' || viewState === 'naming') && selectedRace && (
-        <div className={`details-grid transition-all duration-500 ${viewState === 'naming' ? 'blur-3xl grayscale brightness-50 scale-95 pointer-events-none' : ''}`}>
+      {viewState === 'details' && selectedRace && (
+        <div className="details-grid">
           
           {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
           <div className="char-portrait-container">
@@ -328,49 +310,13 @@ const CharacterCreation = () => {
             <div className="mt-8 mb-10">
                <button
                  disabled={!selectedClass}
-                 onClick={handleFinalizeCreation}
+                 onClick={() => navigate('/vtt')}
                  className="confirm-btn"
                >
                  {selectedClass ? 'Finalizar Criação' : 'Selecione uma Vocação'}
                </button>
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL DE NOME (CENTRALIZADO COM BLUR) --- */}
-      {viewState === 'naming' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-[fadeIn_0.4s]">
-          <div className="relative w-full max-w-lg p-12 rounded-lg bg-black/80 border border-yellow-500/30 shadow-[0_0_100px_rgba(0,0,0,0.9)] text-center animate-[scaleIn_0.3s_ease-out]">
-            <h2 className="rpg-title text-3xl text-white mb-8 tracking-wider">Qual o seu nome, aventureiro?</h2>
-            
-            <div className="relative mb-10">
-                <input 
-                    autoFocus
-                    type="text"
-                    value={characterName}
-                    onChange={(e) => setCharacterName(e.target.value)}
-                    placeholder="Sussurre seu nome..."
-                    className="w-full bg-transparent border-b border-white/20 p-2 text-3xl text-center text-yellow-500 outline-none focus:border-yellow-500 transition-all tracking-[0.2em] font-serif italic"
-                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmName()}
-                />
-            </div>
-
-            <div className="flex flex-col items-center gap-6">
-                <button 
-                    onClick={handleConfirmName}
-                    className="confirm-btn !py-2 !px-8 !text-sm !w-auto shadow-[0_0_20px_rgba(234,179,8,0.2)]"
-                >
-                    Confirmar
-                </button>
-                <button 
-                    onClick={handleBack}
-                    className="text-[10px] uppercase text-gray-500 hover:text-white transition-colors tracking-[0.3em] font-bold"
-                >
-                    Voltar
-                </button>
-            </div>
           </div>
         </div>
       )}
