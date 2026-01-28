@@ -16,6 +16,10 @@ const CharacterCreation = () => {
   const [selectedGender, setSelectedGender] = useState('female');
   const [selectedClass, setSelectedClass] = useState(null);
 
+  // --- NOVOS ESTADOS PARA O MODAL DE NOME ---
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [charName, setCharName] = useState('');
+
   const races = racesData.races;
 
   // 1. Limpeza de Audio
@@ -112,6 +116,12 @@ const CharacterCreation = () => {
   const handleBack = () => {
     setViewState('carousel');
     setSelectedClass(null);
+  };
+
+  const handleFinalizeCreation = () => {
+    // Aqui você pode salvar os dados (nome, raça, classe) no contexto ou localStorage se precisar
+    console.log(`Personagem Criado: ${charName} - ${selectedRace.name} - ${selectedClass}`);
+    navigate('/vtt');
   };
 
   const activeRace = races[activeIndex];
@@ -277,10 +287,10 @@ const CharacterCreation = () => {
 
                     {/* Bônus */}
                     <div className="cd-bonus-box">
-                       <span className="text-xs uppercase font-bold text-blue-300">Bônus de Classe</span>
-                       <span className="font-mono text-sm text-white">
-                         {renderBonuses(info.bonus_class)}
-                       </span>
+                        <span className="text-xs uppercase font-bold text-blue-300">Bônus de Classe</span>
+                        <span className="font-mono text-sm text-white">
+                          {renderBonuses(info.bonus_class)}
+                        </span>
                     </div>
 
                     {/* Habilidades Organizadas */}
@@ -306,11 +316,11 @@ const CharacterCreation = () => {
               })()}
             </div>
 
-            {/* Botão Final */}
+            {/* Botão Final (Alterado para abrir modal) */}
             <div className="mt-8 mb-10">
                <button
                  disabled={!selectedClass}
-                 onClick={() => navigate('/vtt')}
+                 onClick={() => setShowNameModal(true)}
                  className="confirm-btn"
                >
                  {selectedClass ? 'Finalizar Criação' : 'Selecione uma Vocação'}
@@ -320,6 +330,49 @@ const CharacterCreation = () => {
           </div>
         </div>
       )}
+
+      {/* --- MODAL DE NOME (Z-INDEX SUPERIOR + BLUR FORTE) --- */}
+      {showNameModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl animate-[fadeIn_0.5s]">
+           <div className="relative bg-neutral-900/90 border border-yellow-500/50 p-8 rounded-lg shadow-[0_0_60px_rgba(234,179,8,0.3)] flex flex-col items-center gap-6 max-w-md w-full">
+             
+             {/* Título do Modal */}
+             <div className="text-center">
+               <h3 className="rpg-title text-3xl text-yellow-500 tracking-wide mb-2">Identidade</h3>
+               <p className="text-xs text-gray-400 uppercase tracking-widest">Como a história o conhecerá?</p>
+             </div>
+
+             {/* Input e Botão */}
+             <div className="flex w-full gap-3">
+               <input 
+                 type="text" 
+                 value={charName}
+                 onChange={(e) => setCharName(e.target.value)}
+                 placeholder="Nome do Aventureiro"
+                 className="flex-1 bg-black/50 border border-white/20 text-white px-4 py-3 rounded text-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all font-serif"
+                 autoFocus
+               />
+               <button 
+                 onClick={handleFinalizeCreation}
+                 disabled={!charName.trim()}
+                 className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-4 py-2 rounded transition-colors text-sm uppercase tracking-wide flex items-center justify-center min-w-[60px]"
+               >
+                 Go
+               </button>
+             </div>
+
+             {/* Botão Fechar/Cancelar */}
+             <button 
+               onClick={() => setShowNameModal(false)}
+               className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+             >
+               ✕
+             </button>
+
+           </div>
+        </div>
+      )}
+
     </div>
   );
 };
