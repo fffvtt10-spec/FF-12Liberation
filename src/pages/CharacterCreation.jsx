@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import racesData from './data/races.json';
-import classesData from './data/classes.json';
+import racesData from '../data/races.json';
+import classesData from '../data/classes.json';
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
