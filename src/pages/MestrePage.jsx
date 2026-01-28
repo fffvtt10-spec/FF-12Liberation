@@ -5,6 +5,7 @@ import { backgroundMusic } from './LandingPage';
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
+import Bazar from './Bazar'; // <--- IMPORTA O COMPONENTE BAZAR
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
@@ -527,6 +528,9 @@ export default function MestrePage() {
           </div>
         </div>
       )}
+
+      {/* --- AQUI ENTRA O BAZAR --- */}
+      <Bazar isMestre={true} />
 
       <style>{`
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
