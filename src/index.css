@@ -25,10 +25,9 @@ body, html, #root {
   text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
 }
 
-/* Correção Ponto 1: Estilo melhorado para subtítulos/linhagem */
 .rpg-subtitle-styled {
   font-family: 'Cinzel', serif;
-  color: #94a3b8; /* Cinza azulado elegante */
+  color: #94a3b8;
   font-size: 0.85rem;
   letter-spacing: 3px;
   text-transform: uppercase;
@@ -92,7 +91,8 @@ body, html, #root {
   display: flex;
   align-items: center;
   overflow-x: auto;
-  padding: 0 50vw;
+  /* ATUALIZAÇÃO AQUI: Padding normal na esquerda, grande na direita */
+  padding: 0 50vw 0 40px;
   gap: 40px;
   scrollbar-width: none;
 }
@@ -130,31 +130,20 @@ body, html, #root {
 /* --- TELA DE DETALHES --- */
 .details-grid {
   display: grid;
-  grid-template-columns: 40% 60%; /* Ajuste de proporção */
+  grid-template-columns: 40% 60%;
   height: 100vh; width: 100vw;
   padding-top: 80px;
 }
 
-/* Correção Ponto 2: Imagem Alinhada, Zoom no Perfil e Fade Suave */
 .char-portrait-container {
-  position: relative; 
-  height: 100%; 
-  display: flex; 
-  align-items: center; /* Centraliza verticalmente, não no rodapé */
-  justify-content: center;
-  overflow: hidden; /* Garante que o zoom não vaze */
+  position: relative; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 
 .char-portrait {
-  width: 100%;
-  height: 100%;
-  object-fit: cover; /* Cobre a área (Zoom effect) */
-  object-position: top center; /* Foca no rosto/perfil */
-  transform: scale(1.1); /* Zoom inicial leve */
-  /* Fade Suave em volta (Vignette Radial) */
+  width: 100%; height: 100%; object-fit: cover; object-position: top center; transform: scale(1.1);
   mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
   -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
-  animation: slowZoom 20s infinite alternate; /* Movimento sutil */
+  animation: slowZoom 20s infinite alternate;
 }
 
 @keyframes slowZoom {
@@ -214,7 +203,6 @@ body, html, #root {
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
 }
 
-/* Painel de Vidro */
 .glass-panel {
   background: rgba(10, 15, 30, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -225,16 +213,15 @@ body, html, #root {
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-/* Correção Ponto 3: Texto de Descrição Organizado e Formatado */
 .description-text {
   font-size: 1rem;
-  line-height: 1.8; /* Espaçamento entre linhas para leitura */
+  line-height: 1.8;
   color: #cbd5e1;
   text-align: justify;
-  background: rgba(0, 0, 0, 0.2); /* Fundo sutil para contraste */
+  background: rgba(0, 0, 0, 0.2);
   padding: 15px;
   border-radius: 4px;
-  border-left: 3px solid #fbbf24; /* Borda dourada lateral */
+  border-left: 3px solid #fbbf24;
   margin-bottom: 20px;
 }
 
@@ -248,10 +235,10 @@ body, html, #root {
   letter-spacing: 1px;
 }
 
-/* Correção Ponto 4: Botões de Classe Dinâmicos e Organizados */
+/* --- CLASSE SELETOR & DETALHES --- */
 .class-selector-grid {
   display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Botões mais largos */
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 15px;
   margin-bottom: 25px;
 }
@@ -265,7 +252,7 @@ body, html, #root {
   cursor: pointer; 
   transition: all 0.2s;
   display: flex;
-  flex-direction: column; /* Organiza texto verticalmente */
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 80px;
@@ -280,26 +267,14 @@ body, html, #root {
 }
 
 .class-btn-title {
-  font-family: 'Cinzel', serif;
-  font-weight: bold;
-  font-size: 1rem;
-  color: #e2e8f0;
-  text-transform: uppercase;
-  margin-bottom: 4px;
+  font-family: 'Cinzel', serif; font-weight: bold; font-size: 1rem; color: #e2e8f0; text-transform: uppercase; margin-bottom: 4px;
 }
 .class-btn.selected .class-btn-title { color: #fbbf24; }
 
 .class-btn-role {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  background: rgba(0,0,0,0.3);
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;
 }
 
-/* Painel de Detalhes da Classe */
 .class-detail-container {
   border-top: 2px solid #fbbf24;
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
@@ -343,7 +318,6 @@ body, html, #root {
 .cd-ab-cost { font-size: 0.7rem; background: #1e293b; padding: 3px 8px; border-radius: 4px; color: #94a3b8; border: 1px solid #334155; }
 .cd-ab-desc { font-size: 0.85rem; color: #cbd5e1; line-height: 1.4; }
 
-/* Botão Confirmar */
 .confirm-btn {
   width: 100%; padding: 18px;
   background: linear-gradient(to bottom, #d97706, #92400e);
@@ -356,7 +330,6 @@ body, html, #root {
 .confirm-btn:hover:not(:disabled) { filter: brightness(1.2); transform: translateY(-2px); box-shadow: 0 0 25px rgba(251, 191, 36, 0.4); }
 .confirm-btn:disabled { background: #334155; border-color: #475569; color: #94a3b8; cursor: not-allowed; }
 
-/* Animações */
 @keyframes zoomFadeIn {
   from { transform: scale(1.2); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
