@@ -2,15 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
-// Importe sua imagem de fundo corretamente
-import bgCharacter from '../assets/fundo-character.jpg';
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
   const carouselRef = useRef(null);
 
   // --- ESTADOS ---
-  const [viewState, setViewState] = useState('carousel'); // 'carousel' | 'details'
+  const [viewState, setViewState] = useState('carousel'); 
   const [activeIndex, setActiveIndex] = useState(0); 
   const [selectedRace, setSelectedRace] = useState(null); 
   const [selectedGender, setSelectedGender] = useState('female');
@@ -27,37 +25,35 @@ const CharacterCreation = () => {
     });
   }, []);
 
-  // 2. Centralização do Carousel
+  // 2. Efeito de Scroll no Carousel
   useEffect(() => {
     if (viewState === 'carousel' && carouselRef.current) {
-      // Largura do Card (260px) + Gap (40px) = 300px
-      const itemSize = 300; 
+      const itemSize = 300; // 260px card + 40px gap
       const centerOffset = (window.innerWidth / 2) - (260 / 2);
-      const scrollPos = (activeIndex * itemSize) - centerOffset + 130; 
-      carouselRef.current.scrollTo({ left: scrollPos, behavior: 'smooth' });
+      // scroll instantâneo via JS para seguir o indice, mas behavior auto no CSS faria pulo
+      // Aqui usamos smooth para clique, mas o wheel vai brigar se não cuidarmos
+      carouselRef.current.scrollTo({ left: (activeIndex * itemSize) - centerOffset + 130, behavior: 'smooth' });
     }
   }, [activeIndex, viewState]);
 
-  // 3. Scroll Horizontal com Mouse Wheel
+  // 3. Scroll RÁPIDO com Mouse Wheel
   const handleWheelScroll = (e) => {
     if (carouselRef.current) {
-      carouselRef.current.scrollLeft += e.deltaY;
+      // Multiplicador 4x para velocidade
+      carouselRef.current.scrollLeft += e.deltaY * 4; 
     }
   };
 
   // --- LÓGICA DE DADOS ---
-  
   const getAvailableClasses = () => {
     if (!selectedRace) return [];
-    
-    // Tratamento especial para Viera
     if (typeof selectedRace.base_classes === 'object' && !Array.isArray(selectedRace.base_classes)) {
       if (selectedRace.id === 'viera') {
         return selectedGender === 'female' 
           ? selectedRace.base_classes.female 
           : selectedRace.base_classes.male || selectedRace.base_classes.male_exiled;
       }
-      return []; // Fallback
+      return []; 
     }
     return selectedRace.base_classes || [];
   };
@@ -73,48 +69,46 @@ const CharacterCreation = () => {
     setViewState('details');
   };
 
+  const handleBack = () => {
+    setViewState('carousel');
+    setSelectedClass(null);
+  };
+
   const activeRace = races[activeIndex];
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
       
-      {/* --- CAMADA 1: BACKGROUND FIXO E ESCURO --- */}
-      <div className="fixed-bg-layer">
-        <img src={bgCharacter} alt="Background" />
+      {/* --- BACKGROUND ANIMADO (ÉTER) --- */}
+      <div className="ether-container">
+        <div className="ether-vortex"></div>
+        <div className="ether-particles"></div>
       </div>
-      <div className="overlay-layer"></div>
-      <div className="ether-particles"></div>
 
-      {/* --- CAMADA 2: HEADER (Sempre visível) --- */}
-      <header className="absolute top-0 w-full p-6 z-50 flex justify-between items-center border-b border-white/10 bg-gradient-to-b from-black to-transparent">
+      {/* --- CABEÇALHO --- */}
+      <header className="absolute top-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
         <div>
           <h1 className="rpg-title text-3xl">Gênese da Alma</h1>
-          <p className="text-gray-400 text-xs tracking-widest uppercase">
+          <p className="text-gray-400 text-xs tracking-widest uppercase mt-1">
             {viewState === 'carousel' ? 'Selecione sua Linhagem' : `${selectedRace?.name} // Personalização`}
           </p>
         </div>
         {viewState === 'details' && (
-          <button 
-            onClick={() => setViewState('carousel')}
-            className="px-6 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-yellow-500 rounded text-xs uppercase tracking-widest transition-all bg-black/50"
-          >
-            Voltar
+          <button onClick={handleBack} className="nav-back-btn">
+            <span>←</span> Seleção
           </button>
         )}
       </header>
 
-      {/* --- CAMADA 3: CONTEÚDO PRINCIPAL --- */}
-      
-      {/* MODO CARROSEL */}
+      {/* --- FASE 1: CAROUSEL --- */}
       {viewState === 'carousel' && (
         <div className="w-full h-full flex flex-col justify-center animate-[fadeIn_1s]">
           
-          {/* Título da Raça Ativa */}
-          <div className="text-center mb-6 z-10">
+          <div className="text-center mb-4 z-10">
             <h2 className="rpg-title text-5xl text-yellow-500 drop-shadow-lg">{activeRace.name}</h2>
           </div>
 
-          {/* Carousel Viewport */}
+          {/* Viewport do Carousel */}
           <div 
             ref={carouselRef}
             onWheel={handleWheelScroll}
@@ -132,11 +126,10 @@ const CharacterCreation = () => {
             ))}
           </div>
 
-          {/* Botão de Selecionar */}
           <div className="text-center mt-10 z-10">
             <button 
               onClick={confirmRaceSelection}
-              className="cta-button w-64 mx-auto"
+              className="confirm-btn w-64 mx-auto"
             >
               Escolher {activeRace.name}
             </button>
@@ -144,70 +137,67 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* MODO DETALHES (GRID) */}
+      {/* --- FASE 2: DETALHES --- */}
       {viewState === 'details' && selectedRace && (
         <div className="details-grid">
           
-          {/* Coluna Esquerda: Imagem */}
+          {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
           <div className="char-portrait-container">
-            <h1 className="absolute bottom-10 left-[-50px] text-9xl rpg-title opacity-10 pointer-events-none rotate-90 whitespace-nowrap">
-              {selectedRace.name}
-            </h1>
             <img src={selectedRace.image} alt={selectedRace.name} className="char-portrait" />
           </div>
 
-          {/* Coluna Direita: Informações (Scrollável) */}
+          {/* LADO DIREITO: INFO */}
           <div className="info-scroll-area custom-scrollbar">
             
-            {/* 1. Painel da Raça */}
-            <div className="glass-panel mt-10">
-              <h3 className="section-header">Sobre a Raça</h3>
-              <p className="text-gray-300 italic mb-6 leading-relaxed text-sm">
+            {/* Bloco 1: Lore */}
+            <div className="glass-panel mt-8 border-l-4 border-yellow-600">
+              <h3 className="section-header !border-none !mb-2 text-yellow-500">Descrição</h3>
+              <p className="text-gray-300 italic text-sm leading-relaxed">
                 "{selectedRace.description}"
               </p>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs text-blue-400 uppercase font-bold">Características</span>
-                  <p className="text-xs text-gray-400 mt-1">{selectedRace.characteristics}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-green-400 uppercase font-bold">Bônus Racial</span>
-                  <div className="text-xs text-gray-300 font-mono mt-1">
-                    {JSON.stringify(selectedRace.racial_bonus).replace(/["{}]/g, '').replace(/,/g, ', ')}
-                  </div>
-                </div>
+              <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+                 <div>
+                   <span className="text-[10px] uppercase text-blue-400 font-bold">Características</span>
+                   <p className="text-xs text-gray-400 mt-1">{selectedRace.characteristics}</p>
+                 </div>
+                 <div>
+                   <span className="text-[10px] uppercase text-green-400 font-bold">Bônus Racial</span>
+                   <div className="text-xs text-gray-300 font-mono mt-1">
+                     {JSON.stringify(selectedRace.racial_bonus).replace(/["{}]/g, '').replace(/,/g, ', ').replace(/:/g, ': ')}
+                   </div>
+                 </div>
               </div>
             </div>
 
-            {/* 2. Seletor de Gênero */}
-            <div className="glass-panel flex items-center justify-between">
-              <span className="rpg-text text-gray-400 text-sm">GÊNERO DO PERSONAGEM</span>
-              <div className="flex gap-2">
-                <button 
+            {/* Bloco 2: Gênero */}
+            <div className="glass-panel flex flex-col gap-2">
+              <span className="text-xs text-gray-400 uppercase font-bold tracking-widest">Gênero</span>
+              <div className="flex w-full">
+                <div 
                   onClick={() => { setSelectedGender('female'); setSelectedClass(null); }}
-                  className={`px-4 py-1 text-xs border rounded uppercase transition-all ${selectedGender === 'female' ? 'bg-pink-900/50 border-pink-500 text-white' : 'border-gray-600 text-gray-500'}`}
+                  className={`gender-option ${selectedGender === 'female' ? 'active' : ''}`}
                 >
                   Feminino
-                </button>
-                <button 
+                </div>
+                <div 
                   onClick={() => { setSelectedGender('male'); setSelectedClass(null); }}
-                  className={`px-4 py-1 text-xs border rounded uppercase transition-all ${selectedGender === 'male' ? 'bg-blue-900/50 border-blue-500 text-white' : 'border-gray-600 text-gray-500'}`}
+                  className={`gender-option ${selectedGender === 'male' ? 'active' : ''}`}
                 >
                   Masculino
-                </button>
+                </div>
               </div>
             </div>
 
-            {/* 3. Seleção de Classe */}
-            <div className="mt-8">
-              <h3 className="section-header text-white mb-4">Escolha sua Vocação</h3>
+            {/* Bloco 3: Classes */}
+            <div>
+              <h3 className="rpg-title text-xl mb-4 text-white">Vocação</h3>
               
+              {/* Grid de Botões */}
               <div className="class-selector-grid">
                 {getAvailableClasses().map((clsName) => {
                   const details = getClassDetails(clsName);
                   return (
-                    <button
+                    <div 
                       key={clsName}
                       onClick={() => setSelectedClass(clsName)}
                       className={`class-btn ${selectedClass === clsName ? 'selected' : ''}`}
@@ -216,71 +206,76 @@ const CharacterCreation = () => {
                       <span className="block text-[10px] text-gray-500 uppercase mt-1">
                         {details?.role || 'Básico'}
                       </span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
 
-              {/* 4. Detalhes da Classe (Aparece ao selecionar) */}
+              {/* Detalhes da Classe (Expandido) */}
               {selectedClass && (() => {
                 const info = getClassDetails(selectedClass);
                 return info ? (
-                  <div className="glass-panel border-t-2 border-yellow-500 animate-[fadeIn_0.3s]">
-                    <div className="flex justify-between items-end mb-4 border-b border-white/10 pb-2">
-                      <h2 className="text-2xl rpg-title text-white">{info.name}</h2>
-                      <div className="text-right">
-                        <span className="text-[10px] text-gray-500 uppercase block">Tipo</span>
-                        <span className="text-xs text-blue-300 font-bold">{info.type}</span>
+                  <div className="class-detail-container">
+                    
+                    {/* Header: Nome + Tipo + Requisitos */}
+                    <div className="cd-header">
+                      <div>
+                        <h4 className="cd-title rpg-title">{info.name}</h4>
+                        <div className="cd-meta text-blue-400">{info.type} // {info.role}</div>
+                      </div>
+                      <div className="cd-req">
+                        <span className="cd-req-label">Requisitos</span>
+                        <div className="cd-req-val">
+                          {info.requirements?.length ? info.requirements.join(', ') : 'Nenhum'}
+                        </div>
                       </div>
                     </div>
 
-                    <p className="text-sm text-gray-400 mb-6 italic">"{info.description}"</p>
+                    {/* Descrição */}
+                    <div className="cd-desc">
+                      "{info.description}"
+                    </div>
 
-                    {/* Stats e Requisitos */}
-                    <div className="flex gap-4 mb-6 bg-black/30 p-3 rounded">
-                       <div className="flex-1">
-                         <span className="text-[10px] uppercase text-gray-500 block">Bônus de Classe</span>
-                         <span className="text-xs font-mono text-green-300">
-                           {JSON.stringify(info.bonus_class).replace(/["{}]/g, '').replace(/,/g, ' | ')}
-                         </span>
-                       </div>
-                       <div className="flex-1 border-l border-white/10 pl-4">
-                         <span className="text-[10px] uppercase text-gray-500 block">Requisitos</span>
-                         <span className="text-xs text-red-300">
-                           {info.requirements?.length ? info.requirements.join(', ') : 'Nenhum'}
-                         </span>
-                       </div>
+                    {/* Bônus */}
+                    <div className="cd-bonus-box">
+                       <span className="text-xs uppercase font-bold text-blue-300">Bônus de Classe</span>
+                       <span className="font-mono text-sm text-white">
+                         {JSON.stringify(info.bonus_class).replace(/["{}]/g, '').replace(/,/g, '  |  ')}
+                       </span>
                     </div>
 
                     {/* Habilidades */}
                     <div>
-                      <h4 className="text-xs uppercase text-yellow-500 font-bold mb-3">Habilidades Iniciais</h4>
-                      <div className="space-y-2">
+                      <h5 className="text-xs uppercase text-yellow-500 font-bold mb-3 tracking-wider border-b border-white/10 pb-1 inline-block">
+                        Habilidades Iniciais
+                      </h5>
+                      <div className="cd-abilities-grid">
                         {info.abilities?.map((ab, i) => (
-                          <div key={i} className="flex flex-col bg-white/5 p-2 rounded hover:bg-white/10 transition-colors border border-transparent hover:border-white/20">
-                            <div className="flex justify-between">
-                              <span className="text-xs font-bold text-gray-200">{ab.name}</span>
-                              <span className="text-[10px] text-blue-300 bg-blue-900/30 px-2 rounded">{ab.cost}</span>
+                          <div key={i} className="cd-ability-card">
+                            <div className="cd-ab-header">
+                              <span className="cd-ab-name">{ab.name}</span>
+                              <span className="cd-ab-cost">{ab.cost}</span>
                             </div>
-                            <p className="text-[10px] text-gray-500 mt-1">{ab.description}</p>
+                            <p className="cd-ab-desc">{ab.description}</p>
                           </div>
                         ))}
                       </div>
                     </div>
+
                   </div>
-                ) : <div className="p-4 text-center">Carregando dados...</div>;
+                ) : <div className="p-4 text-center">Carregando...</div>;
               })()}
             </div>
 
             {/* Botão Final */}
-            <div className="mt-8 mb-20">
-              <button 
-                disabled={!selectedClass}
-                onClick={() => navigate('/vtt')}
-                className="cta-button"
-              >
-                {selectedClass ? 'Finalizar Criação' : 'Selecione uma Classe'}
-              </button>
+            <div className="mt-8 mb-10">
+               <button
+                 disabled={!selectedClass}
+                 onClick={() => navigate('/vtt')}
+                 className="confirm-btn"
+               >
+                 {selectedClass ? 'Finalizar Criação' : 'Selecione uma Vocação'}
+               </button>
             </div>
 
           </div>
