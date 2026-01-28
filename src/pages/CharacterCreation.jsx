@@ -196,7 +196,7 @@ const CharacterCreation = () => {
 
       {/* --- FASE 2: DETALHES --- */}
       {(viewState === 'details' || viewState === 'naming') && selectedRace && (
-        <div className={`details-grid transition-all duration-500 ${viewState === 'naming' ? 'blur-3xl grayscale brightness-50 scale-95 pointer-events-none' : ''}`}>
+        <div className={`details-grid transition-all duration-500 ${viewState === 'naming' ? 'blur-[50px] grayscale brightness-[0.3] scale-95 pointer-events-none' : ''}`}>
           
           {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
           <div className="char-portrait-container">
@@ -339,38 +339,30 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME (CENTRALIZADO COM BLUR) --- */}
+      {/* --- MODAL DE NOME (FASE 3) --- */}
       {viewState === 'naming' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-[fadeIn_0.4s]">
-          <div className="relative w-full max-w-lg p-12 rounded-lg bg-black/80 border border-yellow-500/30 shadow-[0_0_100px_rgba(0,0,0,0.9)] text-center animate-[scaleIn_0.3s_ease-out]">
-            <h2 className="rpg-title text-3xl text-white mb-8 tracking-wider">Qual o seu nome, aventureiro?</h2>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center animate-[fadeIn_0.4s]">
+          <div className="bg-black/90 border border-yellow-500/50 p-10 rounded-lg shadow-[0_0_100px_rgba(0,0,0,1)] text-center w-full max-w-md mx-4 animate-[scaleIn_0.3s_ease-out]">
+            <h2 className="rpg-title text-2xl text-white mb-8 tracking-widest">Qual o seu nome, aventureiro?</h2>
             
-            <div className="relative mb-10">
+            <div className="relative mb-8">
                 <input 
                     autoFocus
                     type="text"
                     value={characterName}
                     onChange={(e) => setCharacterName(e.target.value)}
-                    placeholder="Sussurre seu nome..."
-                    className="w-full bg-transparent border-b border-white/20 p-2 text-3xl text-center text-yellow-500 outline-none focus:border-yellow-500 transition-all tracking-[0.2em] font-serif italic"
+                    placeholder="Sussurre sua alcunha..."
+                    className="w-full bg-transparent border-b border-white/20 p-2 text-3xl text-center text-yellow-500 outline-none focus:border-yellow-500 transition-all font-serif italic tracking-widest"
                     onKeyDown={(e) => e.key === 'Enter' && handleConfirmName()}
                 />
             </div>
 
-            <div className="flex flex-col items-center gap-6">
-                <button 
-                    onClick={handleConfirmName}
-                    className="confirm-btn !py-2 !px-8 !text-sm !w-auto shadow-[0_0_20px_rgba(234,179,8,0.2)]"
-                >
-                    Confirmar
-                </button>
-                <button 
-                    onClick={handleBack}
-                    className="text-[10px] uppercase text-gray-500 hover:text-white transition-colors tracking-[0.3em] font-bold"
-                >
-                    Voltar
-                </button>
-            </div>
+            <button 
+                onClick={handleConfirmName}
+                className="confirm-btn !text-xs !py-2 !px-8 !w-auto mx-auto block uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(234,179,8,0.2)]"
+            >
+                Confirmar
+            </button>
           </div>
         </div>
       )}
