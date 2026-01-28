@@ -16,7 +16,7 @@ const CharacterCreation = () => {
   const [selectedGender, setSelectedGender] = useState('female');
   const [selectedClass, setSelectedClass] = useState(null);
 
-  // Estados do Modal
+  // --- NOVOS ESTADOS PARA O MODAL DE NOME ---
   const [showNameModal, setShowNameModal] = useState(false);
   const [charName, setCharName] = useState('');
 
@@ -116,144 +116,79 @@ const CharacterCreation = () => {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       
-      {/* CSS INJETADO PARA GARANTIR O ESTILO RPG DA CAIXA */}
+      {/* CSS DO MODAL DE NOME (Estilo Dourado/Pergaminho) */}
       <style>{`
-        /* Animação */
         @keyframes scaleIn {
           0% { transform: scale(0.8); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
 
-        /* Container que cobre a tela inteira */
         .rpg-modal-overlay {
           position: fixed;
-          top: 0; 
-          left: 0;
-          width: 100vw;
-          height: 100vh;
+          top: 0; left: 0; width: 100vw; height: 100vh;
           background-color: rgba(0, 0, 0, 0.85);
           backdrop-filter: blur(8px);
-          z-index: 9999; /* Força ficar em cima de tudo */
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          z-index: 9999;
+          display: flex; align-items: center; justify-content: center;
         }
 
-        /* A Caixa Dourada */
         .rpg-modal-box {
           position: relative;
-          width: 500px;
-          max-width: 90%;
-          background: #1a120b; /* Fundo escuro base */
-          border: 2px solid #b45309; /* Borda laranja escura */
+          width: 500px; max-width: 90%;
+          background: #1a120b;
+          border: 2px solid #b45309;
           box-shadow: 0 0 50px rgba(234, 179, 8, 0.4);
           padding: 6px;
           border-radius: 8px;
           animation: scaleIn 0.3s ease-out forwards;
         }
 
-        /* O interior estilo pergaminho */
         .rpg-modal-inner {
           background: linear-gradient(to bottom, #f3e6d5, #e7cba8);
           border: 1px solid #78350f;
           padding: 40px 20px;
           border-radius: 4px;
           text-align: center;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 20px;
+          display: flex; flex-direction: column; align-items: center; gap: 20px;
         }
 
-        /* Texto */
         .rpg-modal-title {
-          font-family: 'Cinzel', serif;
-          font-size: 32px;
-          color: #78350f;
-          font-weight: bold;
-          text-transform: uppercase;
-          text-shadow: 0px 1px 0px rgba(255,255,255,0.6);
-          margin-bottom: 5px;
+          font-family: 'Cinzel', serif; font-size: 32px; color: #78350f; font-weight: bold;
+          text-transform: uppercase; text-shadow: 0px 1px 0px rgba(255,255,255,0.6); margin-bottom: 5px;
         }
         .rpg-modal-subtitle {
-          font-family: 'Cinzel', serif;
-          font-size: 14px;
-          color: #92400e;
-          font-style: italic;
-          border-top: 1px solid rgba(146, 64, 14, 0.3);
-          padding-top: 10px;
-          width: 100%;
+          font-family: 'Cinzel', serif; font-size: 14px; color: #92400e; font-style: italic;
+          border-top: 1px solid rgba(146, 64, 14, 0.3); padding-top: 10px; width: 100%;
         }
 
-        /* Input Customizado */
         .rpg-input {
-          width: 100%;
-          padding: 12px;
-          background: #fff8ed;
-          border: 2px solid #854d0e;
-          font-family: 'Cinzel', serif;
-          font-size: 18px;
-          color: #451a03;
-          outline: none;
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-          border-radius: 4px;
+          width: 100%; padding: 12px; background: #fff8ed; border: 2px solid #854d0e;
+          font-family: 'Cinzel', serif; font-size: 18px; color: #451a03; outline: none;
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px;
         }
-        .rpg-input:focus {
-          border-color: #d97706;
-          background: #ffffff;
-        }
+        .rpg-input:focus { border-color: #d97706; background: #ffffff; }
 
-        /* Botão Go Dourado */
         .rpg-btn-go {
           background: linear-gradient(to bottom, #fcd34d, #d97706);
-          border: 1px solid #92400e;
-          padding: 10px 30px;
-          font-family: 'Cinzel', serif;
-          font-weight: bold;
-          font-size: 18px;
-          color: #451a03;
-          text-transform: uppercase;
-          cursor: pointer;
-          border-radius: 4px;
-          box-shadow: 0 4px 0 #92400e;
-          transition: transform 0.1s;
+          border: 1px solid #92400e; padding: 10px 30px;
+          font-family: 'Cinzel', serif; font-weight: bold; font-size: 18px; color: #451a03;
+          text-transform: uppercase; cursor: pointer; border-radius: 4px;
+          box-shadow: 0 4px 0 #92400e; transition: transform 0.1s;
         }
-        .rpg-btn-go:active {
-          transform: translateY(4px);
-          box-shadow: 0 0 0 #92400e;
-        }
-        .rpg-btn-go:disabled {
-          filter: grayscale(1);
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
+        .rpg-btn-go:active { transform: translateY(4px); box-shadow: 0 0 0 #92400e; }
+        .rpg-btn-go:disabled { filter: grayscale(1); opacity: 0.6; cursor: not-allowed; }
 
-        /* Botão Fechar */
         .rpg-close-btn {
-          position: absolute;
-          top: 10px;
-          right: 15px;
-          background: none;
-          border: none;
-          font-size: 20px;
-          color: #92400e;
-          cursor: pointer;
-          font-weight: bold;
+          position: absolute; top: 10px; right: 15px; background: none; border: none;
+          font-size: 20px; color: #92400e; cursor: pointer; font-weight: bold;
         }
         .rpg-close-btn:hover { color: #ff0000; }
 
-        /* Decoração de Cantos */
-        .corner {
-          position: absolute;
-          width: 20px; height: 20px;
-          border-color: #fcd34d;
-          border-style: solid;
-        }
+        .corner { position: absolute; width: 20px; height: 20px; border-color: #fcd34d; border-style: solid; }
         .tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
         .tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
         .bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
         .br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
-
       `}</style>
 
       {/* --- BACKGROUND ANIMADO (ÉTER) --- */}
@@ -372,11 +307,10 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME CORRIGIDO E FORÇADO POR CIMA DE TUDO --- */}
+      {/* --- MODAL DE NOME (POR CIMA DE TUDO) --- */}
       {showNameModal && (
         <div className="rpg-modal-overlay">
            <div className="rpg-modal-box">
-             {/* Cantoneiras Douradas */}
              <div className="corner tl"></div>
              <div className="corner tr"></div>
              <div className="corner bl"></div>
