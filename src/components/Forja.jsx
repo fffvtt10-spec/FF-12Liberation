@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
-import forjaIcon from '../assets/forja.png'; // Certifique-se de ter esta imagem
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore";
+import forjaIcon from '../assets/forja.png';
 
 export default function Forja() {
   const [isOpen, setIsOpen] = useState(false);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([]); // Itens que estão no COFRE (Vault)
   const [searchTerm, setSearchTerm] = useState("");
   
   // Estados para Criação/Edição
@@ -16,12 +16,17 @@ export default function Forja() {
     imagem: ''
   });
 
-  // --- BUSCAR ITENS DA FORJA (VAULT) ---
+  // --- BUSCAR ITENS (Apenas status "vault") ---
   useEffect(() => {
     if (!isOpen) return;
     
-    // "vault_items" é a coleção de itens criados, mas ainda não necessariamente à venda
-    const q = query(collection(db, "vault_items"), orderBy("createdAt", "desc"));
+    // Filtra apenas itens que NÃO estão no bazar e NEM com jogadores
+    const q = query(
+        collection(db, "game_items"), 
+        where("status", "==", "vault"), 
+        orderBy("createdAt", "desc")
+    );
+
     const unsub = onSnapshot(q, (snap) => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -40,11 +45,15 @@ export default function Forja() {
       };
 
       if (isEditing) {
-        await updateDoc(doc(db, "vault_items", isEditing), payload);
+        await updateDoc(doc(db, "game_items", isEditing), payload);
         setIsEditing(null);
       } else {
-        await addDoc(collection(db, "vault_items"), {
+        // CRIA O ITEM ÚNICO COM STATUS 'VAULT'
+        await addDoc(collection(db, "game_items"), {
           ...payload,
+          status: "vault", // Nasce guardado
+          ownerId: null,   // Sem dono
+          valorGil: 0,     // Preço indefinido ainda
           createdAt: serverTimestamp()
         });
       }
@@ -56,8 +65,9 @@ export default function Forja() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Quebrar este item em pedaços (Excluir)?")) {
-      await deleteDoc(doc(db, "vault_items", id));
+    // AQUI É O ÚNICO LUGAR QUE DELETA DO BANCO REALMENTE
+    if (window.confirm("ATENÇÃO: Isso destruirá o item permanentemente. Deseja continuar?")) {
+      await deleteDoc(doc(db, "game_items", id));
     }
   };
 
@@ -77,12 +87,10 @@ export default function Forja() {
 
   return (
     <>
-      {/* BOTÃO FLUTUANTE DA FORJA (Posicionado à esquerda do Bazar) */}
       <button className="forja-trigger-btn" onClick={() => setIsOpen(true)} title="Abrir Forja">
         <img src={forjaIcon} alt="Forja" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='FORJA'}} />
       </button>
 
-      {/* MODAL */}
       {isOpen && (
         <div className="forja-overlay" onClick={() => setIsOpen(false)}>
           <div className="forja-modal" onClick={e => e.stopPropagation()}>
@@ -92,7 +100,6 @@ export default function Forja() {
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
             </div>
 
-            {/* PAINEL DE CRIAÇÃO */}
             <div className="mestre-panel-forja">
                 <h4 style={{color:'#f44', margin:'0 0 10px 0'}}>FORJAR NOVO ARTEFATO</h4>
                 <form onSubmit={handleSaveItem} className="forja-form">
@@ -109,7 +116,6 @@ export default function Forja() {
                 </form>
             </div>
 
-            {/* BARRA DE PESQUISA */}
             <div className="search-bar-container-forja">
               <input 
                 type="text" 
@@ -120,7 +126,6 @@ export default function Forja() {
               />
             </div>
 
-            {/* LISTA DE ITENS FORJADOS */}
             <div className="forja-grid">
               {filteredItems.map(item => (
                 <div key={item.id} className="forja-item-card">
@@ -128,6 +133,7 @@ export default function Forja() {
                   <div className="item-info">
                     <h4>{item.nome}</h4>
                     <p className="desc">{item.descricao}</p>
+                    <small style={{color: '#666'}}>Status: Cofre</small>
                   </div>
                   <div className="item-actions">
                     <button className="btn-icon edit" onClick={() => handleEditClick(item)} title="Editar">🔨</button>
@@ -135,7 +141,7 @@ export default function Forja() {
                   </div>
                 </div>
               ))}
-              {filteredItems.length === 0 && <p className="empty-msg">A forja está fria. Nenhum item criado.</p>}
+              {filteredItems.length === 0 && <p className="empty-msg">A forja está fria. Nenhum item no cofre.</p>}
             </div>
 
           </div>
@@ -143,66 +149,26 @@ export default function Forja() {
       )}
 
       <style>{`
-        /* BOTÃO FORJA (Lado a lado com Bazar) */
         .forja-trigger-btn {
-          position: fixed;
-          bottom: 30px;
-          right: 110px; /* Deslocado para a esquerda do Bazar */
-          width: 70px;
-          height: 70px;
-          border-radius: 50%;
-          border: 2px solid #f44;
-          background: #000;
-          cursor: pointer;
-          z-index: 9999;
-          transition: transform 0.2s, box-shadow 0.2s;
-          padding: 0;
-          overflow: hidden;
-          display: flex; align-items: center; justify-content: center;
+          position: fixed; bottom: 30px; right: 110px; width: 70px; height: 70px;
+          border-radius: 50%; border: 2px solid #f44; background: #000; cursor: pointer; z-index: 9999;
+          transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center;
           color: #f44; font-weight: bold; font-size: 10px;
         }
         .forja-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 20px #f44; }
         .forja-trigger-btn img { width: 80%; height: 80%; object-fit: contain; }
 
-        /* MODAL */
-        .forja-overlay {
-          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-          background: rgba(0,0,0,0.9); z-index: 100000;
-          display: flex; align-items: center; justify-content: center;
-          backdrop-filter: blur(5px);
-        }
-        .forja-modal {
-          width: 800px; max-height: 90vh;
-          background: #150a0a; /* Tom avermelhado escuro */
-          border: 1px solid #f44;
-          display: flex; flex-direction: column;
-          box-shadow: 0 0 50px rgba(255, 68, 68, 0.2);
-          border-radius: 8px;
-          overflow: hidden;
-        }
+        .forja-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 100000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .forja-modal { width: 800px; max-height: 90vh; background: #150a0a; border: 1px solid #f44; display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(255, 68, 68, 0.2); border-radius: 8px; overflow: hidden; }
 
-        /* HEADER */
-        .forja-header {
-          background: linear-gradient(90deg, #2a0e0e, #000);
-          padding: 20px;
-          display: flex; justify-content: space-between; align-items: center;
-          border-bottom: 2px solid #f44;
-        }
+        .forja-header { background: linear-gradient(90deg, #2a0e0e, #000); padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f44; }
         .forja-header h2 { margin: 0; color: #f44; font-family: serif; letter-spacing: 2px; text-shadow: 0 0 10px #f44; font-size: 24px; }
         .close-btn { background: transparent; border: none; color: #fff; font-size: 30px; cursor: pointer; }
 
-        /* PAINEL */
-        .mestre-panel-forja {
-          background: rgba(255, 68, 68, 0.05);
-          padding: 20px;
-          border-bottom: 1px solid #333;
-        }
+        .mestre-panel-forja { background: rgba(255, 68, 68, 0.05); padding: 20px; border-bottom: 1px solid #333; }
         .forja-form { display: flex; flex-direction: column; gap: 10px; }
         .forja-form .row { display: flex; gap: 10px; }
-        .forja-input {
-          background: #000; border: 1px solid #522; color: #fff;
-          padding: 10px; flex: 1; outline: none; font-family: serif;
-        }
+        .forja-input { background: #000; border: 1px solid #522; color: #fff; padding: 10px; flex: 1; outline: none; font-family: serif; }
         .forja-input:focus { border-color: #f44; }
         .forja-input.area { height: 80px; resize: none; }
         
@@ -210,33 +176,16 @@ export default function Forja() {
         .btn-forjar:hover { background: #d00; box-shadow: 0 0 10px #d00; }
         .btn-cancel { background: #333; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; }
 
-        /* LISTA E BUSCA */
         .search-bar-container-forja { padding: 15px; background: #000; border-bottom: 1px solid #333; }
         .search-input-forja { width: 100%; background: #111; border: 1px solid #522; color: #fff; padding: 12px; border-radius: 20px; text-align: center; outline: none; font-size: 16px; }
 
-        .forja-grid {
-          flex: 1; overflow-y: auto; padding: 20px;
-          display: flex; flex-direction: column; gap: 15px;
-          /* Scroll invisivel */
-          scrollbar-width: none; -ms-overflow-style: none;
-        }
+        .forja-grid { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; scrollbar-width: none; -ms-overflow-style: none; }
         .forja-grid::-webkit-scrollbar { display: none; }
 
-        /* ITEM CARD */
-        .forja-item-card {
-          background: linear-gradient(90deg, rgba(40,10,10,0.9), rgba(0,0,0,0.8));
-          border: 1px solid #522;
-          display: flex; align-items: center; padding: 10px;
-          border-radius: 4px; transition: 0.2s;
-        }
+        .forja-item-card { background: linear-gradient(90deg, rgba(40,10,10,0.9), rgba(0,0,0,0.8)); border: 1px solid #522; display: flex; align-items: center; padding: 10px; border-radius: 4px; transition: 0.2s; }
         .forja-item-card:hover { border-color: #f44; }
         
-        .item-img {
-          width: 70px; height: 70px;
-          background-size: cover; background-position: center;
-          border: 1px solid #633; margin-right: 15px;
-          border-radius: 4px; background-color: #000;
-        }
+        .item-img { width: 70px; height: 70px; background-size: cover; background-position: center; border: 1px solid #633; margin-right: 15px; border-radius: 4px; background-color: #000; }
         .item-info { flex: 1; }
         .item-info h4 { margin: 0 0 5px 0; color: #fff; font-size: 18px; }
         .item-info .desc { margin: 0; color: #aaa; font-size: 12px; font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

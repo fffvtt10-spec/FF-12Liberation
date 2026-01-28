@@ -6,7 +6,7 @@ import fundoMestre from '../assets/fundo-mestre.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
 import Bazar from '../components/Bazar'; 
-import Forja from '../components/Forja'; // <--- IMPORTA A FORJA
+import Forja from '../components/Forja'; 
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
@@ -530,8 +530,8 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- AQUI ENTRAM OS BOTÕES FLUTUANTES --- */}
-      <Forja /> {/* Componente novo da Forja */}
+      {/* --- BOTÕES FLUTUANTES (Forja e Bazar) --- */}
+      <Forja /> 
       <Bazar isMestre={true} />
 
       <style>{`
@@ -559,7 +559,6 @@ export default function MestrePage() {
         .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
 
-        /* SESSÃO CARD STYLES */
         .sessao-card { background: linear-gradient(135deg, rgba(20,20,50,0.9), rgba(0,0,20,0.9)); border: 1px solid #00f2ff; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,242,255,0.1); }
         .sessao-status { font-size: 10px; color: #f44; font-weight: bold; margin-bottom: 8px; animation: pulse 2s infinite; }
         .sessao-title { color: #fff; font-size: 18px; margin: 0 0 10px 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
@@ -570,13 +569,11 @@ export default function MestrePage() {
         
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* UPLOAD STYLES */
         .upload-section-box { border: 1px dashed #444; padding: 15px; margin: 20px 0; background: rgba(0,0,0,0.3); }
         .upload-section-title { color: #00f2ff; font-size: 12px; margin-bottom: 15px; border-bottom: 1px solid #00f2ff; padding-bottom: 5px; display: inline-block; }
         .ff-select-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; }
         .ff-input-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; color-scheme: dark; }
 
-        /* IMPORT LINK STYLES */
         .link-import-row { display: flex; gap: 10px; margin-bottom: 15px; }
         .small-select { width: 120px; }
         .assets-lists { display: flex; flex-direction: column; gap: 10px; }
