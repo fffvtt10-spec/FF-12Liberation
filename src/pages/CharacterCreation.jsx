@@ -50,7 +50,6 @@ const CharacterCreation = () => {
 
     // Mapa de tradução
     const translations = {
-      type: "Tipo",
       value: "Valor",
       detail: "Detalhes",
       details: "Detalhes",
@@ -63,9 +62,12 @@ const CharacterCreation = () => {
     // Se for objeto, itera e traduz
     if (typeof bonusData === 'object') {
       return Object.entries(bonusData).map(([key, val], index) => {
+        // Ignora chaves internas se existirem (embora tenhamos removido 'type')
+        if (key === 'type') return null;
+
         const label = translations[key] || key.toUpperCase().replace(/_/g, ' ');
         
-        // Se o valor for outro objeto (ex: atributos aninhados), formata recursivamente ou simplifica
+        // Se o valor for outro objeto, formata recursivamente ou simplifica
         let displayVal = val;
         if (typeof val === 'object') {
           displayVal = JSON.stringify(val).replace(/["{}]/g, '').replace(/:/g, ': ').replace(/,/g, ', ');
@@ -200,7 +202,6 @@ const CharacterCreation = () => {
                  <div>
                    <span className="text-[10px] uppercase text-green-400 font-bold">Bônus Racial</span>
                    <div className="text-xs text-gray-300 font-mono mt-1">
-                     {/* Chamada da função de renderização traduzida */}
                      {renderBonuses(selectedRace.racial_bonus)}
                    </div>
                  </div>
@@ -278,7 +279,6 @@ const CharacterCreation = () => {
                     <div className="cd-bonus-box">
                        <span className="text-xs uppercase font-bold text-blue-300">Bônus de Classe</span>
                        <span className="font-mono text-sm text-white">
-                         {/* Usando renderBonuses para garantir tradução aqui também se necessário */}
                          {renderBonuses(info.bonus_class)}
                        </span>
                     </div>

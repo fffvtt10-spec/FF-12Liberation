@@ -7,7 +7,6 @@
       "description": "Os Humes são a raça mais comum e predominante em Ivalice. Adaptáveis, curiosos e persistentes, habitam desde as grandes capitais até vilarejos fronteiriços. Sua origem é antiga e pouco documentada, mas acredita-se que foram os primeiros a construir grandes cidades e fundar os clãs atuais.",
       "characteristics": "Sua maior qualidade é a versatilidade. Não se destacam naturalmente em nenhum atributo específico, mas aprendem qualquer função rapidamente, prosperando em qualquer lugar que chamem de lar.",
       "racial_bonus": {
-        "type": "custom",
         "value": 5,
         "detail": "5 pontos extras para distribuir livremente entre os atributos durante a criação de personagem."
       },
@@ -29,7 +28,7 @@
           "INT": 2
         },
         "male_exiled": {
-          "free_points": 5
+          "pontos-livres": 5
         }
       },
       "base_classes": {
@@ -46,7 +45,7 @@
     {
       "id": "moogles",
       "name": "Moogles",
-      "image": "races/moogle.png",
+      "image": "races/moogles.png",
       "description": "Pequenos, adoráveis e envoltos em mistério. Possuem corpos peludos, antenas com pompons flutuantes e pequenas asas de morcego. Não possuem gênero definido.",
       "characteristics": "Extremamente inteligentes e obcecados por tecnologia e invenções, misturando ciência com feitiçaria. Carregam um estranho 'magnetismo da sorte'.",
       "racial_bonus": {
