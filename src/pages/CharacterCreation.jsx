@@ -44,6 +44,43 @@ const CharacterCreation = () => {
     }
   };
 
+  // --- LÓGICA DE TRADUÇÃO E FORMATAÇÃO ---
+  const renderBonuses = (bonusData) => {
+    if (!bonusData) return "Nenhum";
+
+    // Mapa de tradução
+    const translations = {
+      type: "Tipo",
+      value: "Valor",
+      detail: "Detalhes",
+      details: "Detalhes",
+      free_points: "Pontos Livres",
+      female: "Feminino",
+      male: "Masculino",
+      male_exiled: "Masculino (Exilado)"
+    };
+
+    // Se for objeto, itera e traduz
+    if (typeof bonusData === 'object') {
+      return Object.entries(bonusData).map(([key, val], index) => {
+        const label = translations[key] || key.toUpperCase().replace(/_/g, ' ');
+        
+        // Se o valor for outro objeto (ex: atributos aninhados), formata recursivamente ou simplifica
+        let displayVal = val;
+        if (typeof val === 'object') {
+          displayVal = JSON.stringify(val).replace(/["{}]/g, '').replace(/:/g, ': ').replace(/,/g, ', ');
+        }
+
+        return (
+          <div key={index} className="mb-1">
+            <span className="text-gray-400 font-bold">{label}:</span> <span className="text-gray-200">{displayVal}</span>
+          </div>
+        );
+      });
+    }
+    return bonusData;
+  };
+
   // --- LÓGICA DE DADOS ---
   const getAvailableClasses = () => {
     if (!selectedRace) return [];
@@ -90,7 +127,6 @@ const CharacterCreation = () => {
       <header className="absolute top-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
         <div>
           <h1 className="rpg-title text-3xl">Gênese da Alma</h1>
-          {/* Correção Ponto 1: Texto de linhagem estilizado */}
           <p className="rpg-subtitle-styled mt-2">
             {viewState === 'carousel' ? 'Determine sua Linhagem Ancestral' : `${selectedRace?.name} // Customização`}
           </p>
@@ -142,7 +178,7 @@ const CharacterCreation = () => {
       {viewState === 'details' && selectedRace && (
         <div className="details-grid">
           
-          {/* Correção Ponto 2: Imagem com Zoom/Fade, alinhada ao topo/centro */}
+          {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
           <div className="char-portrait-container">
             <img src={selectedRace.image} alt={selectedRace.name} className="char-portrait" />
           </div>
@@ -153,7 +189,6 @@ const CharacterCreation = () => {
             {/* Bloco 1: Lore */}
             <div className="glass-panel mt-8 border-l-4 border-yellow-600">
               <h3 className="section-header !border-none !mb-2 text-yellow-500">Descrição</h3>
-              {/* Correção Ponto 3: Descrição formatada e espaçada */}
               <p className="description-text">
                 "{selectedRace.description}"
               </p>
@@ -165,7 +200,8 @@ const CharacterCreation = () => {
                  <div>
                    <span className="text-[10px] uppercase text-green-400 font-bold">Bônus Racial</span>
                    <div className="text-xs text-gray-300 font-mono mt-1">
-                     {JSON.stringify(selectedRace.racial_bonus).replace(/["{}]/g, '').replace(/,/g, ', ').replace(/:/g, ': ')}
+                     {/* Chamada da função de renderização traduzida */}
+                     {renderBonuses(selectedRace.racial_bonus)}
                    </div>
                  </div>
               </div>
@@ -194,7 +230,7 @@ const CharacterCreation = () => {
             <div>
               <h3 className="rpg-title text-xl mb-4 text-white">Vocação</h3>
               
-              {/* Correção Ponto 4: Botões de Classe Organizados */}
+              {/* Grid de Botões */}
               <div className="class-selector-grid">
                 {getAvailableClasses().map((clsName) => {
                   const details = getClassDetails(clsName);
@@ -242,7 +278,8 @@ const CharacterCreation = () => {
                     <div className="cd-bonus-box">
                        <span className="text-xs uppercase font-bold text-blue-300">Bônus de Classe</span>
                        <span className="font-mono text-sm text-white">
-                         {JSON.stringify(info.bonus_class).replace(/["{}]/g, '').replace(/,/g, '  |  ')}
+                         {/* Usando renderBonuses para garantir tradução aqui também se necessário */}
+                         {renderBonuses(info.bonus_class)}
                        </span>
                     </div>
 
