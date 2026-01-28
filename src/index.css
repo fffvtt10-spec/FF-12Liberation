@@ -11,7 +11,7 @@ body, html, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #020617; /* Azul muito escuro */
+  background-color: #020617;
   font-family: 'Lato', sans-serif;
   color: #e2e8f0;
 }
@@ -21,8 +21,20 @@ body, html, #root {
   font-family: 'Cinzel', serif;
   text-transform: uppercase;
   letter-spacing: 4px;
-  color: #fbbf24; /* Dourado */
+  color: #fbbf24;
   text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+/* Correção Ponto 1: Estilo melhorado para subtítulos/linhagem */
+.rpg-subtitle-styled {
+  font-family: 'Cinzel', serif;
+  color: #94a3b8; /* Cinza azulado elegante */
+  font-size: 0.85rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  padding-bottom: 4px;
+  display: inline-block;
 }
 
 .rpg-text {
@@ -35,7 +47,7 @@ body, html, #root {
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #fbbf24; }
 
-/* --- NOVO BACKGROUND (ÉTER VÓRTICE) --- */
+/* --- BACKGROUND (ÉTER VÓRTICE) --- */
 .ether-container {
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;
@@ -82,7 +94,6 @@ body, html, #root {
   overflow-x: auto;
   padding: 0 50vw;
   gap: 40px;
-  /* Scroll behavior removido do CSS para o JS controlar a velocidade */
   scrollbar-width: none;
 }
 .carousel-viewport::-webkit-scrollbar { display: none; }
@@ -119,33 +130,45 @@ body, html, #root {
 /* --- TELA DE DETALHES --- */
 .details-grid {
   display: grid;
-  grid-template-columns: 35% 65%;
+  grid-template-columns: 40% 60%; /* Ajuste de proporção */
   height: 100vh; width: 100vw;
   padding-top: 80px;
 }
 
-/* Imagem com Zoom/Fade Inicial */
+/* Correção Ponto 2: Imagem Alinhada, Zoom no Perfil e Fade Suave */
 .char-portrait-container {
-  position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center;
-  animation: zoomFadeIn 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  opacity: 0;
+  position: relative; 
+  height: 100%; 
+  display: flex; 
+  align-items: center; /* Centraliza verticalmente, não no rodapé */
+  justify-content: center;
+  overflow: hidden; /* Garante que o zoom não vaze */
 }
 
 .char-portrait {
-  max-height: 95%; max-width: 100%;
-  filter: drop-shadow(0 0 30px rgba(0,0,0,0.8));
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Cobre a área (Zoom effect) */
+  object-position: top center; /* Foca no rosto/perfil */
+  transform: scale(1.1); /* Zoom inicial leve */
+  /* Fade Suave em volta (Vignette Radial) */
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+  animation: slowZoom 20s infinite alternate; /* Movimento sutil */
+}
+
+@keyframes slowZoom {
+  from { transform: scale(1.1); }
+  to { transform: scale(1.2); }
 }
 
 .info-scroll-area {
-  height: 100%; overflow-y: auto; padding: 0 40px 100px 40px;
+  height: 100%; overflow-y: auto; padding: 0 60px 100px 40px;
   animation: fadeIn 0.8s ease-out 0.3s forwards; opacity: 0;
 }
 
 /* --- COMPONENTES DE UI --- */
 
-/* Botão Voltar */
 .nav-back-btn {
   background: rgba(0,0,0,0.6);
   border: 1px solid #94a3b8;
@@ -166,10 +189,9 @@ body, html, #root {
   box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
 }
 
-/* Botões de Gênero */
 .gender-option {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #334155;
   background: rgba(15, 23, 42, 0.5);
   color: #94a3b8;
@@ -195,7 +217,7 @@ body, html, #root {
 /* Painel de Vidro */
 .glass-panel {
   background: rgba(10, 15, 30, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 24px;
   margin-bottom: 24px;
@@ -203,30 +225,87 @@ body, html, #root {
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-/* --- CLASSE SELETOR & DETALHES --- */
+/* Correção Ponto 3: Texto de Descrição Organizado e Formatado */
+.description-text {
+  font-size: 1rem;
+  line-height: 1.8; /* Espaçamento entre linhas para leitura */
+  color: #cbd5e1;
+  text-align: justify;
+  background: rgba(0, 0, 0, 0.2); /* Fundo sutil para contraste */
+  padding: 15px;
+  border-radius: 4px;
+  border-left: 3px solid #fbbf24; /* Borda dourada lateral */
+  margin-bottom: 20px;
+}
+
+.section-header {
+  color: #fbbf24;
+  font-family: 'Cinzel', serif;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 8px;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+}
+
+/* Correção Ponto 4: Botões de Classe Dinâmicos e Organizados */
 .class-selector-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Botões mais largos */
+  gap: 15px;
+  margin-bottom: 25px;
 }
 
 .class-btn {
   background: linear-gradient(180deg, #1e293b, #0f172a);
   border: 1px solid #334155;
-  padding: 15px; text-align: center; border-radius: 6px;
-  cursor: pointer; transition: all 0.2s;
+  padding: 15px 10px;
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer; 
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column; /* Organiza texto verticalmente */
+  justify-content: center;
+  align-items: center;
+  min-height: 80px;
 }
-.class-btn:hover { border-color: #fbbf24; transform: translateY(-2px); }
+
+.class-btn:hover { border-color: #fbbf24; transform: translateY(-3px); background: #334155; }
+
 .class-btn.selected {
   background: linear-gradient(135deg, #172554, #1e3a8a);
   border-color: #fbbf24;
   box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
 }
 
-/* Painel de Detalhes da Classe (Organizado) */
+.class-btn-title {
+  font-family: 'Cinzel', serif;
+  font-weight: bold;
+  font-size: 1rem;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.class-btn.selected .class-btn-title { color: #fbbf24; }
+
+.class-btn-role {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: rgba(0,0,0,0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Painel de Detalhes da Classe */
 .class-detail-container {
   border-top: 2px solid #fbbf24;
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
-  padding: 25px;
-  border-radius: 0 0 8px 8px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
   animation: slideDown 0.4s ease-out;
 }
 
@@ -235,32 +314,34 @@ body, html, #root {
   border-bottom: 1px solid rgba(255,255,255,0.1);
   padding-bottom: 15px; margin-bottom: 15px;
 }
-.cd-title { font-size: 1.8rem; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.3); margin-bottom: 5px; }
-.cd-meta { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+.cd-title { font-size: 2rem; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.3); margin-bottom: 5px; }
+.cd-meta { font-size: 0.8rem; color: #60a5fa; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; }
 .cd-req { text-align: right; }
-.cd-req-label { display: block; font-size: 0.7rem; color: #64748b; text-transform: uppercase; }
+.cd-req-label { display: block; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; }
 .cd-req-val { color: #f87171; font-size: 0.85rem; font-weight: bold; }
 
 .cd-desc {
-  font-style: italic; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;
-  padding: 10px; background: rgba(0,0,0,0.2); border-left: 3px solid #fbbf24;
+  font-style: italic; color: #cbd5e1; line-height: 1.6; margin-bottom: 25px;
+  padding: 15px; background: rgba(0,0,0,0.3); border-radius: 4px;
 }
 
 .cd-bonus-box {
-  background: rgba(30, 58, 138, 0.2); border: 1px solid rgba(59, 130, 246, 0.3);
-  padding: 10px 15px; border-radius: 4px; margin-bottom: 20px;
+  background: rgba(30, 58, 138, 0.15); border: 1px solid rgba(59, 130, 246, 0.2);
+  padding: 12px 20px; border-radius: 4px; margin-bottom: 25px;
   display: flex; justify-content: space-between; align-items: center;
 }
 
-.cd-abilities-grid { display: grid; gap: 10px; }
+.cd-abilities-grid { display: grid; gap: 12px; }
 .cd-ability-card {
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
-  padding: 10px; border-radius: 4px;
+  padding: 15px; border-radius: 6px; transition: background 0.2s;
 }
-.cd-ab-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
-.cd-ab-name { color: #fbbf24; font-family: 'Cinzel', serif; font-size: 0.9rem; }
-.cd-ab-cost { font-size: 0.75rem; background: #1e293b; padding: 2px 6px; border-radius: 3px; color: #94a3b8; }
-.cd-ab-desc { font-size: 0.8rem; color: #94a3b8; }
+.cd-ability-card:hover { background: rgba(255,255,255,0.06); }
+
+.cd-ab-header { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; }
+.cd-ab-name { color: #fbbf24; font-family: 'Cinzel', serif; font-size: 0.95rem; font-weight: bold; }
+.cd-ab-cost { font-size: 0.7rem; background: #1e293b; padding: 3px 8px; border-radius: 4px; color: #94a3b8; border: 1px solid #334155; }
+.cd-ab-desc { font-size: 0.85rem; color: #cbd5e1; line-height: 1.4; }
 
 /* Botão Confirmar */
 .confirm-btn {
@@ -277,8 +358,8 @@ body, html, #root {
 
 /* Animações */
 @keyframes zoomFadeIn {
-  from { transform: scale(1.2) translateY(50px); opacity: 0; }
-  to { transform: scale(1) translateY(0); opacity: 1; }
+  from { transform: scale(1.2); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }

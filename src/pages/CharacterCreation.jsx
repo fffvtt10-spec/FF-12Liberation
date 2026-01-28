@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
+// Importe sua imagem de fundo
+import bgCharacter from '../assets/fundo-character.jpg';
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
@@ -25,21 +27,19 @@ const CharacterCreation = () => {
     });
   }, []);
 
-  // 2. Efeito de Scroll no Carousel
+  // 2. Centralização do Carousel
   useEffect(() => {
     if (viewState === 'carousel' && carouselRef.current) {
-      const itemSize = 300; // 260px card + 40px gap
+      const itemSize = 300; 
       const centerOffset = (window.innerWidth / 2) - (260 / 2);
-      // scroll instantâneo via JS para seguir o indice, mas behavior auto no CSS faria pulo
-      // Aqui usamos smooth para clique, mas o wheel vai brigar se não cuidarmos
-      carouselRef.current.scrollTo({ left: (activeIndex * itemSize) - centerOffset + 130, behavior: 'smooth' });
+      const scrollPos = (activeIndex * itemSize) - centerOffset + 130; 
+      carouselRef.current.scrollTo({ left: scrollPos, behavior: 'smooth' });
     }
   }, [activeIndex, viewState]);
 
   // 3. Scroll RÁPIDO com Mouse Wheel
   const handleWheelScroll = (e) => {
     if (carouselRef.current) {
-      // Multiplicador 4x para velocidade
       carouselRef.current.scrollLeft += e.deltaY * 4; 
     }
   };
@@ -47,6 +47,7 @@ const CharacterCreation = () => {
   // --- LÓGICA DE DADOS ---
   const getAvailableClasses = () => {
     if (!selectedRace) return [];
+    
     if (typeof selectedRace.base_classes === 'object' && !Array.isArray(selectedRace.base_classes)) {
       if (selectedRace.id === 'viera') {
         return selectedGender === 'female' 
@@ -89,8 +90,9 @@ const CharacterCreation = () => {
       <header className="absolute top-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
         <div>
           <h1 className="rpg-title text-3xl">Gênese da Alma</h1>
-          <p className="text-gray-400 text-xs tracking-widest uppercase mt-1">
-            {viewState === 'carousel' ? 'Selecione sua Linhagem' : `${selectedRace?.name} // Personalização`}
+          {/* Correção Ponto 1: Texto de linhagem estilizado */}
+          <p className="rpg-subtitle-styled mt-2">
+            {viewState === 'carousel' ? 'Determine sua Linhagem Ancestral' : `${selectedRace?.name} // Customização`}
           </p>
         </div>
         {viewState === 'details' && (
@@ -108,7 +110,6 @@ const CharacterCreation = () => {
             <h2 className="rpg-title text-5xl text-yellow-500 drop-shadow-lg">{activeRace.name}</h2>
           </div>
 
-          {/* Viewport do Carousel */}
           <div 
             ref={carouselRef}
             onWheel={handleWheelScroll}
@@ -141,7 +142,7 @@ const CharacterCreation = () => {
       {viewState === 'details' && selectedRace && (
         <div className="details-grid">
           
-          {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
+          {/* Correção Ponto 2: Imagem com Zoom/Fade, alinhada ao topo/centro */}
           <div className="char-portrait-container">
             <img src={selectedRace.image} alt={selectedRace.name} className="char-portrait" />
           </div>
@@ -152,7 +153,8 @@ const CharacterCreation = () => {
             {/* Bloco 1: Lore */}
             <div className="glass-panel mt-8 border-l-4 border-yellow-600">
               <h3 className="section-header !border-none !mb-2 text-yellow-500">Descrição</h3>
-              <p className="text-gray-300 italic text-sm leading-relaxed">
+              {/* Correção Ponto 3: Descrição formatada e espaçada */}
+              <p className="description-text">
                 "{selectedRace.description}"
               </p>
               <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
@@ -192,7 +194,7 @@ const CharacterCreation = () => {
             <div>
               <h3 className="rpg-title text-xl mb-4 text-white">Vocação</h3>
               
-              {/* Grid de Botões */}
+              {/* Correção Ponto 4: Botões de Classe Organizados */}
               <div className="class-selector-grid">
                 {getAvailableClasses().map((clsName) => {
                   const details = getClassDetails(clsName);
@@ -202,8 +204,8 @@ const CharacterCreation = () => {
                       onClick={() => setSelectedClass(clsName)}
                       className={`class-btn ${selectedClass === clsName ? 'selected' : ''}`}
                     >
-                      <span className="block rpg-text font-bold text-sm text-gray-200">{clsName}</span>
-                      <span className="block text-[10px] text-gray-500 uppercase mt-1">
+                      <span className="class-btn-title">{clsName}</span>
+                      <span className="class-btn-role">
                         {details?.role || 'Básico'}
                       </span>
                     </div>
@@ -217,7 +219,7 @@ const CharacterCreation = () => {
                 return info ? (
                   <div className="class-detail-container">
                     
-                    {/* Header: Nome + Tipo + Requisitos */}
+                    {/* Header */}
                     <div className="cd-header">
                       <div>
                         <h4 className="cd-title rpg-title">{info.name}</h4>
@@ -231,7 +233,7 @@ const CharacterCreation = () => {
                       </div>
                     </div>
 
-                    {/* Descrição */}
+                    {/* Descrição Formatada */}
                     <div className="cd-desc">
                       "{info.description}"
                     </div>
@@ -244,7 +246,7 @@ const CharacterCreation = () => {
                        </span>
                     </div>
 
-                    {/* Habilidades */}
+                    {/* Habilidades Organizadas */}
                     <div>
                       <h5 className="text-xs uppercase text-yellow-500 font-bold mb-3 tracking-wider border-b border-white/10 pb-1 inline-block">
                         Habilidades Iniciais
