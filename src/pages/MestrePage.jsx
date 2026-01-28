@@ -32,10 +32,10 @@ export default function MestrePage() {
   // --- ESTADOS GERAIS ---
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
-  const [sessoes, setSessoes] = useState([]); // NOVO: Estado para Sessões
+  const [sessoes, setSessoes] = useState([]); 
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
-  const [showSessionModal, setShowSessionModal] = useState(false); // NOVO: Modal de Sessão
+  const [showSessionModal, setShowSessionModal] = useState(false); 
   const [showDetails, setShowDetails] = useState(null); 
   const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
@@ -44,7 +44,7 @@ export default function MestrePage() {
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
-  const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); // NOVO: Players da sessão
+  const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
   const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
 
   // FORM MISSÃO
@@ -52,14 +52,17 @@ export default function MestrePage() {
     nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
 
-  // FORM SESSÃO (NOVO)
+  // FORM SESSÃO (LINKS IMGUR)
   const [sessionForm, setSessionForm] = useState({
     missaoId: '',
     dataInicio: '',
-    cenarios: [], // Array de {name, data}
-    tokens: [],
-    musicas: []
+    cenarios: [], // Array de strings (URLs)
+    tokens: []    // Array de strings (URLs)
   });
+
+  // Estados temporários para inputs de link
+  const [tempLink, setTempLink] = useState("");
+  const [tempType, setTempType] = useState("cenario");
 
   // --- PERSISTÊNCIA DA ASSINATURA ---
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
@@ -75,27 +78,22 @@ export default function MestrePage() {
     if (backgroundMusic) backgroundMusic.pause();
     if (!auth.currentUser) return;
 
-    // Queries existentes
     const qM = query(collection(db, "missoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
     const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     const qR = query(collection(db, "resenhas"), where("mestreId", "==", auth.currentUser.uid), orderBy("createdAt", "desc"));
     const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // Query NOVA para Sessões
     const qS = query(collection(db, "sessoes"), where("mestreId", "==", auth.currentUser.uid), orderBy("dataInicio", "asc"));
     const unsubS = onSnapshot(qS, (snap) => {
-        const now = new Date();
         const loadedSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        // Opcional: Auto-excluir visualmente se passar de 24h (Logica de backend seria ideal para delete real)
         setSessoes(loadedSessoes);
     });
 
     return () => { unsubM(); unsubR(); unsubS(); };
   }, []);
 
-  // --- LOGICA DE CRIAÇÃO ---
+  // --- LOGICA DE CRIAÇÃO (MISSÃO) ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
@@ -121,26 +119,22 @@ export default function MestrePage() {
     } catch (e) { alert("Erro ao publicar."); }
   };
 
-  // --- LOGICA DA SESSÃO ---
-  const handleFileSelect = async (e, type) => {
-      const files = Array.from(e.target.files);
-      const promises = files.map(file => {
-          return new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.readAsDataURL(file);
-              reader.onload = () => resolve({ name: file.name, data: reader.result });
-              reader.onerror = error => reject(error);
-          });
-      });
-      
-      try {
-          const results = await Promise.all(promises);
-          setSessionForm(prev => ({
-              ...prev,
-              [type]: [...prev[type], ...results]
-          }));
-      } catch (err) {
-          console.error("Erro ao ler arquivos", err);
+  // --- LÓGICA DE ASSETS DA SESSÃO ---
+  const handleAddAsset = () => {
+      if (!tempLink) return;
+      if (tempType === 'cenario') {
+          setSessionForm(prev => ({ ...prev, cenarios: [...prev.cenarios, tempLink] }));
+      } else {
+          setSessionForm(prev => ({ ...prev, tokens: [...prev.tokens, tempLink] }));
+      }
+      setTempLink(""); // Limpa o input
+  };
+
+  const handleRemoveAsset = (type, index) => {
+      if (type === 'cenario') {
+          setSessionForm(prev => ({ ...prev, cenarios: prev.cenarios.filter((_, i) => i !== index) }));
+      } else {
+          setSessionForm(prev => ({ ...prev, tokens: prev.tokens.filter((_, i) => i !== index) }));
       }
   };
 
@@ -153,6 +147,7 @@ export default function MestrePage() {
         const inicio = new Date(sessionForm.dataInicio);
         const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); // +24 horas
 
+        // Salva arrays de links strings (super leve)
         await addDoc(collection(db, "sessoes"), {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
@@ -162,22 +157,21 @@ export default function MestrePage() {
             participantes: sessaoDestinatarios,
             cenarios: sessionForm.cenarios,
             tokens: sessionForm.tokens,
-            musicas: sessionForm.musicas,
             createdAt: serverTimestamp()
         });
         
         setShowSessionModal(false);
-        setSessionForm({ missaoId: '', dataInicio: '', cenarios: [], tokens: [], musicas: [] });
+        setSessionForm({ missaoId: '', dataInicio: '', cenarios: [], tokens: [] });
         setSessaoDestinatarios([]);
+        alert("Sessão criada com sucesso!");
       } catch (err) {
-          alert("Erro ao agendar sessão.");
+          alert("Erro ao criar sessão: " + err.message);
           console.error(err);
       }
   };
 
   const enterVTT = (sessao) => {
-      alert(`Entrando no VTT do Mestre para a sessão: ${sessao.missaoNome}\nCarregando ${sessao.cenarios?.length || 0} cenários e ${sessao.musicas?.length || 0} músicas...`);
-      // Aqui entraria a lógica de navegação real para a rota do VTT
+      alert(`Entrando no VTT do Mestre para a sessão: ${sessao.missaoNome}\nCarregando ${sessao.cenarios?.length || 0} cenários e ${sessao.tokens?.length || 0} tokens...`);
   };
 
   return (
@@ -237,7 +231,7 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 3: SESSÕES (ATUALIZADA) */}
+          {/* COLUNA 3: SESSÕES */}
           <div className="ff-card board-column">
             <div className="card-header no-border">
               <h3>SESSÕES DE JOGO</h3>
@@ -256,7 +250,7 @@ export default function MestrePage() {
                                <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
                            </div>
                            <div className="sessao-assets-count">
-                               🖼️ {s.cenarios?.length || 0} Cenários • 🎵 {s.musicas?.length || 0} Faixas
+                               🖼️ {s.cenarios?.length || 0} Cenários • ♟️ {s.tokens?.length || 0} Tokens
                            </div>
                            <div className="poster-actions" style={{marginTop: '15px'}}>
                                <button className="btn-play-vtt" onClick={() => enterVTT(s)}>▶ ACESSAR VTT</button>
@@ -370,7 +364,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO DE SESSÃO (NOVO) */}
+      {/* MODAL DE CRIAÇÃO DE SESSÃO (COM INPUT DE LINKS) */}
       {showSessionModal && (
           <div className="ff-modal-overlay-fixed">
               <div className="ff-modal-scrollable ff-card">
@@ -401,24 +395,48 @@ export default function MestrePage() {
                       </div>
 
                       <div className="upload-section-box">
-                          <h4 className="upload-section-title">ASSETS DO VTT</h4>
+                          <h4 className="upload-section-title">IMPORTAR IMAGENS (IMGUR)</h4>
                           
-                          <div className="modal-input-group">
-                              <label>IMAGENS DE CENÁRIO (Mapas/Backgrounds)</label>
-                              <input type="file" multiple accept="image/*" onChange={(e) => handleFileSelect(e, 'cenarios')} />
-                              <div className="file-count-tag">{sessionForm.cenarios.length} arquivos selecionados</div>
+                          <div className="link-import-row">
+                              <input 
+                                className="ff-input-dark" 
+                                placeholder="Cole o link da imagem aqui..." 
+                                value={tempLink} 
+                                onChange={e => setTempLink(e.target.value)} 
+                              />
+                              <select className="ff-select-dark small-select" value={tempType} onChange={e => setTempType(e.target.value)}>
+                                  <option value="cenario">Cenário</option>
+                                  <option value="token">Token</option>
+                              </select>
+                              <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
                           </div>
 
-                          <div className="modal-input-group">
-                              <label>TOKENS DE MONSTROS/NPCs</label>
-                              <input type="file" multiple accept="image/*" onChange={(e) => handleFileSelect(e, 'tokens')} />
-                              <div className="file-count-tag">{sessionForm.tokens.length} arquivos selecionados</div>
-                          </div>
+                          <div className="assets-lists">
+                              {/* LISTA DE CENÁRIOS */}
+                              {sessionForm.cenarios.length > 0 && (
+                                <div className="asset-group">
+                                    <label>CENÁRIOS:</label>
+                                    {sessionForm.cenarios.map((link, i) => (
+                                        <div key={i} className="asset-item">
+                                            <span className="truncate-link">{link}</span>
+                                            <button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenario', i)}>×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                              )}
 
-                          <div className="modal-input-group">
-                              <label>MÚSICAS E EFEITOS (Soundboard)</label>
-                              <input type="file" multiple accept="audio/*" onChange={(e) => handleFileSelect(e, 'musicas')} />
-                              <div className="file-count-tag">{sessionForm.musicas.length} arquivos selecionados</div>
+                              {/* LISTA DE TOKENS */}
+                              {sessionForm.tokens.length > 0 && (
+                                <div className="asset-group">
+                                    <label>TOKENS:</label>
+                                    {sessionForm.tokens.map((link, i) => (
+                                        <div key={i} className="asset-item">
+                                            <span className="truncate-link">{link}</span>
+                                            <button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('token', i)}>×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                              )}
                           </div>
                       </div>
 
@@ -549,9 +567,18 @@ export default function MestrePage() {
         /* UPLOAD STYLES */
         .upload-section-box { border: 1px dashed #444; padding: 15px; margin: 20px 0; background: rgba(0,0,0,0.3); }
         .upload-section-title { color: #00f2ff; font-size: 12px; margin-bottom: 15px; border-bottom: 1px solid #00f2ff; padding-bottom: 5px; display: inline-block; }
-        .file-count-tag { font-size: 10px; color: #aaa; margin-top: 3px; font-style: italic; }
         .ff-select-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; }
         .ff-input-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; color-scheme: dark; }
+
+        /* IMPORT LINK STYLES */
+        .link-import-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .small-select { width: 120px; }
+        .assets-lists { display: flex; flex-direction: column; gap: 10px; }
+        .asset-group { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; }
+        .asset-group label { display: block; color: #ffcc00; font-size: 10px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #333; }
+        .asset-item { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #ddd; margin-bottom: 4px; }
+        .truncate-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
+        .btn-remove-x { background: transparent; border: none; color: #f44; font-weight: bold; cursor: pointer; font-size: 14px; }
 
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.94); z-index: 99999; display: flex; align-items: center; justify-content: center; }
         .ff-modal-scrollable { width: 550px; max-height: 90vh; overflow-y: auto; background: #000c1d; border: 2px solid #ffcc00; padding: 35px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
