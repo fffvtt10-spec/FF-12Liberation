@@ -5,7 +5,8 @@ import { backgroundMusic } from './LandingPage';
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
-import Bazar from '../components/Bazar'; // <--- IMPORTA O COMPONENTE BAZAR
+import Bazar from '../components/Bazar'; 
+import Forja from '../components/Forja'; // <--- IMPORTA A FORJA
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
@@ -529,7 +530,8 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- AQUI ENTRA O BAZAR --- */}
+      {/* --- AQUI ENTRAM OS BOTÕES FLUTUANTES --- */}
+      <Forja /> {/* Componente novo da Forja */}
       <Bazar isMestre={true} />
 
       <style>{`

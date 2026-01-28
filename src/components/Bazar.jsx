@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
-import bazarIcon from '../assets/bazar.png'; // Garanta que esta imagem existe ou troque o caminho
+import bazarIcon from '../assets/bazar.png'; 
 
 export default function Bazar({ isMestre }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([]); // Itens do Bazar (bazar_items)
+  const [vaultItems, setVaultItems] = useState([]); // Itens da Forja (vault_items)
   const [searchTerm, setSearchTerm] = useState("");
   
   // Estados para Criação/Edição (Apenas Mestre)
   const [isEditing, setIsEditing] = useState(null); // ID do item sendo editado
+  
+  // Form agora é populado principalmente pela Forja
   const [form, setForm] = useState({
     nome: '',
     descricao: '',
@@ -18,16 +21,42 @@ export default function Bazar({ isMestre }) {
     valorReal: ''
   });
 
-  // --- BUSCAR ITENS NO FIREBASE ---
+  // --- BUSCAR ITENS DO BAZAR (Venda) ---
   useEffect(() => {
-    if (!isOpen) return; // Otimização: Só busca se o modal estiver aberto
-    
+    if (!isOpen) return;
     const q = query(collection(db, "bazar_items"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, [isOpen]);
+
+  // --- BUSCAR ITENS DA FORJA (Para importar) ---
+  useEffect(() => {
+    if (!isOpen || !isMestre) return;
+    const q = query(collection(db, "vault_items"), orderBy("nome", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setVaultItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [isOpen, isMestre]);
+
+  // --- FUNÇÃO PARA IMPORTAR DADOS DA FORJA ---
+  const handleSelectVaultItem = (e) => {
+    const vaultId = e.target.value;
+    if (!vaultId) return;
+
+    const selected = vaultItems.find(v => v.id === vaultId);
+    if (selected) {
+      setForm(prev => ({
+        ...prev,
+        nome: selected.nome,
+        descricao: selected.descricao,
+        imagem: selected.imagem,
+        // Mantém valores de Gil/Real se já tiver digitado, ou limpa
+      }));
+    }
+  };
 
   // --- CRUD (MESTRE) ---
   const handleSaveItem = async (e) => {
@@ -45,7 +74,7 @@ export default function Bazar({ isMestre }) {
         await updateDoc(doc(db, "bazar_items", isEditing), payload);
         setIsEditing(null);
       } else {
-        // Criar Novo
+        // Criar Novo no Estoque do Bazar
         await addDoc(collection(db, "bazar_items"), {
           ...payload,
           createdAt: serverTimestamp()
@@ -60,7 +89,7 @@ export default function Bazar({ isMestre }) {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Tem certeza que deseja remover este item do Bazar?")) {
+    if (window.confirm("Remover este item do Bazar? (O item original continua na Forja)")) {
       await deleteDoc(doc(db, "bazar_items", id));
     }
   };
@@ -97,22 +126,39 @@ export default function Bazar({ isMestre }) {
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
             </div>
 
-            {/* ÁREA DE CRIAÇÃO (SÓ MESTRE) */}
+            {/* ÁREA DE CRIAÇÃO/IMPORTAÇÃO (SÓ MESTRE) */}
             {isMestre && (
               <div className="mestre-panel">
                 <form onSubmit={handleSaveItem} className="bazar-form">
+                  
+                  {/* SELETOR DA FORJA */}
+                  {!isEditing && (
+                    <div className="row" style={{marginBottom: '10px'}}>
+                        <select className="bazar-input" onChange={handleSelectVaultItem} defaultValue="">
+                            <option value="" disabled>📥 Importar Item da Forja...</option>
+                            {vaultItems.map(v => (
+                                <option key={v.id} value={v.id}>{v.nome}</option>
+                            ))}
+                        </select>
+                    </div>
+                  )}
+
                   <div className="row">
-                    <input placeholder="Nome do Item" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} className="bazar-input" />
-                    <input placeholder="Link Imagem (Imgur)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} className="bazar-input" />
+                    <input placeholder="Nome do Item" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} className="bazar-input" readOnly={!isEditing} />
+                    {/* Imagem fica escondida ou readonly pois vem da forja, mas deixamos editavel caso queira customizar pro bazar */}
+                    <input placeholder="Link Imagem" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} className="bazar-input" />
                   </div>
+
                   <div className="row">
-                    <input placeholder="Valor Gil" type="number" value={form.valorGil} onChange={e=>setForm({...form, valorGil: e.target.value})} className="bazar-input" />
+                    <input placeholder="Valor Gil" type="number" value={form.valorGil} onChange={e=>setForm({...form, valorGil: e.target.value})} className="bazar-input" required />
                     <input placeholder="Valor Real (R$)" type="number" value={form.valorReal} onChange={e=>setForm({...form, valorReal: e.target.value})} className="bazar-input" />
                   </div>
+                  
+                  {/* Descrição também vem da forja */}
                   <textarea placeholder="Descrição do item..." value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} className="bazar-input area" />
                   
                   <div className="form-actions">
-                    <button type="submit" className="btn-save">{isEditing ? "SALVAR ALTERAÇÃO" : "ADICIONAR AO ESTOQUE"}</button>
+                    <button type="submit" className="btn-save">{isEditing ? "SALVAR PREÇO" : "COLOCAR À VENDA"}</button>
                     {isEditing && <button type="button" onClick={handleCancelEdit} className="btn-cancel">CANCELAR</button>}
                   </div>
                 </form>
@@ -123,14 +169,14 @@ export default function Bazar({ isMestre }) {
             <div className="search-bar-container">
               <input 
                 type="text" 
-                placeholder="🔍 Procurar item..." 
+                placeholder="🔍 Procurar item no estoque..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="search-input"
               />
             </div>
 
-            {/* LISTA DE ITENS */}
+            {/* LISTA DE ITENS À VENDA */}
             <div className="bazar-grid">
               {filteredItems.map(item => (
                 <div key={item.id} className="bazar-item-card">
@@ -148,8 +194,8 @@ export default function Bazar({ isMestre }) {
                   <div className="item-actions">
                     {isMestre ? (
                       <>
-                        <button className="btn-icon edit" onClick={() => handleEditClick(item)} title="Editar">✏️</button>
-                        <button className="btn-icon delete" onClick={() => handleDelete(item.id)} title="Excluir">🗑️</button>
+                        <button className="btn-icon edit" onClick={() => handleEditClick(item)} title="Editar Preço/Detalhes">✏️</button>
+                        <button className="btn-icon delete" onClick={() => handleDelete(item.id)} title="Remover do Bazar">🗑️</button>
                       </>
                     ) : (
                       <button className="btn-buy" onClick={() => alert(`Você comprou: ${item.nome}`)}>COMPRAR</button>
@@ -157,7 +203,7 @@ export default function Bazar({ isMestre }) {
                   </div>
                 </div>
               ))}
-              {filteredItems.length === 0 && <p className="empty-msg">Nenhum item encontrado no estoque.</p>}
+              {filteredItems.length === 0 && <p className="empty-msg">Nenhum item à venda no momento.</p>}
             </div>
 
           </div>
