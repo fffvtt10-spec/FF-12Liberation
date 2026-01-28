@@ -1,0 +1,83 @@
+{
+  "character_sheet": {
+    "basic_info": {
+      "character_name": "",
+      "player_name": "",
+      "level": 0,
+      "experience": {
+        "current": 0,
+        "max": 100
+      },
+      "race": "",
+      "guild_rank": "",
+      "notes": ""
+    },
+    "attributes": {
+      "FOR": { "value": 0, "modifier": 0 },
+      "CONS": { "value": 0, "modifier": 0 },
+      "INT": { "value": 0, "modifier": 0 },
+      "SOR": { "value": 0, "modifier": 0 },
+      "CAR": { "value": 0, "modifier": 0 },
+      "VEL": { "value": 0, "modifier": 0 }
+    },
+    "status": {
+      "hp": { "current": 0, "max": 0 },
+      "mp": { "current": 0, "max": 0 },
+      "arm": { "value": 0, "description": "Armadura Física" },
+      "res": { "value": 0, "description": "Resistência Mágica" }
+    },
+    "equipment": {
+      "slots": [
+        { "slot_id": 1, "item_name": "", "effect": "" },
+        { "slot_id": 2, "item_name": "", "effect": "" },
+        { "slot_id": 3, "item_name": "", "effect": "" },
+        { "slot_id": 4, "item_name": "", "effect": "" },
+        { "slot_id": 5, "item_name": "", "effect": "" },
+        { "slot_id": 6, "item_name": "", "effect": "" },
+        { "slot_id": 7, "item_name": "", "effect": "" }
+      ]
+    },
+    "job_system": {
+      "class_bonus": {
+        "description": "Bônus de Atributos da Classe (ex: +5 CONS)",
+        "value": ""
+      },
+      "primary_class": {
+        "name": "",
+        "skills": [
+          { "name": "", "cost": "", "effect": "" },
+          { "name": "", "cost": "", "effect": "" },
+          { "name": "", "cost": "", "effect": "" },
+          { "name": "", "cost": "", "effect": "" }
+        ]
+      },
+      "secondary_class": {
+        "name": "",
+        "skills": [
+          { "name": "", "cost": "", "effect": "" },
+          { "name": "", "cost": "", "effect": "" },
+          { "name": "", "cost": "", "effect": "" }
+        ]
+      },
+      "reaction_ability": {
+        "name": "",
+        "effect": ""
+      },
+      "passive_ability": {
+        "name": "",
+        "effect": ""
+      }
+    },
+    "inventory": {
+      "gil": 0,
+      "items": [
+        { "name": "", "quantity": 0, "description": "" },
+        { "name": "", "quantity": 0, "description": "" },
+        { "name": "", "quantity": 0, "description": "" },
+        { "name": "", "quantity": 0, "description": "" },
+        { "name": "", "quantity": 0, "description": "" },
+        { "name": "", "quantity": 0, "description": "" }
+      ]
+    }
+  }
+}

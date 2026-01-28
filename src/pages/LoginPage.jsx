@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import videoFundo from '../assets/video-fundo.mp4'; 
 import iconAdmin from '../assets/botao-admin.png';
-import { db, login } from '../firebase'; // Certifique-se de importar o 'db'
+import { db, login } from '../firebase'; 
 import { doc, getDoc } from "firebase/firestore";
 
 export default function LoginPage() {
@@ -13,47 +13,48 @@ export default function LoginPage() {
   const [erro, setErro] = useState('');
 
   const handleLogin = async (e) => {
-  e.preventDefault();
-  setErro(""); // Limpa erros anteriores
+    e.preventDefault();
+    setErro(""); 
   
-  try {
-    // 1. Faz o login no Firebase Auth
-    const userCredential = await login(email, password);
-    const user = userCredential.user;
+    try {
+      // 1. Faz o login no Firebase Auth
+      const userCredential = await login(email, password);
+      const user = userCredential.user;
 
-    // 2. Busca o cargo (role) do usuário no Firestore usando o UID
-    // Importante: Na AdminPage usamos user.uid como ID do documento
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
+      // 2. Busca o cargo (role) do usuário no Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
 
-    if (userSnap.exists()) {
-      const userData = userSnap.data();
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
 
-      // 3. Validação: Se ele escolheu "NARRADOR" mas no banco é "jogador", ele não entra
-      // Nota: 'role' (estado do clique) vs 'userData.role' (o que está no banco)
-      if (role === 'master' && userData.role !== 'mestre') {
-        setErro("ACESSO NEGADO: VOCÊ NÃO É UM MESTRE.");
-        return;
-      }
+        // 3. Validação de segurança
+        if (role === 'master' && userData.role !== 'mestre') {
+          setErro("ACESSO NEGADO: VOCÊ NÃO É UM MESTRE.");
+          return;
+        }
 
-      // 4. Redirecionamento correto
-      if (userData.role === 'mestre') {
-        navigate('/mestre'); // Crie esta rota no seu App.jsx
+        // 4. Redirecionamento Atualizado
+        if (userData.role === 'mestre') {
+          navigate('/mestre'); 
+        } else {
+          // Jogadores são redirecionados para a tela de Criação de Personagem
+          navigate('/create-character'); 
+        }
       } else {
-        navigate('/jogador'); // Crie esta rota no seu App.jsx
+        // Se o usuário existe no Auth mas não no Firestore, 
+        // manda para criação de personagem para criar o registro
+        navigate('/create-character');
       }
-    } else {
-      setErro("USUÁRIO SEM PERFIL NO ÉTER.");
+    } catch (err) {
+      console.error(err);
+      setErro("FALHA NA CONEXÃO COM O ÉTER.");
     }
-  } catch (err) {
-    console.error(err);
-    setErro("FALHA NA CONEXÃO COM O ÉTER.");
-  }
-};
+  };
 
   return (
     <div className="login-container">
-      {/* 1. VÍDEO DE FUNDO COM Z-INDEX 1 */}
+      {/* 1. VÍDEO DE FUNDO */}
       <video 
         autoPlay 
         loop 
@@ -65,7 +66,7 @@ export default function LoginPage() {
         <source src={videoFundo} type="video/mp4" />
       </video>
 
-      {/* 2. OVERLAY TRANSPARENTE COM Z-INDEX 10 */}
+      {/* 2. OVERLAY TRANSPARENTE */}
       <div className="content-overlay">
         {!role ? (
           <div className="selection-screen fade-in">
@@ -101,7 +102,7 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* 3. BOTÃO DE ADMIN (LION ICON) COM Z-INDEX 100 */}
+      {/* 3. BOTÃO DE ADMIN */}
       <button 
         className="admin-portal-btn" 
         onClick={() => navigate('/admin-login')} 
@@ -159,13 +160,14 @@ export default function LoginPage() {
           margin-bottom: 40px; 
           text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); 
           text-align: center;
-          font-family: 'serif'; /* Simula tipografia FF */
+          font-family: 'serif'; 
         }
 
         .ff-subtitle { color: #ffcc00; letter-spacing: 4px; margin-bottom: 30px; text-align: center; }
         .ff-button-group { display: flex; flex-direction: column; gap: 20px; align-items: center; }
         
-        .ff-btn, .ff-submit {
+        /* Botões Iniciais */
+        .ff-btn {
           background: rgba(0, 0, 30, 0.6); 
           border: 1px solid rgba(255, 255, 255, 0.6);
           color: #fff;
@@ -176,6 +178,22 @@ export default function LoginPage() {
           width: 280px;
           backdrop-filter: blur(5px);
           font-weight: bold;
+        }
+
+        /* Botão de Entrar (Ajustado para igualar a largura dos inputs) */
+        .ff-submit {
+          background: rgba(0, 0, 30, 0.6); 
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          color: #fff;
+          padding: 15px 0; /* padding lateral removido para usar width */
+          letter-spacing: 3px;
+          cursor: pointer;
+          transition: 0.4s;
+          width: 326px; /* 300px input + 24px padding + 2px border */
+          backdrop-filter: blur(5px);
+          font-weight: bold;
+          margin: 0 auto;
+          display: block;
         }
 
         .ff-btn:hover, .ff-submit:hover { 
@@ -199,7 +217,7 @@ export default function LoginPage() {
 
         .ff-input-group input:focus { border-color: #ffcc00; }
         .ff-back { background: none; border: none; color: #ffcc00; cursor: pointer; margin-bottom: 15px; display: block; font-weight: bold; }
-        .ff-error { color: #ff4444; font-size: 12px; margin-bottom: 15px; text-shadow: 0 0 5px #000; }
+        .ff-error { color: #ff4444; font-size: 12px; margin-bottom: 15px; text-shadow: 0 0 5px #000; text-align: center; }
 
         .admin-portal-btn {
           position: absolute;
