@@ -22,13 +22,30 @@ const CharacterCreation = () => {
 
   const races = racesData.races;
 
-  // 1. Limpeza de Audio
+  // 1. Limpeza de Audio (Aprimorada para garantir silêncio)
   useEffect(() => {
-    const audioElements = document.querySelectorAll('audio, video');
-    audioElements.forEach(el => {
-      if(el.tagName === 'VIDEO' && el.classList.contains('background-video')) return;
-      el.pause();
-    });
+    const stopAudio = () => {
+      const audioElements = document.querySelectorAll('audio, video');
+      audioElements.forEach(el => {
+        // Ignora o vídeo de fundo se ele tiver a classe especifica
+        if(el.tagName === 'VIDEO' && el.classList.contains('background-video')) return;
+        
+        try {
+          el.pause();
+          el.currentTime = 0; // Opcional: Reinicia o audio
+        } catch (e) {
+          console.error("Erro ao pausar audio:", e);
+        }
+      });
+    };
+
+    // Executa imediatamente
+    stopAudio();
+    
+    // Executa novamente após um breve delay para garantir (caso o audio carregue depois)
+    const timeout = setTimeout(stopAudio, 100);
+
+    return () => clearTimeout(timeout);
   }, []);
 
   // 2. Centralização do Carousel
@@ -331,10 +348,13 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME (Z-INDEX SUPERIOR + BLUR FORTE) --- */}
+      {/* --- MODAL DE NOME (Z-INDEX SUPERIOR + BLUR FORTE + POSICIONAMENTO FORÇADO) --- */}
       {showNameModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl animate-[fadeIn_0.5s]">
-           <div className="relative bg-neutral-900/90 border border-yellow-500/50 p-8 rounded-lg shadow-[0_0_60px_rgba(234,179,8,0.3)] flex flex-col items-center gap-6 max-w-md w-full">
+        <div 
+          style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          className="bg-black/70 backdrop-blur-md animate-[fadeIn_0.5s]"
+        >
+           <div className="relative bg-neutral-900/90 border border-yellow-500/50 p-8 rounded-lg shadow-[0_0_60px_rgba(234,179,8,0.3)] flex flex-col items-center gap-6 max-w-md w-full m-4">
              
              {/* Título do Modal */}
              <div className="text-center">
