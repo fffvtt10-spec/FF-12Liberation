@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import racesData from './data/races.json'; // Ajuste o caminho se necessário
-import classesData from './data/classes.json'; // Ajuste o caminho se necessário
+import racesData from '../data/races.json'; // Ajuste o caminho se necessário
+import classesData from '../data/classes.json'; // Ajuste o caminho se necessário
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
