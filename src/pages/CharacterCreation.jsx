@@ -22,7 +22,7 @@ const CharacterCreation = () => {
 
   const races = racesData.races;
 
-  // 1. Limpeza de Audio (Aprimorada para garantir silêncio)
+  // 1. Limpeza de Audio (Agressiva)
   useEffect(() => {
     const stopAudio = () => {
       const audioElements = document.querySelectorAll('audio, video');
@@ -32,20 +32,24 @@ const CharacterCreation = () => {
         
         try {
           el.pause();
-          el.currentTime = 0; // Opcional: Reinicia o audio
+          el.currentTime = 0; 
         } catch (e) {
           console.error("Erro ao pausar audio:", e);
         }
       });
     };
 
-    // Executa imediatamente
+    // Tenta parar imediatamente
     stopAudio();
     
-    // Executa novamente após um breve delay para garantir (caso o audio carregue depois)
-    const timeout = setTimeout(stopAudio, 100);
+    // Insiste em parar algumas vezes nos primeiros segundos para garantir que nada carregue depois
+    const interval = setInterval(stopAudio, 200);
+    const timeout = setTimeout(() => clearInterval(interval), 1500);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // 2. Centralização do Carousel
@@ -69,7 +73,6 @@ const CharacterCreation = () => {
   const renderBonuses = (bonusData) => {
     if (!bonusData) return "Nenhum";
 
-    // Mapa de tradução
     const translations = {
       value: "Valor",
       detail: "Detalhes",
@@ -80,15 +83,12 @@ const CharacterCreation = () => {
       male_exiled: "Masculino (Exilado)"
     };
 
-    // Se for objeto, itera e traduz
     if (typeof bonusData === 'object') {
       return Object.entries(bonusData).map(([key, val], index) => {
-        // Ignora chaves internas se existirem (embora tenhamos removido 'type')
         if (key === 'type') return null;
 
         const label = translations[key] || key.toUpperCase().replace(/_/g, ' ');
         
-        // Se o valor for outro objeto, formata recursivamente ou simplifica
         let displayVal = val;
         if (typeof val === 'object') {
           displayVal = JSON.stringify(val).replace(/["{}]/g, '').replace(/:/g, ': ').replace(/,/g, ', ');
@@ -136,7 +136,6 @@ const CharacterCreation = () => {
   };
 
   const handleFinalizeCreation = () => {
-    // Aqui você pode salvar os dados (nome, raça, classe) no contexto ou localStorage se precisar
     console.log(`Personagem Criado: ${charName} - ${selectedRace.name} - ${selectedClass}`);
     navigate('/vtt');
   };
@@ -146,6 +145,18 @@ const CharacterCreation = () => {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       
+      {/* Estilos inline para animação personalizada do modal */}
+      <style>{`
+        @keyframes scaleInCenter {
+          0% { transform: scale(0); opacity: 0; }
+          80% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-in {
+          animation: scaleInCenter 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+      `}</style>
+
       {/* --- BACKGROUND ANIMADO (ÉTER) --- */}
       <div className="ether-container">
         <div className="ether-vortex"></div>
@@ -207,7 +218,7 @@ const CharacterCreation = () => {
       {viewState === 'details' && selectedRace && (
         <div className="details-grid">
           
-          {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
+          {/* LADO ESQUERDO: IMAGEM */}
           <div className="char-portrait-container">
             <img src={selectedRace.image} alt={selectedRace.name} className="char-portrait" />
           </div>
@@ -258,7 +269,6 @@ const CharacterCreation = () => {
             <div>
               <h3 className="rpg-title text-xl mb-4 text-white">Vocação</h3>
               
-              {/* Grid de Botões */}
               <div className="class-selector-grid">
                 {getAvailableClasses().map((clsName) => {
                   const details = getClassDetails(clsName);
@@ -277,13 +287,11 @@ const CharacterCreation = () => {
                 })}
               </div>
 
-              {/* Detalhes da Classe (Expandido) */}
               {selectedClass && (() => {
                 const info = getClassDetails(selectedClass);
                 return info ? (
                   <div className="class-detail-container">
                     
-                    {/* Header */}
                     <div className="cd-header">
                       <div>
                         <h4 className="cd-title rpg-title">{info.name}</h4>
@@ -297,12 +305,10 @@ const CharacterCreation = () => {
                       </div>
                     </div>
 
-                    {/* Descrição Formatada */}
                     <div className="cd-desc">
                       "{info.description}"
                     </div>
 
-                    {/* Bônus */}
                     <div className="cd-bonus-box">
                         <span className="text-xs uppercase font-bold text-blue-300">Bônus de Classe</span>
                         <span className="font-mono text-sm text-white">
@@ -310,7 +316,6 @@ const CharacterCreation = () => {
                         </span>
                     </div>
 
-                    {/* Habilidades Organizadas */}
                     <div>
                       <h5 className="text-xs uppercase text-yellow-500 font-bold mb-3 tracking-wider border-b border-white/10 pb-1 inline-block">
                         Habilidades Iniciais
@@ -333,7 +338,6 @@ const CharacterCreation = () => {
               })()}
             </div>
 
-            {/* Botão Final (Alterado para abrir modal) */}
             <div className="mt-8 mb-10">
                <button
                  disabled={!selectedClass}
@@ -348,47 +352,69 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME (Z-INDEX SUPERIOR + BLUR FORTE + POSICIONAMENTO FORÇADO) --- */}
+      {/* --- MODAL DE NOME RPG STYLE --- */}
       {showNameModal && (
         <div 
           style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          className="bg-black/70 backdrop-blur-md animate-[fadeIn_0.5s]"
+          className="bg-black/80 backdrop-blur-xl" // Blur forte e fundo escuro
         >
-           <div className="relative bg-neutral-900/90 border border-yellow-500/50 p-8 rounded-lg shadow-[0_0_60px_rgba(234,179,8,0.3)] flex flex-col items-center gap-6 max-w-md w-full m-4">
+           {/* Container da Caixa (Animação Scale In) */}
+           <div className="animate-scale-in relative w-full max-w-lg m-4">
              
-             {/* Título do Modal */}
-             <div className="text-center">
-               <h3 className="rpg-title text-3xl text-yellow-500 tracking-wide mb-2">Identidade</h3>
-               <p className="text-xs text-gray-400 uppercase tracking-widest">Como a história o conhecerá?</p>
+             {/* Borda Externa Dourada/Fancy */}
+             <div className="relative bg-gradient-to-b from-gray-900 to-black border-2 border-yellow-700 shadow-[0_0_50px_rgba(234,179,8,0.4)] rounded-lg p-1">
+                
+                {/* Borda Interna Decorativa */}
+                <div className="border border-yellow-500/30 rounded-md p-8 flex flex-col items-center gap-6 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 to-gray-950">
+                   
+                   {/* Título Estilizado */}
+                   <div className="text-center space-y-2">
+                     <h3 className="text-4xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-300 font-serif font-bold tracking-wider drop-shadow-md">
+                       IDENTIDADE
+                     </h3>
+                     <p className="text-yellow-700 font-serif italic text-sm tracking-widest border-t border-yellow-900/50 pt-2">
+                       Como a história o conhecerá?
+                     </p>
+                   </div>
+
+                   {/* Container do Input e Botão */}
+                   <div className="w-full relative flex items-stretch shadow-lg mt-4 group">
+                      <div className="absolute inset-0 bg-yellow-600 blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                      
+                      <input 
+                        type="text" 
+                        value={charName}
+                        onChange={(e) => setCharName(e.target.value)}
+                        placeholder="Nome do Aventureiro"
+                        className="relative z-10 flex-1 bg-black/60 border-2 border-yellow-700 text-yellow-100 px-4 py-4 text-xl font-serif placeholder-yellow-800/50 focus:border-yellow-400 outline-none transition-colors rounded-l-md"
+                        autoFocus
+                      />
+                      
+                      <button 
+                        onClick={handleFinalizeCreation}
+                        disabled={!charName.trim()}
+                        className="relative z-10 bg-gradient-to-b from-yellow-600 to-yellow-800 hover:from-yellow-500 hover:to-yellow-700 text-white font-serif font-bold text-lg px-6 py-2 border-2 border-l-0 border-yellow-700 rounded-r-md shadow-inner transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest"
+                      >
+                        Go
+                      </button>
+                   </div>
+
+                   {/* Botão Fechar Decorativo */}
+                   <button 
+                     onClick={() => setShowNameModal(false)}
+                     className="absolute top-2 right-2 text-yellow-800 hover:text-yellow-500 transition-colors w-8 h-8 flex items-center justify-center font-bold"
+                   >
+                     ✕
+                   </button>
+                </div>
+
+                {/* Detalhes de Cantos (Opcional, css puro) */}
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-yellow-500 -mt-1 -ml-1"></div>
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-yellow-500 -mt-1 -mr-1"></div>
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-yellow-500 -mb-1 -ml-1"></div>
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-500 -mb-1 -mr-1"></div>
+
              </div>
-
-             {/* Input e Botão */}
-             <div className="flex w-full gap-3">
-               <input 
-                 type="text" 
-                 value={charName}
-                 onChange={(e) => setCharName(e.target.value)}
-                 placeholder="Nome do Aventureiro"
-                 className="flex-1 bg-black/50 border border-white/20 text-white px-4 py-3 rounded text-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all font-serif"
-                 autoFocus
-               />
-               <button 
-                 onClick={handleFinalizeCreation}
-                 disabled={!charName.trim()}
-                 className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold px-4 py-2 rounded transition-colors text-sm uppercase tracking-wide flex items-center justify-center min-w-[60px]"
-               >
-                 Go
-               </button>
-             </div>
-
-             {/* Botão Fechar/Cancelar */}
-             <button 
-               onClick={() => setShowNameModal(false)}
-               className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
-             >
-               ✕
-             </button>
-
            </div>
         </div>
       )}
