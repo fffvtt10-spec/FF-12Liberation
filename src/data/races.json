@@ -3,7 +3,7 @@
     {
       "id": "humes",
       "name": "Humes",
-      "image": "/races/humes.png",
+      "image": "races/humes.png",
       "description": "Os Humes são a raça mais comum e predominante em Ivalice. Adaptáveis, curiosos e persistentes, habitam desde as grandes capitais até vilarejos fronteiriços. Sua origem é antiga e pouco documentada, mas acredita-se que foram os primeiros a construir grandes cidades e fundar os clãs atuais.",
       "characteristics": "Sua maior qualidade é a versatilidade. Não se destacam naturalmente em nenhum atributo específico, mas aprendem qualquer função rapidamente, prosperando em qualquer lugar que chamem de lar.",
       "racial_bonus": {
@@ -20,7 +20,7 @@
     {
       "id": "viera",
       "name": "Viera",
-      "image": "/races/viera.png",
+      "image": "races/viera.png",
       "description": "Uma raça graciosa e enigmática, marcada por longas orelhas e aparência esguia. Vivem em florestas profundas, isoladas do mundo exterior e conectadas aos espíritos da natureza. A sociedade é matriarcal.",
       "characteristics": "Conhecidas por sentidos aguçados, velocidade impressionante e habilidades mágicas refinadas. Os machos são raros e exilados ao atingirem a maturidade.",
       "racial_bonus": {
@@ -46,7 +46,7 @@
     {
       "id": "moogles",
       "name": "Moogles",
-      "image": "/races/moogles.png",
+      "image": "races/moogles.png",
       "description": "Pequenos, adoráveis e envoltos em mistério. Possuem corpos peludos, antenas com pompons flutuantes e pequenas asas de morcego. Não possuem gênero definido.",
       "characteristics": "Extremamente inteligentes e obcecados por tecnologia e invenções, misturando ciência com feitiçaria. Carregam um estranho 'magnetismo da sorte'.",
       "racial_bonus": {
@@ -60,7 +60,7 @@
     {
       "id": "bangaa",
       "name": "Bangaa",
-      "image": "/races/bangaa.png",
+      "image": "races/bangaa.png",
       "description": "Guerreiros reptilianos robustos, com pele escamosa e traços que lembram dragões antigos. São temidos pela força bruta e respeitados pela honra em combate.",
       "characteristics": "Sua origem remonta a tempos ancestrais e acredita-se que possuam sangue dracônico. Valorizam a lealdade, a disciplina física e o dever.",
       "racial_bonus": {
@@ -75,7 +75,7 @@
     {
       "id": "grias",
       "name": "Grias",
-      "image": "/races/grias.png",
+      "image": "races/grias.png",
       "description": "Guerreiras aladas, exclusivamente femininas, nascidas para dominar os céus. Possuem corpos atléticos, chifres, caudas e asas fortes.",
       "characteristics": "Mestres da caça alada e emboscadas aéreas. Usam a altura como vantagem tática e seus ataques de mergulho são devastadores.",
       "racial_bonus": {
@@ -93,7 +93,7 @@
     {
       "id": "elvaan",
       "name": "Elvaan",
-      "image": "/races/elvaan.png",
+      "image": "races/elvaan.png",
       "description": "Originários de Valendia, são guerreiros altos, nobres e disciplinados, com orelhas alongadas. Simbolizam tradição e justiça em Ivalice.",
       "characteristics": "Treinados desde a infância no manejo de lâminas e estilos de combate ancestrais. Desprezam truques e valorizam o confronto direto.",
       "racial_bonus": {
@@ -111,7 +111,7 @@
     {
       "id": "mithra",
       "name": "Mithra",
-      "image": "/races/mithra.png",
+      "image": "races/mithra.png",
       "description": "Raça com traços felinos, ágil e astuta. Compartilham uma origem ancestral com as Viera, mas se espalharam por matas tropicais e ruínas.",
       "characteristics": "Especialistas em furtividade, espionagem e ladronagem. Possuem forte senso de honra ligado à astúcia.",
       "racial_bonus": {
@@ -129,7 +129,7 @@
     {
       "id": "nu_mou",
       "name": "Nu Mou",
-      "image": "/races/nu_mou.png",
+      "image": "races/nu_mou.png",
       "description": "Pequenos em estatura, com aparência canina e pelagem espessa, mas imensos em conhecimento. São magos natos que vivem séculos acumulando sabedoria.",
       "characteristics": "Frequentemente ocupam cargos de conselheiros. Possuem empatia natural com a vida selvagem, comunicando-se com monstros e animais.",
       "racial_bonus": {
@@ -144,7 +144,7 @@
     {
       "id": "hypello",
       "name": "Hypello",
-      "image": "/races/hypello.png",
+      "image": "races/hypello.png",
       "description": "Raça anfíbia dos pântanos de Kerwon. Possuem grande estatura, corpos robustos e pele azulada ou esverdeada.",
       "characteristics": "Herbalistas por excelência, mestres em usar plantas para curas ou venenos. Sua maior força é a vitalidade e a empatia.",
       "racial_bonus": {
@@ -158,7 +158,7 @@
     {
       "id": "umbros",
       "name": "Umbros",
-      "image": "/races/umbros.png",
+      "image": "races/umbros.png",
       "description": "Seres de pele negra e marcas brilhantes que reagem à lua. Descendentes dos seres tocados pelas Pedras Zodiacais.",
       "characteristics": "Alta resistência à corrupção e aptidão mágica. Vistos como oráculos ou andarilhos que carregam segredos esquecidos.",
       "racial_bonus": {
