@@ -5,7 +5,7 @@ import { backgroundMusic } from './LandingPage';
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
-import Bazar from './Bazar'; // <--- IMPORTA O COMPONENTE BAZAR
+import Bazar from './components/Bazar'; // <--- IMPORTA O COMPONENTE BAZAR
 
 // --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
