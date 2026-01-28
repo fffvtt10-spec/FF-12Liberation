@@ -15,6 +15,7 @@ const CharacterCreation = () => {
   const [selectedRace, setSelectedRace] = useState(null); 
   const [selectedGender, setSelectedGender] = useState('female');
   const [selectedClass, setSelectedClass] = useState(null);
+  const [characterName, setCharacterName] = useState('');
 
   const races = racesData.races;
 
@@ -110,8 +111,25 @@ const CharacterCreation = () => {
   };
 
   const handleBack = () => {
-    setViewState('carousel');
-    setSelectedClass(null);
+    if (viewState === 'naming') {
+        setViewState('details');
+    } else {
+        setViewState('carousel');
+        setSelectedClass(null);
+    }
+  };
+
+  const handleFinalizeCreation = () => {
+    setViewState('naming');
+  };
+
+  const handleConfirmName = () => {
+    if (characterName.trim().length < 3) {
+        alert("O nome deve ter pelo menos 3 caracteres.");
+        return;
+    }
+    // Aqui você pode salvar os dados antes de navegar
+    navigate('/vtt');
   };
 
   const activeRace = races[activeIndex];
@@ -133,9 +151,9 @@ const CharacterCreation = () => {
             {viewState === 'carousel' ? 'Determine sua Linhagem Ancestral' : `${selectedRace?.name} // Customização`}
           </p>
         </div>
-        {viewState === 'details' && (
+        {(viewState === 'details' || viewState === 'naming') && (
           <button onClick={handleBack} className="nav-back-btn">
-            <span>←</span> Seleção
+            <span>←</span> {viewState === 'naming' ? 'Ajustar Detalhes' : 'Seleção'}
           </button>
         )}
       </header>
@@ -177,8 +195,8 @@ const CharacterCreation = () => {
       )}
 
       {/* --- FASE 2: DETALHES --- */}
-      {viewState === 'details' && selectedRace && (
-        <div className="details-grid">
+      {(viewState === 'details' || viewState === 'naming') && selectedRace && (
+        <div className={`details-grid transition-all duration-500 ${viewState === 'naming' ? 'blur-xl grayscale-[0.5] scale-95 pointer-events-none' : ''}`}>
           
           {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
           <div className="char-portrait-container">
@@ -310,13 +328,54 @@ const CharacterCreation = () => {
             <div className="mt-8 mb-10">
                <button
                  disabled={!selectedClass}
-                 onClick={() => navigate('/vtt')}
+                 onClick={handleFinalizeCreation}
                  className="confirm-btn"
                >
                  {selectedClass ? 'Finalizar Criação' : 'Selecione uma Vocação'}
                </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DE NOME (FASE 3) --- */}
+      {viewState === 'naming' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center animate-[fadeIn_0.3s]">
+          <div className="glass-panel w-full max-w-md p-8 border-t-2 border-b-2 border-yellow-500 bg-black/80 backdrop-blur-md shadow-[0_0_50px_rgba(0,0,0,0.8)] text-center">
+            <h2 className="rpg-title text-3xl text-yellow-500 mb-6 tracking-widest">Identidade</h2>
+            
+            <p className="text-xs text-gray-400 uppercase font-bold mb-4 tracking-tighter">
+                Como os bardos cantarão suas glórias?
+            </p>
+
+            <div className="relative mb-8">
+                <input 
+                    autoFocus
+                    type="text"
+                    value={characterName}
+                    onChange={(e) => setCharacterName(e.target.value)}
+                    placeholder="Nome do Herói..."
+                    className="w-full bg-transparent border-b-2 border-white/20 p-4 text-2xl text-center text-white outline-none focus:border-yellow-500 transition-colors tracking-widest font-serif italic"
+                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmName()}
+                />
+                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+                <button 
+                    onClick={handleConfirmName}
+                    className="confirm-btn !text-xl"
+                >
+                    Despertar em Gaia
+                </button>
+                <button 
+                    onClick={handleBack}
+                    className="text-[10px] uppercase text-gray-500 hover:text-white transition-colors tracking-[0.2em]"
+                >
+                    Revisar Atributos
+                </button>
+            </div>
           </div>
         </div>
       )}
