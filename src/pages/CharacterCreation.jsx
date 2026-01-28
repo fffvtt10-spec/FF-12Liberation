@@ -1,208 +1,271 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import racesData from '../data/races.json'; // Ajuste o caminho se necessário
-import classesData from '../data/classes.json'; // Ajuste o caminho se necessário
+import racesData from './data/races.json';
+import classesData from './data/classes.json';
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
-  
-  // Estados
-  const [introVisible, setIntroVisible] = useState(true);
-  const [selectedRace, setSelectedRace] = useState(null);
-  const [selectedGender, setSelectedGender] = useState('female'); // Padrão para Viera/Grias
-  const [selectedClass, setSelectedClass] = useState(null);
-  
-  // Dados brutos
+  const carouselRef = useRef(null);
+
+  // --- ESTADOS ---
+  // 'selection' = Carrosel | 'details' = Raça no canto esquerdo, info na direita
+  const [phase, setPhase] = useState('selection'); 
+  const [focusedIndex, setFocusedIndex] = useState(0); // Qual raça está no meio do carrosel
+  const [selectedGender, setSelectedGender] = useState('female');
+  const [selectedClassId, setSelectedClassId] = useState(null);
+
   const races = racesData.races;
+  const currentRace = races[focusedIndex];
+
+  // --- EFEITOS ---
   
-  // Resolve as classes disponíveis baseadas na raça e gênero selecionados
-  const getAvailableClasses = () => {
-    if (!selectedRace) return [];
-    
-    // Se base_classes for um array, retorna ele
-    if (Array.isArray(selectedRace.base_classes)) {
-      return selectedRace.base_classes;
+  // 1. Parar músicas residuais (Safety Check)
+  useEffect(() => {
+    const audioElements = document.querySelectorAll('audio, video');
+    audioElements.forEach(el => el.pause());
+  }, []);
+
+  // 2. Centralizar scroll do carrosel quando o foco muda
+  useEffect(() => {
+    if (carouselRef.current && phase === 'selection') {
+      const cardWidth = 220; // Largura aproximada do card + margem
+      const centerOffset = (window.innerWidth / 2) - (cardWidth / 2);
+      carouselRef.current.scrollTo({
+        left: (focusedIndex * cardWidth) - centerOffset + (cardWidth / 2),
+        behavior: 'smooth'
+      });
     }
-    
-    // Se for objeto (como Viera), depende do gênero
-    if (typeof selectedRace.base_classes === 'object') {
-      if (selectedRace.id === 'viera') {
+  }, [focusedIndex, phase]);
+
+  // --- LÓGICA DE DADOS ---
+
+  const getAvailableClasses = () => {
+    if (!currentRace) return [];
+    if (Array.isArray(currentRace.base_classes)) return currentRace.base_classes;
+    if (typeof currentRace.base_classes === 'object') {
+      if (currentRace.id === 'viera') {
         return selectedGender === 'female' 
-          ? selectedRace.base_classes.female 
-          : selectedRace.base_classes.male || selectedRace.base_classes.male_exiled;
+          ? currentRace.base_classes.female 
+          : currentRace.base_classes.male || currentRace.base_classes.male_exiled;
       }
     }
     return [];
   };
 
-  const availableClasses = getAvailableClasses();
-
-  const handleConfirm = () => {
-    if (selectedRace && selectedClass) {
-      console.log("Personagem Criado:", {
-        race: selectedRace.name,
-        class: selectedClass,
-        gender: selectedGender
-      });
-      // Navegar para o VTT (rota placeholder por enquanto)
-      navigate('/vtt'); 
-    }
+  const getClassInfo = (className) => {
+    return classesData.classes.find(c => c.name === className);
   };
 
-  // Encontra detalhes da classe selecionada no JSON de classes
-  const getClassDetails = (className) => {
-    return classesData.classes.find(c => c.name === className) || { description: "Detalhes não encontrados." };
+  const handleClassSelect = (className) => {
+    setSelectedClassId(className);
   };
+
+  // --- RENDERIZAÇÃO ---
 
   return (
-    <div className="relative w-full h-screen overflow-hidden font-sans text-white">
-      {/* Background Éter */}
-      <div className="ether-bg">
-        <div className="ether-particles"></div>
-      </div>
-
-      {/* Tela de Intro com Blur */}
-      <div 
-        className={`intro-blur ${!introVisible ? 'hidden' : ''}`} 
-        onClick={() => setIntroVisible(false)}
-      >
-        <div className="text-center">
-          <h1 className="press-start-text mb-4">Crie seu Destino</h1>
-          <p className="text-blue-200 text-sm animate-bounce">Toque para iniciar</p>
+    <div className="relative w-full h-screen overflow-hidden text-white fighting-bg flex flex-col">
+      
+      {/* HEADER / TOP BAR */}
+      <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-center z-50 pointer-events-none">
+        <div>
+          <h1 className="arcade-font text-4xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+            SELEÇÃO DE PERSONAGEM
+          </h1>
+          <p className="text-gray-400 text-sm tracking-widest font-bold">NOVA FICHA // {phase === 'selection' ? 'ESCOLHA A RAÇA' : 'CUSTOMIZAÇÃO'}</p>
         </div>
+        {phase === 'details' && (
+          <button 
+            onClick={() => { setPhase('selection'); setSelectedClassId(null); }}
+            className="pointer-events-auto bg-red-600/80 hover:bg-red-500 text-white px-6 py-2 skew-x-[-20deg] font-bold border-l-4 border-white transition-all"
+          >
+            <span className="skew-x-[20deg] block">VOLTAR</span>
+          </button>
+        )}
       </div>
 
-      {/* Conteúdo Principal (Só aparece/interage quando o blur sai) */}
-      <div className={`relative z-10 w-full h-full p-4 md:p-8 flex flex-col transition-opacity duration-1000 ${introVisible ? 'opacity-0' : 'opacity-100'}`}>
-        
-        {/* Cabeçalho */}
-        <header className="fft-window mb-6 flex justify-between items-center bg-opacity-90">
-          <div>
-            <h2 className="text-xl font-bold text-yellow-300 uppercase tracking-widest">Criação de Personagem</h2>
-            <p className="text-xs text-gray-300">Escolha sua linhagem e vocação</p>
-          </div>
-          {selectedRace && (
-             <div className="text-right">
-               <span className="text-sm text-blue-300">Raça:</span> <span className="font-bold">{selectedRace.name}</span>
-               <span className="mx-2">|</span>
-               <span className="text-sm text-blue-300">Classe:</span> <span className="font-bold">{selectedClass || '...'}</span>
-             </div>
-          )}
-        </header>
-
-        <div className="flex flex-col lg:flex-row gap-6 h-full overflow-hidden pb-4">
+      {/* --- FASE 1: CARROSEL (FIGHTING GAME STYLE) --- */}
+      {phase === 'selection' && (
+        <div className="w-full h-full flex flex-col justify-center items-center relative animate-fadeIn">
           
-          {/* Coluna 1: Seleção de Raça */}
-          <div className="flex-1 fft-window overflow-y-auto custom-scrollbar bg-opacity-90 flex flex-col">
-            <h3 className="text-yellow-200 mb-4 border-b border-gray-600 pb-2">1. Escolha a Raça</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {races.map((race) => (
-                <div 
-                  key={race.id}
-                  onClick={() => {
-                    setSelectedRace(race);
-                    setSelectedClass(null); // Reseta a classe ao mudar a raça
-                  }}
-                  className={`race-card p-3 rounded flex items-center gap-3 border ${selectedRace?.id === race.id ? 'bg-blue-900 border-yellow-400' : 'bg-transparent border-gray-600 hover:bg-white/10'}`}
-                >
-                  {/* Avatar Placeholder - usa a prop image do JSON ou fallback */}
-                  <div className="w-12 h-12 bg-black border border-gray-400 rounded-full overflow-hidden shrink-0">
-                    <img src={race.image} alt={race.name} className="w-full h-full object-cover" onError={(e) => e.target.style.display='none'} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm">{race.name}</h4>
-                    <p className="text-xs text-gray-400 line-clamp-2">{race.description}</p>
-                  </div>
+          {/* Container do Scroll Horizontal */}
+          <div 
+            ref={carouselRef}
+            className="flex items-center gap-4 overflow-x-auto no-scrollbar w-full px-[50vw] py-10"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {races.map((race, index) => (
+              <div 
+                key={race.id}
+                onClick={() => setFocusedIndex(index)}
+                className={`racer-card relative shrink-0 w-48 h-80 md:w-64 md:h-[450px] cursor-pointer rounded-lg overflow-hidden bg-black ${index === focusedIndex ? 'active' : ''}`}
+              >
+                {/* Imagem de Fundo do Card */}
+                <img 
+                  src={race.image} 
+                  alt={race.name}
+                  className="w-full h-full object-cover object-top"
+                  onError={(e) => e.target.style.display='none'}
+                />
+                
+                {/* Nome no Rodapé (Estilo Faixa) */}
+                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/80 to-transparent p-4 pt-10">
+                   <h2 className="arcade-font text-2xl md:text-3xl text-center text-white drop-shadow-md">
+                     {race.name.toUpperCase()}
+                   </h2>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
-          {/* Coluna 2: Detalhes e Classe */}
-          <div className="flex-[1.5] flex flex-col gap-4">
-            
-            {/* Detalhes da Raça */}
-            <div className="fft-window flex-1 bg-opacity-90 relative">
-              {!selectedRace ? (
-                <div className="flex items-center justify-center h-full text-gray-500 italic">
-                  Selecione uma raça ao lado para ver os detalhes.
-                </div>
-              ) : (
-                <div className="h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-2xl text-yellow-300 font-serif">{selectedRace.name}</h3>
-                    
-                    {/* Seletor de Gênero (Aparece para todas, mas crucial para Viera) */}
-                    <div className="flex bg-black/30 rounded p-1">
-                      <button 
-                        onClick={() => { setSelectedGender('female'); setSelectedClass(null); }}
-                        className={`px-3 py-1 text-xs rounded ${selectedGender === 'female' ? 'bg-pink-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                      >
-                        ♀ Fem
-                      </button>
-                      <button 
-                         onClick={() => { setSelectedGender('male'); setSelectedClass(null); }}
-                         className={`px-3 py-1 text-xs rounded ${selectedGender === 'male' ? 'bg-blue-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                      >
-                        ♂ Masc
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto pr-2 mb-4">
-                    <p className="text-sm mb-4 leading-relaxed text-gray-200">{selectedRace.description}</p>
-                    
-                    <div className="bg-black/20 p-3 rounded mb-4">
-                      <h4 className="text-blue-300 text-xs font-bold uppercase mb-1">Características</h4>
-                      <p className="text-xs">{selectedRace.characteristics}</p>
-                    </div>
-
-                    <div className="bg-black/20 p-3 rounded">
-                      <h4 className="text-green-300 text-xs font-bold uppercase mb-1">Bônus Racial</h4>
-                      <p className="text-xs font-mono">
-                         {/* Renderização simples do objeto de bônus */}
-                         {JSON.stringify(selectedRace.racial_bonus).replace(/["{}]/g, '').replace(/,/g, ', ')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Seletor de Classe (Gamificado) */}
-                  <div className="border-t border-gray-600 pt-4 mt-auto">
-                    <h4 className="text-yellow-200 mb-2 text-sm">2. Classe Inicial</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {availableClasses.map((clsName) => (
-                        <button
-                          key={clsName}
-                          onClick={() => setSelectedClass(clsName)}
-                          className={`fft-button text-xs flex-1 min-w-[100px] ${selectedClass === clsName ? 'ring-2 ring-yellow-400 bg-blue-800' : ''}`}
-                        >
-                          {clsName}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Preview da Classe */}
-                    {selectedClass && (
-                      <div className="mt-2 text-xs text-blue-200 bg-blue-900/30 p-2 rounded border border-blue-800">
-                        <span className="font-bold text-white">Função:</span> {getClassDetails(selectedClass).role || "Básica"} <br/>
-                        <span className="italic">{getClassDetails(selectedClass).description}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Botão de Confirmação */}
+          {/* Botão de Confirmar Seleção (Aparece embaixo do ativo) */}
+          <div className="mt-8">
             <button 
-              onClick={handleConfirm}
-              disabled={!selectedRace || !selectedClass}
-              className={`fft-button w-full py-4 text-lg tracking-widest transition-all duration-300 ${(!selectedRace || !selectedClass) ? 'opacity-50 grayscale' : 'hover:scale-[1.02]'}`}
+              onClick={() => setPhase('details')}
+              className="group relative px-12 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl tracking-widest skew-x-[-20deg] transition-all hover:scale-110 shadow-[0_0_20px_rgba(255,200,0,0.6)]"
             >
-              INICIAR JORNADA
+              <div className="skew-x-[20deg]">SELECIONAR</div>
             </button>
           </div>
         </div>
-      </div>
+      )}
+
+
+      {/* --- FASE 2: DETALHES (SPLIT SCREEN) --- */}
+      {phase === 'details' && (
+        <div className="w-full h-full flex relative">
+          
+          {/* LADO ESQUERDO: IMAGEM GRANDE (Slant Design) */}
+          <div className="hidden md:block w-1/3 h-full relative z-10 slant-container bg-black border-r-4 border-cyan-500 shadow-[10px_0_50px_rgba(0,0,0,0.8)] animate-slideInLeft">
+             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/90 z-20"></div>
+             <img 
+               src={currentRace.image} 
+               alt={currentRace.name}
+               className="w-full h-full object-cover object-top opacity-90"
+             />
+             <div className="absolute bottom-10 left-10 z-30">
+               <h1 className="arcade-font text-6xl text-white drop-shadow-[4px_4px_0_#000]">{currentRace.name}</h1>
+               <div className="h-2 w-32 bg-cyan-500 mt-2"></div>
+             </div>
+          </div>
+
+          {/* LADO DIREITO: INFORMAÇÕES E CLASSES */}
+          <div className="flex-1 h-full overflow-y-auto p-6 md:p-12 md:pl-20 pt-24 animate-slideInRight custom-scrollbar">
+            
+            <div className="max-w-4xl mx-auto flex flex-col gap-8">
+              
+              {/* Descrição da Raça */}
+              <div className="bg-black/50 p-6 border-l-4 border-yellow-500 backdrop-blur-sm">
+                <p className="text-lg text-gray-200 italic leading-relaxed">"{currentRace.description}"</p>
+                <div className="mt-4 flex gap-4 text-sm font-mono text-cyan-300">
+                   <span>BÔNUS RACIAL: {JSON.stringify(currentRace.racial_bonus).replace(/["{}]/g, '').replace(/,/g, ', ')}</span>
+                </div>
+              </div>
+
+              {/* Seletor de Gênero (Crucial para Viera) */}
+              <div className="flex gap-4 items-center">
+                <span className="arcade-font text-gray-400">GÊNERO:</span>
+                <button 
+                  onClick={() => { setSelectedGender('female'); setSelectedClassId(null); }}
+                  className={`px-6 py-2 skew-x-[-15deg] font-bold border border-white/30 transition-all ${selectedGender === 'female' ? 'bg-pink-600 text-white border-pink-400 scale-105' : 'bg-transparent text-gray-500'}`}
+                >
+                  <span className="skew-x-[15deg]">FEMININO</span>
+                </button>
+                <button 
+                  onClick={() => { setSelectedGender('male'); setSelectedClassId(null); }}
+                  className={`px-6 py-2 skew-x-[-15deg] font-bold border border-white/30 transition-all ${selectedGender === 'male' ? 'bg-blue-600 text-white border-blue-400 scale-105' : 'bg-transparent text-gray-500'}`}
+                >
+                  <span className="skew-x-[15deg]">MASCULINO</span>
+                </button>
+              </div>
+
+              {/* Seleção de Classe (Cards Interativos) */}
+              <div>
+                <h3 className="arcade-font text-2xl mb-4 text-white border-b border-gray-700 pb-2">ESCOLHA SUA CLASSE</h3>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {getAvailableClasses().map((clsName) => (
+                    <button
+                      key={clsName}
+                      onClick={() => handleClassSelect(clsName)}
+                      className={`relative p-4 h-24 text-left transition-all border overflow-hidden group
+                        ${selectedClassId === clsName 
+                          ? 'bg-cyan-900 border-cyan-400 shadow-[0_0_15px_rgba(0,255,255,0.4)] translate-y-[-2px]' 
+                          : 'bg-gray-900/80 border-gray-700 hover:border-gray-400 hover:bg-gray-800'
+                        }`}
+                    >
+                      <span className={`block font-bold text-lg uppercase ${selectedClassId === clsName ? 'text-cyan-300' : 'text-gray-300'}`}>
+                        {clsName}
+                      </span>
+                      {/* Efeito de hover barra lateral */}
+                      <div className={`absolute top-0 left-0 w-1 h-full transition-all ${selectedClassId === clsName ? 'bg-cyan-400' : 'bg-transparent group-hover:bg-gray-500'}`}></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Painel de Informações da Classe (Abre ao clicar) */}
+              {selectedClassId && (
+                <div className="bg-gradient-to-r from-cyan-900/40 to-transparent p-6 border-t-2 border-cyan-500 animate-fadeInUp">
+                  {(() => {
+                    const clsInfo = getClassInfo(selectedClassId);
+                    if (!clsInfo) return <p>Carregando dados...</p>;
+                    return (
+                      <>
+                        <div className="flex justify-between items-end mb-2">
+                           <h4 className="text-3xl font-bold text-cyan-200">{clsInfo.name}</h4>
+                           <span className="text-sm bg-black px-2 py-1 border border-cyan-800 text-cyan-500">{clsInfo.role || "Classe Básica"}</span>
+                        </div>
+                        <p className="text-gray-300 mb-4">{clsInfo.description}</p>
+                        
+                        {/* Habilidades Prévias */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                           {clsInfo.abilities && clsInfo.abilities.slice(0, 4).map((ab, i) => (
+                             <div key={i} className="text-xs bg-black/40 p-2 border-l-2 border-yellow-600">
+                               <strong className="text-white block">{ab.name}</strong>
+                               <span className="text-gray-400">{ab.description}</span>
+                             </div>
+                           ))}
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {/* Botão Final */}
+              <div className="pb-10 pt-4">
+                 <button
+                   disabled={!selectedClassId}
+                   onClick={() => navigate('/vtt')}
+                   className={`w-full py-5 text-2xl font-black italic tracking-widest uppercase transition-all
+                     ${selectedClassId 
+                       ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg cursor-pointer' 
+                       : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                     }`}
+                 >
+                   {selectedClassId ? 'CONFIRMAR IDENTIDADE' : 'SELECIONE UMA CLASSE'}
+                 </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animações CSS Inline para garantir que funcionem sem configurar tailwind.config */}
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
+        
+        @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .animate-slideInLeft { animation: slideInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        @keyframes slideInRight { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .animate-slideInRight { animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
+
+        @keyframes fadeInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; }
+      `}</style>
     </div>
   );
 };

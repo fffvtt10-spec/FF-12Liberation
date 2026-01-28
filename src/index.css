@@ -172,3 +172,63 @@ body, html, #root {
   box-shadow: 0 0 15px #00d2ff;
   border-color: #fff;
 }
+
+/* --- NOVOS ESTILOS: SELEÇÃO DE PERSONAGEM (CAROUSEL & DETALHES) --- */
+
+/* Fundo estilo Grid Cibernético/Éter Moderno */
+.fighting-bg {
+  background: 
+    linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.9)),
+    url('https://www.transparenttextures.com/patterns/cubes.png'), 
+    linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  background-attachment: fixed;
+  background-size: auto, auto, 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Recortes Diagonais (Estilo Persona/Fighting Games) */
+.slant-container {
+  clip-path: polygon(0 0, 100% 0, 95% 100%, 0% 100%);
+}
+
+.slant-reverse {
+  clip-path: polygon(5% 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+/* Card do Carousel */
+.racer-card {
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  filter: grayscale(80%) brightness(0.6);
+  transform: scale(0.9);
+}
+
+.racer-card.active {
+  filter: grayscale(0%) brightness(1.1);
+  transform: scale(1.1);
+  z-index: 10;
+  box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);
+  border: 2px solid #fff;
+}
+
+/* Texto estilo Arcade */
+.arcade-font {
+  font-family: 'Impact', sans-serif; /* Use uma fonte mais grossa se tiver */
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-style: italic;
+}
+
+/* Scrollbar invisível para o carousel */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
