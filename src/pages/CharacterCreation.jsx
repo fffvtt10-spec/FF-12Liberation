@@ -196,7 +196,7 @@ const CharacterCreation = () => {
 
       {/* --- FASE 2: DETALHES --- */}
       {(viewState === 'details' || viewState === 'naming') && selectedRace && (
-        <div className={`details-grid transition-all duration-500 ${viewState === 'naming' ? 'blur-xl grayscale-[0.5] scale-95 pointer-events-none' : ''}`}>
+        <div className={`details-grid transition-all duration-500 ${viewState === 'naming' ? 'blur-3xl grayscale brightness-50 scale-95 pointer-events-none' : ''}`}>
           
           {/* LADO ESQUERDO: IMAGEM (Zoom + Fade) */}
           <div className="char-portrait-container">
@@ -339,41 +339,36 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME (FASE 3) --- */}
+      {/* --- MODAL DE NOME (CENTRALIZADO COM BLUR) --- */}
       {viewState === 'naming' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center animate-[fadeIn_0.3s]">
-          <div className="glass-panel w-full max-w-md p-8 border-t-2 border-b-2 border-yellow-500 bg-black/80 backdrop-blur-md shadow-[0_0_50px_rgba(0,0,0,0.8)] text-center">
-            <h2 className="rpg-title text-3xl text-yellow-500 mb-6 tracking-widest">Identidade</h2>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 animate-[fadeIn_0.4s]">
+          <div className="relative w-full max-w-lg p-12 rounded-lg bg-black/80 border border-yellow-500/30 shadow-[0_0_100px_rgba(0,0,0,0.9)] text-center animate-[scaleIn_0.3s_ease-out]">
+            <h2 className="rpg-title text-3xl text-white mb-8 tracking-wider">Qual o seu nome, aventureiro?</h2>
             
-            <p className="text-xs text-gray-400 uppercase font-bold mb-4 tracking-tighter">
-                Como os bardos cantarão suas glórias?
-            </p>
-
-            <div className="relative mb-8">
+            <div className="relative mb-10">
                 <input 
                     autoFocus
                     type="text"
                     value={characterName}
                     onChange={(e) => setCharacterName(e.target.value)}
-                    placeholder="Nome do Herói..."
-                    className="w-full bg-transparent border-b-2 border-white/20 p-4 text-2xl text-center text-white outline-none focus:border-yellow-500 transition-colors tracking-widest font-serif italic"
+                    placeholder="Sussurre seu nome..."
+                    className="w-full bg-transparent border-b border-white/20 p-2 text-3xl text-center text-yellow-500 outline-none focus:border-yellow-500 transition-all tracking-[0.2em] font-serif italic"
                     onKeyDown={(e) => e.key === 'Enter' && handleConfirmName()}
                 />
-                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col items-center gap-6">
                 <button 
                     onClick={handleConfirmName}
-                    className="confirm-btn !text-xl"
+                    className="confirm-btn !py-2 !px-8 !text-sm !w-auto shadow-[0_0_20px_rgba(234,179,8,0.2)]"
                 >
-                    Despertar em Gaia
+                    Confirmar
                 </button>
                 <button 
                     onClick={handleBack}
-                    className="text-[10px] uppercase text-gray-500 hover:text-white transition-colors tracking-[0.2em]"
+                    className="text-[10px] uppercase text-gray-500 hover:text-white transition-colors tracking-[0.3em] font-bold"
                 >
-                    Revisar Atributos
+                    Voltar
                 </button>
             </div>
           </div>
