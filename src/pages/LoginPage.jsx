@@ -19,7 +19,7 @@ export default function LoginPage() {
   // --- EFEITO PARA REDUZIR VOLUME ---
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = 0.5; // Define o volume em 50%
+      audioRef.current.volume = 0.2; // Define o volume em 20%
     }
   }, []);
 
@@ -87,7 +87,7 @@ export default function LoginPage() {
       <div className="content-overlay">
         {!role ? (
           <div className="selection-screen fade-in">
-            <h2 className="ff-title">ESCOLHA SUA CLASSE</h2>
+            <h2 className="ff-title">ESCOLHA SUA JORNADA</h2>
             <div className="ff-button-group">
               <button className="ff-btn" onClick={() => setRole('player')}>JOGADOR</button>
               <button className="ff-btn" onClick={() => setRole('master')}>NARRADOR</button>

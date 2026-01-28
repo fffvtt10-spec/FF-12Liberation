@@ -22,12 +22,12 @@ const CharacterCreation = () => {
 
   const races = racesData.races;
 
-  // 1. Limpeza de Audio (Agressiva) - Garante que a música do Login morre aqui
+  // 1. Limpeza de Audio (Agressiva) - Mata o áudio do Login
   useEffect(() => {
     const stopAudio = () => {
       const audioElements = document.querySelectorAll('audio, video');
       audioElements.forEach(el => {
-        // Ignora o vídeo de fundo se ele tiver a classe especifica
+        // Ignora o vídeo de fundo da tela (se houver um específico para esta tela)
         if(el.tagName === 'VIDEO' && el.classList.contains('background-video')) return;
         
         try {
@@ -39,17 +39,10 @@ const CharacterCreation = () => {
       });
     };
 
-    // Tenta parar imediatamente
     stopAudio();
-    
-    // Insiste em parar algumas vezes nos primeiros segundos para garantir que nada carregue depois
-    const interval = setInterval(stopAudio, 200);
-    const timeout = setTimeout(() => clearInterval(interval), 1500);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
+    // Garante que pare mesmo se carregar atrasado
+    const timeout = setTimeout(stopAudio, 500);
+    return () => clearTimeout(timeout);
   }, []);
 
   // 2. Centralização do Carousel
@@ -352,69 +345,78 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME RPG STYLE (VISUAL ATUALIZADO) --- */}
+      {/* --- MODAL DE NOME ESTILO RPG HIGH-END (IGUAL A IMAGEM) --- */}
       {showNameModal && (
         <div 
           style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          className="bg-black/80 backdrop-blur-xl" // Blur forte e fundo escuro
+          className="bg-black/80 backdrop-blur-xl" // Fundo muito escuro e muito borrado
         >
-           {/* Container da Caixa (Animação Scale In) */}
-           <div className="animate-scale-in relative w-full max-w-lg m-4">
+           {/* Container Principal da Caixa (com animação) */}
+           <div className="animate-scale-in relative w-full max-w-xl p-4">
              
-             {/* Borda Externa Dourada/Fancy (Camada Decorativa) */}
-             <div className="relative bg-gradient-to-b from-yellow-700 via-yellow-500 to-yellow-800 rounded-lg p-[3px] shadow-[0_0_50px_rgba(234,179,8,0.4)]">
+             {/* 1. MOLDURA DOURADA EXTERNA */}
+             <div className="relative rounded-lg p-[4px] bg-gradient-to-b from-[#d97706] via-[#fbbf24] to-[#b45309] shadow-[0_0_60px_rgba(251,191,36,0.5)]">
                 
-                {/* Borda Interna e Conteúdo */}
-                <div className="bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 via-gray-900 to-black rounded-md p-8 flex flex-col items-center gap-6 border-2 border-yellow-900/50 relative overflow-hidden">
+                {/* 2. MOLDURA ESCURA INTERMEDIÁRIA */}
+                <div className="bg-[#1a120b] p-1 rounded-md">
                    
-                   {/* Detalhe de Brilho no Topo */}
-                   <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-50"></div>
-
-                   {/* Título Estilizado */}
-                   <div className="text-center space-y-2 z-10">
-                     <h3 className="text-4xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-200 font-serif font-bold tracking-wider drop-shadow-sm uppercase">
-                       Identidade
-                     </h3>
-                     <p className="text-yellow-600/80 font-serif italic text-sm tracking-widest border-t border-yellow-900/30 pt-2">
-                       Como a história o conhecerá?
-                     </p>
-                   </div>
-
-                   {/* Container do Input e Botão (Estilo Unificado) */}
-                   <div className="w-full relative flex items-stretch shadow-2xl mt-2 z-10">
+                   {/* 3. FUNDO PERGAMINHO INTERNO (ESTILO PAPEL ANTIGO) */}
+                   <div className="bg-[radial-gradient(circle_at_center,#e7cba8,#d4b483)] rounded border border-[#854d0e] p-8 flex flex-col items-center shadow-inner relative overflow-hidden">
                       
-                      <input 
-                        type="text" 
-                        value={charName}
-                        onChange={(e) => setCharName(e.target.value)}
-                        placeholder="Nome do Aventureiro"
-                        className="flex-1 bg-black/40 border-y-2 border-l-2 border-yellow-700/60 text-yellow-100 px-4 py-3 text-lg font-serif placeholder-yellow-800/40 focus:border-yellow-500/80 focus:bg-black/60 outline-none transition-all rounded-l-md"
-                        autoFocus
-                      />
-                      
+                      {/* Efeito de sujeira/textura nas bordas internas */}
+                      <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(66,32,6,0.4)] pointer-events-none"></div>
+
+                      {/* Cabeçalho */}
+                      <div className="text-center z-10 mb-6">
+                        <h3 className="text-4xl text-[#78350f] font-serif font-bold tracking-widest drop-shadow-sm uppercase" style={{ textShadow: '1px 1px 0px rgba(255,255,255,0.4)' }}>
+                          Identidade
+                        </h3>
+                        <div className="h-[2px] w-2/3 bg-gradient-to-r from-transparent via-[#92400e] to-transparent mx-auto my-2"></div>
+                        <p className="text-[#92400e] font-serif italic text-sm tracking-widest">
+                          Como a história o conhecerá?
+                        </p>
+                      </div>
+
+                      {/* Input e Botão (Agrupados Visualmente) */}
+                      <div className="flex w-full items-stretch gap-2 z-10">
+                        {/* Input estilo 'slot' afundado */}
+                        <div className="flex-1 relative">
+                          <input 
+                            type="text" 
+                            value={charName}
+                            onChange={(e) => setCharName(e.target.value)}
+                            placeholder="Nome do Aventureiro"
+                            className="w-full h-full bg-[#f3e6d5] border-2 border-[#a16207] shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] text-[#451a03] px-4 py-3 text-lg font-serif placeholder-[#a16207]/50 focus:border-[#78350f] focus:bg-[#faf5ef] outline-none rounded transition-colors"
+                            autoFocus
+                          />
+                        </div>
+
+                        {/* Botão Dourado 3D */}
+                        <button 
+                          onClick={handleFinalizeCreation}
+                          disabled={!charName.trim()}
+                          className="bg-gradient-to-b from-[#fcd34d] to-[#d97706] text-[#451a03] border border-[#b45309] px-8 py-2 rounded font-serif font-bold text-lg uppercase tracking-wider shadow-[0_4px_0_#92400e,0_5px_10px_rgba(0,0,0,0.3)] active:shadow-[0_0_0_#92400e] active:translate-y-[4px] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 hover:brightness-110"
+                        >
+                          Go
+                        </button>
+                      </div>
+
+                      {/* Botão Fechar (X) */}
                       <button 
-                        onClick={handleFinalizeCreation}
-                        disabled={!charName.trim()}
-                        className="bg-gradient-to-b from-yellow-600 to-yellow-800 hover:from-yellow-500 hover:to-yellow-700 text-white font-serif font-bold text-lg px-6 py-2 border-2 border-yellow-700/80 rounded-r-md shadow-inner transition-all disabled:opacity-50 disabled:grayscale uppercase tracking-widest"
+                        onClick={() => setShowNameModal(false)}
+                        className="absolute top-2 right-3 text-[#92400e] hover:text-[#451a03] font-bold text-xl z-20 transition-colors"
                       >
-                        Go
+                        ✕
                       </button>
-                   </div>
 
-                   {/* Botão Fechar Decorativo */}
-                   <button 
-                     onClick={() => setShowNameModal(false)}
-                     className="absolute top-2 right-3 text-yellow-800 hover:text-yellow-400 transition-colors text-xl font-bold z-20"
-                   >
-                     ✕
-                   </button>
+                   </div>
                 </div>
 
-                {/* Cantos Decorativos Dourados (Simulação de Cantoneiras) */}
-                <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-yellow-300"></div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-yellow-300"></div>
-                <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-yellow-300"></div>
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-yellow-300"></div>
+                {/* Cantoneiras Decorativas (Detalhes Dourados nos cantos da moldura externa) */}
+                <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[#fcd34d] rounded-tl-sm"></div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-[#fcd34d] rounded-tr-sm"></div>
+                <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-[#fcd34d] rounded-bl-sm"></div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[#fcd34d] rounded-br-sm"></div>
 
              </div>
            </div>

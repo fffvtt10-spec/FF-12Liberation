@@ -91,7 +91,7 @@ body, html, #root {
   display: flex;
   align-items: center;
   overflow-x: auto;
-  /* ATUALIZAÇÃO AQUI: Padding normal na esquerda, grande na direita */
+  /* Padding normal na esquerda, grande na direita */
   padding: 0 50vw 0 40px;
   gap: 40px;
   scrollbar-width: none;
