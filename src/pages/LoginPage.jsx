@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import videoFundo from '../assets/video-fundo.mp4'; 
 import iconAdmin from '../assets/botao-admin.png';
+// Importe sua música de login aqui. Se não tiver, comente a linha abaixo.
+import musicaLogin from '../assets/musica-tema.mp3'; 
 import { db, login } from '../firebase'; 
 import { doc, getDoc } from "firebase/firestore";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const audioRef = useRef(null); // Referência para controlar o áudio
+
   const [role, setRole] = useState(null); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [erro, setErro] = useState('');
+
+  // --- EFEITO PARA REDUZIR VOLUME ---
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = 0.5; // Define o volume em 50%
+    }
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -54,6 +65,12 @@ export default function LoginPage() {
 
   return (
     <div className="login-container">
+      {/* --- AUDIO DE FUNDO (SÓ TOCA NO LOGIN COM VOLUME 50%) --- */}
+      {/* O React desmontará este elemento ao mudar de página, parando a música */}
+      <audio ref={audioRef} autoPlay loop>
+        <source src={musicaLogin} type="audio/mp3" />
+      </audio>
+
       {/* 1. VÍDEO DE FUNDO */}
       <video 
         autoPlay 

@@ -22,7 +22,7 @@ const CharacterCreation = () => {
 
   const races = racesData.races;
 
-  // 1. Limpeza de Audio (Agressiva)
+  // 1. Limpeza de Audio (Agressiva) - Garante que a música do Login morre aqui
   useEffect(() => {
     const stopAudio = () => {
       const audioElements = document.querySelectorAll('audio, video');
@@ -352,7 +352,7 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME RPG STYLE --- */}
+      {/* --- MODAL DE NOME RPG STYLE (VISUAL ATUALIZADO) --- */}
       {showNameModal && (
         <div 
           style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -361,39 +361,41 @@ const CharacterCreation = () => {
            {/* Container da Caixa (Animação Scale In) */}
            <div className="animate-scale-in relative w-full max-w-lg m-4">
              
-             {/* Borda Externa Dourada/Fancy */}
-             <div className="relative bg-gradient-to-b from-gray-900 to-black border-2 border-yellow-700 shadow-[0_0_50px_rgba(234,179,8,0.4)] rounded-lg p-1">
+             {/* Borda Externa Dourada/Fancy (Camada Decorativa) */}
+             <div className="relative bg-gradient-to-b from-yellow-700 via-yellow-500 to-yellow-800 rounded-lg p-[3px] shadow-[0_0_50px_rgba(234,179,8,0.4)]">
                 
-                {/* Borda Interna Decorativa */}
-                <div className="border border-yellow-500/30 rounded-md p-8 flex flex-col items-center gap-6 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 to-gray-950">
+                {/* Borda Interna e Conteúdo */}
+                <div className="bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 via-gray-900 to-black rounded-md p-8 flex flex-col items-center gap-6 border-2 border-yellow-900/50 relative overflow-hidden">
                    
+                   {/* Detalhe de Brilho no Topo */}
+                   <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-50"></div>
+
                    {/* Título Estilizado */}
-                   <div className="text-center space-y-2">
-                     <h3 className="text-4xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-300 font-serif font-bold tracking-wider drop-shadow-md">
-                       IDENTIDADE
+                   <div className="text-center space-y-2 z-10">
+                     <h3 className="text-4xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-200 font-serif font-bold tracking-wider drop-shadow-sm uppercase">
+                       Identidade
                      </h3>
-                     <p className="text-yellow-700 font-serif italic text-sm tracking-widest border-t border-yellow-900/50 pt-2">
+                     <p className="text-yellow-600/80 font-serif italic text-sm tracking-widest border-t border-yellow-900/30 pt-2">
                        Como a história o conhecerá?
                      </p>
                    </div>
 
-                   {/* Container do Input e Botão */}
-                   <div className="w-full relative flex items-stretch shadow-lg mt-4 group">
-                      <div className="absolute inset-0 bg-yellow-600 blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                   {/* Container do Input e Botão (Estilo Unificado) */}
+                   <div className="w-full relative flex items-stretch shadow-2xl mt-2 z-10">
                       
                       <input 
                         type="text" 
                         value={charName}
                         onChange={(e) => setCharName(e.target.value)}
                         placeholder="Nome do Aventureiro"
-                        className="relative z-10 flex-1 bg-black/60 border-2 border-yellow-700 text-yellow-100 px-4 py-4 text-xl font-serif placeholder-yellow-800/50 focus:border-yellow-400 outline-none transition-colors rounded-l-md"
+                        className="flex-1 bg-black/40 border-y-2 border-l-2 border-yellow-700/60 text-yellow-100 px-4 py-3 text-lg font-serif placeholder-yellow-800/40 focus:border-yellow-500/80 focus:bg-black/60 outline-none transition-all rounded-l-md"
                         autoFocus
                       />
                       
                       <button 
                         onClick={handleFinalizeCreation}
                         disabled={!charName.trim()}
-                        className="relative z-10 bg-gradient-to-b from-yellow-600 to-yellow-800 hover:from-yellow-500 hover:to-yellow-700 text-white font-serif font-bold text-lg px-6 py-2 border-2 border-l-0 border-yellow-700 rounded-r-md shadow-inner transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest"
+                        className="bg-gradient-to-b from-yellow-600 to-yellow-800 hover:from-yellow-500 hover:to-yellow-700 text-white font-serif font-bold text-lg px-6 py-2 border-2 border-yellow-700/80 rounded-r-md shadow-inner transition-all disabled:opacity-50 disabled:grayscale uppercase tracking-widest"
                       >
                         Go
                       </button>
@@ -402,17 +404,17 @@ const CharacterCreation = () => {
                    {/* Botão Fechar Decorativo */}
                    <button 
                      onClick={() => setShowNameModal(false)}
-                     className="absolute top-2 right-2 text-yellow-800 hover:text-yellow-500 transition-colors w-8 h-8 flex items-center justify-center font-bold"
+                     className="absolute top-2 right-3 text-yellow-800 hover:text-yellow-400 transition-colors text-xl font-bold z-20"
                    >
                      ✕
                    </button>
                 </div>
 
-                {/* Detalhes de Cantos (Opcional, css puro) */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-yellow-500 -mt-1 -ml-1"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-yellow-500 -mt-1 -mr-1"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-yellow-500 -mb-1 -ml-1"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-500 -mb-1 -mr-1"></div>
+                {/* Cantos Decorativos Dourados (Simulação de Cantoneiras) */}
+                <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-yellow-300"></div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-yellow-300"></div>
+                <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-yellow-300"></div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-yellow-300"></div>
 
              </div>
            </div>
