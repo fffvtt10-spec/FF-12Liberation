@@ -2,40 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
-// COMPONENTE AUXILIAR: Botão Pequeno de Upload de Imagem (+)
-// Agora aceita className para estilização específica (cruz, centro, etc)
-const ImageUploader = ({ onSave, label, customClass = "btn-plus-gold" }) => {
-    const [isOpen, setIsOpen] = useState(false);
+// --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
+const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
 
-    const handleSave = () => {
-        onSave(tempUrl);
-        setIsOpen(false);
-    };
+    if (!isOpen) return null;
 
     return (
-        <div className={`img-uploader-wrapper ${customClass}-wrapper`}>
-            <button className={customClass} onClick={() => setIsOpen(true)} title={`Adicionar Imagem de ${label}`}>+</button>
-            {isOpen && (
-                <div className="mini-popover">
-                    <input 
-                        placeholder="Cole o link (Imgur)..." 
-                        value={tempUrl} 
-                        onChange={e => setTempUrl(e.target.value)} 
-                        autoFocus
-                    />
-                    <div className="pop-actions">
-                        <button onClick={handleSave} className="pop-confirm">OK</button>
-                        <button onClick={() => setIsOpen(false)} className="pop-cancel">X</button>
-                    </div>
+        <div className="img-modal-overlay" onClick={onClose}>
+            <div className="img-modal-content" onClick={e => e.stopPropagation()}>
+                <h3>ALTERAR IMAGEM: {label.toUpperCase()}</h3>
+                <input 
+                    placeholder="Cole o link da imagem (Imgur, Discord, etc)..." 
+                    value={tempUrl} 
+                    onChange={e => setTempUrl(e.target.value)} 
+                    autoFocus
+                />
+                <div className="img-modal-actions">
+                    <button onClick={() => { onSave(tempUrl); onClose(); }} className="btn-confirm">CONFIRMAR</button>
+                    <button onClick={onClose} className="btn-cancel">CANCELAR</button>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
 
 export default function Ficha({ characterData, isMaster, onClose }) {
-  // Estado local da ficha
   const [sheet, setSheet] = useState(characterData.character_sheet || {
     basic_info: { 
         character_name: characterData.name, 
@@ -76,20 +68,23 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
   
-  // Estados para Gestão de Itens (Forja)
+  // Estados de Upload
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadLabel, setUploadLabel] = useState("");
+  const [uploadCallback, setUploadCallback] = useState(null);
+
+  // Estados de Forja
   const [showForgeSelector, setShowForgeSelector] = useState(false); 
   const [forgeItems, setForgeItems] = useState([]); 
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
-  // Sincronização em tempo real (para o jogador)
   useEffect(() => {
     if (!isMaster && characterData.character_sheet) {
         setSheet(characterData.character_sheet);
     }
   }, [characterData, isMaster]);
 
-  // Função genérica de atualização local
   const updateField = (path, value) => {
     if (!isMaster) return;
     const newSheet = JSON.parse(JSON.stringify(sheet));
@@ -104,7 +99,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     setHasUnsavedChanges(true);
   };
 
-  // Salvar no Firebase
   const saveSheetToDb = async () => {
       try {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
@@ -117,7 +111,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       }
   };
 
-  // --- LÓGICA DE ITENS (FORJA INTEGRATION) ---
+  const openUploadModal = (label, callback) => {
+      setUploadLabel(label);
+      setUploadCallback(() => callback);
+      setUploadModalOpen(true);
+  };
+
+  // --- FORJA ---
   const handleOpenForgeSelector = async (slotIndex) => {
       if(!isMaster) return;
       setActiveSlotIndex(slotIndex);
@@ -185,10 +185,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     }, 4000);
   };
 
-  // --- RADAR CHART LOGIC ---
+  // --- RADAR CHART (Reduzido para caber melhor) ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
-  const radius = 110; 
+  const radius = 90; // Reduzido de 110 para 90 para evitar cortes
   const center = 150;
 
   const getPoint = (value, index, total) => {
@@ -206,7 +206,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   return (
     <div className="ficha-overlay-fixed">
-        {/* BOTÃO DE SALVAR (LADO DE FORA) */}
         {isMaster && (
             <button 
                 className={`save-btn-floating ${hasUnsavedChanges ? 'unsaved' : ''}`} 
@@ -226,11 +225,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 <span className="header-label-top">SIGNO</span>
                 <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}}>
                     {isMaster && (
-                        <ImageUploader 
-                            label="Signo" 
-                            customClass="btn-center-add"
-                            onSave={(url) => updateField('basic_info.guild_insignia', url)} 
-                        />
+                        <button className="btn-plus-corner" onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}>+</button>
                     )}
                 </div>
             </div>
@@ -274,14 +269,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             {/* Direita: Rank Guilda */}
             <div className="guild-rank-box">
                 <span className="header-label-top">RANK</span>
-                {/* Texto Iniciado Removido */}
                 <div className="rank-display" style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}}>
                     {isMaster && (
-                        <ImageUploader 
-                            label="Rank" 
-                            customClass="btn-center-add"
-                            onSave={(url) => updateField('basic_info.guild_rank_image', url)} 
-                        />
+                        <button className="btn-plus-corner" onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}>+</button>
                     )}
                 </div>
             </div>
@@ -298,11 +288,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             
             {activeTab === 'geral' ? (
                 <>
-                    {/* COLUNA ESQUERDA: ATRIBUTOS */}
+                    {/* COLUNA ESQUERDA: ATRIBUTOS (Reduzida) */}
                     <div className="col-attributes">
                         <h3 className="section-title">ATRIBUTOS</h3>
                         <div className="radar-wrapper">
-                            <svg width="300" height="300" viewBox="0 0 300 300">
+                            <svg width="260" height="260" viewBox="0 0 300 300">
                                 {[20, 40, 60, 80, 100].map(r => (
                                     <polygon key={r} points={stats.map((_, i) => { const {x,y} = getPoint(r, i, 6); return `${x},${y}`; }).join(" ")} fill="none" stroke="#333" strokeWidth="1" />
                                 ))}
@@ -337,8 +327,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     <div className="col-center-equip">
                         <div className="char-image-frame">
                             {isMaster && (
-                                <div style={{position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100}}>
-                                    <ImageUploader label="Personagem" onSave={(url) => updateField('imgUrl', url)} customClass="btn-cross-ff" />
+                                <div className="char-img-upload-btn" onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))}>
+                                    +
                                 </div>
                             )}
                             <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
@@ -357,12 +347,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
                                     <div className="slot-square">
-                                        {/* Estado Vazio + Mestre */}
                                         {!sheet.equipment?.slots?.[idx]?.item_img && isMaster && (
                                             <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>
                                         )}
-                                        
-                                        {/* Estado Cheio */}
                                         {sheet.equipment?.slots?.[idx]?.item_img ? (
                                             <>
                                                 <div className="item-bg" style={{backgroundImage: `url(${sheet.equipment.slots[idx].item_img})`}}></div>
@@ -370,7 +357,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                                 {isMaster && <button className="btn-return-forge" title="Devolver para Forja" onClick={() => handleUnequipItem(idx)}>↩️</button>}
                                             </>
                                         ) : (
-                                            /* Estado Vazio + Jogador */
                                             !isMaster && <span className="empty-text">Vazio</span>
                                         )}
                                     </div>
@@ -466,6 +452,14 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             )}
         </div>
 
+        {/* MODAL GLOBAL DE UPLOAD DE IMAGEM */}
+        <ImageUploadModal 
+            isOpen={uploadModalOpen} 
+            onClose={() => setUploadModalOpen(false)} 
+            onSave={uploadCallback} 
+            label={uploadLabel} 
+        />
+
         {/* MODAL SELETOR DE ITENS DA FORJA */}
         {showForgeSelector && (
             <div className="item-selector-overlay" onClick={() => setShowForgeSelector(false)}>
@@ -501,7 +495,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             </div>
         )}
 
-        {/* LEVEL UP ANIMATION */}
         {showLevelUpAnim && (
             <div className="level-up-overlay"><h1 className="levelup-text">LEVEL UP!</h1></div>
         )}
@@ -511,10 +504,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       <style>{`
         /* GERAL */
         .ficha-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-        /* Ajustado max-width e padding para não cortar bordas */
-        .ficha-container { width: 1100px; height: 850px; max-width: 95vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
+        .ficha-container { width: 1200px; height: 850px; max-width: 95vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
         
-        /* Botão de Fechar */
         .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 200; font-weight: bold; }
         
         /* Botão Salvar (Fixo no topo da tela, fora da ficha) */
@@ -522,26 +513,14 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .save-btn-floating.unsaved { background: #00f2ff; color: #000; cursor: pointer; border-color: #fff; box-shadow: 0 0 25px #00f2ff; animation: pulseSave 1.5s infinite; }
         @keyframes pulseSave { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } 100% { transform: translateX(-50%) scale(1); } }
 
-        /* UPLOADER E INPUTS */
-        .img-uploader-wrapper { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: absolute; top:0; left:0; pointer-events: none; }
-        .btn-plus-gold { pointer-events: auto; background: rgba(0,0,0,0.5); color: #ffcc00; border: 1px solid #ffcc00; width: 20px; height: 20px; border-radius: 50%; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .btn-center-add { pointer-events: auto; background: transparent; color: #ffcc00; border: none; font-size: 24px; font-weight: bold; cursor: pointer; text-shadow: 0 0 5px #000; }
-        
-        .btn-cross-ff { pointer-events: auto; width: 40px; height: 40px; background: rgba(0,0,0,0.5); border: 2px solid #ffcc00; border-radius: 50%; color: #ffcc00; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 0 15px #ffcc00; }
-        .btn-cross-ff:hover { background: rgba(255, 204, 0, 0.2); transform: scale(1.1); }
-
-        .mini-popover { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background: #000; border: 1px solid #ffcc00; padding: 5px; width: 200px; z-index: 500; display: flex; gap: 5px; flex-direction: column; pointer-events: auto; }
-        .mini-popover input { background: #111; color: #fff; border: 1px solid #444; font-size: 10px; padding: 3px; width: 100%; }
-        .pop-actions { display: flex; gap: 5px; }
-        .pop-confirm { background: #00f2ff; border: none; color: #000; font-size: 9px; flex: 1; cursor: pointer; font-weight: bold; }
-        .pop-cancel { background: #f44; border: none; color: #fff; font-size: 9px; width: 20px; cursor: pointer; }
-
         /* HEADER */
         .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
         .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
         .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; }
+        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; display: flex; align-items: center; justify-content: center; }
         
+        .btn-plus-corner { background: transparent; color: #ffcc00; font-size: 20px; border: none; font-weight: bold; cursor: pointer; text-shadow: 0 0 5px #000; }
+
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
         .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
@@ -588,11 +567,14 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
 
-        /* COLUNA EQUIPAMENTOS (Ajustado) */
+        /* COLUNA EQUIPAMENTOS */
         .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
         .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
         
+        .char-img-upload-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ffcc00; font-size: 40px; font-weight: bold; cursor: pointer; text-shadow: 0 0 10px #000; z-index: 100; transition: transform 0.2s; }
+        .char-img-upload-btn:hover { transform: translate(-50%, -50%) scale(1.2); }
+
         .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }
         .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
@@ -624,6 +606,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .i-qtd { color: #00f2ff; font-weight: bold; }
         .add-item-btn { width: 100%; background: #222; border: 1px dashed #555; color: #888; padding: 5px; cursor: pointer; margin-top: 10px; font-size: 10px; }
         
+        /* MODAL UPLOAD IMG (NOVO) */
+        .img-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 300000; display: flex; align-items: center; justify-content: center; }
+        .img-modal-content { background: #111; border: 1px solid #ffcc00; padding: 20px; width: 400px; border-radius: 8px; text-align: center; }
+        .img-modal-content h3 { color: #ffcc00; margin-top: 0; }
+        .img-modal-content input { width: 100%; padding: 10px; background: #000; border: 1px solid #444; color: #fff; margin: 15px 0; }
+        .img-modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .btn-confirm { background: #00f2ff; color: #000; padding: 8px 20px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-cancel { background: #333; color: #fff; padding: 8px 20px; border: none; cursor: pointer; }
+
         /* MODAIS DE ITEM */
         .item-selector-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300000; display: flex; align-items: center; justify-content: center; }
         .item-selector-box { width: 400px; height: 500px; background: #111; border: 1px solid #ffcc00; padding: 20px; display: flex; flex-direction: column; border-radius: 8px; }

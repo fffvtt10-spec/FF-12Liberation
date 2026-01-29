@@ -8,7 +8,7 @@ import papiroImg from '../assets/papiro.png';
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
 import Ficha from '../components/Ficha'; 
-import fichaIcon from '../assets/ficha-icon.png'; // Ícone genérico se não tiver pode usar url direto
+import fichaIcon from '../assets/ficha-icon.png'; 
 
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -185,11 +185,13 @@ export default function MestrePage() {
       <div className="mestre-bg-image-full" style={{backgroundImage: `url(${fundoMestre})`}}></div>
       
       <div className="mestre-content">
-        <h1 className="ff-title">HUB DO NARRADOR</h1>
-
-        <div className="mestre-identity-box ff-card fade-in">
-          <label>ASSINATURA DO MESTRE:</label>
-          <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
+        <div className="top-bar-flex">
+            <h1 className="ff-title">HUB DO NARRADOR</h1>
+            
+            <div className="mestre-identity-box ff-card fade-in">
+                <label>ASSINATURA DO MESTRE:</label>
+                <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
+            </div>
         </div>
         
         <div className="mestre-grid">
@@ -420,11 +422,11 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- BOTÕES FLUTUANTES (Forja e Bazar) + GERENCIAR FICHAS --- */}
+      {/* --- BOTÕES FLUTUANTES --- */}
       <div className="master-floating-group">
           <Forja /> 
           <Bazar isMestre={true} />
-          {/* BOTÃO FLUTUANTE DE FICHAS */}
+          {/* BOTÃO FLUTUANTE DE FICHAS - ESTILO IGUAL */}
           <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Gerenciar Fichas">
             <img src={fichaIcon} alt="Fichas" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='FICHAS'}} />
           </button>
@@ -434,24 +436,33 @@ export default function MestrePage() {
         /* ESTILOS MANTIDOS + NOVOS */
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
         .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
-        .mestre-content { position: relative; z-index: 1; padding: 30px; display: flex; flex-direction: column; height: 100vh; }
-        .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; margin-bottom: 30px; font-size: 2.5rem; }
+        .mestre-content { position: relative; z-index: 1; padding: 20px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* GRID RESPONSIVO */
-        .mestre-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 25px; flex: 1; overflow-y: auto; padding-bottom: 80px; }
-        .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
-        .card-header.no-border { border-bottom: none; }
-        .board-column { height: 75vh; display: flex; flex-direction: column; }
-        .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; align-self: center; }
+        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .ff-title { color: #ffcc00; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; font-size: 2rem; margin: 0; }
+        .mestre-identity-box { display: flex; align-items: center; gap: 10px; border: 1px solid #ffcc00; padding: 8px 15px; background: rgba(0, 10, 30, 0.9); }
         .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 5px 10px; font-weight: bold; font-family: 'serif'; outline: none; }
-        .mission-scroll { flex: 1; overflow-y: auto; padding-right: 8px; }
+
+        /* GRID RESPONSIVO TELA ÚNICA */
+        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex: 1; overflow: hidden; padding-bottom: 60px; /* Espaço para botões flutuantes */ }
+        
+        /* CARDS TELA ÚNICA - REDUZIDO ALTURA */
+        .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; backdrop-filter: blur(10px); display: flex; flex-direction: column; max-height: 100%; }
+        .board-column { flex: 1; overflow: hidden; min-height: 0; }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
+        .card-header.no-border { border-bottom: none; }
+        
+        .mission-scroll { flex: 1; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: #ffcc00 #000; }
+        .mission-scroll::-webkit-scrollbar { width: 6px; }
+        .mission-scroll::-webkit-scrollbar-thumb { background: #ffcc00; }
+
         .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
         .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
         .candidates-mini-box { margin-top: 8px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; }
         .sanchez-card { position: relative; overflow: hidden; }
-        .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0; }
         .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
         .sessao-card { background: linear-gradient(135deg, rgba(20,20,50,0.9), rgba(0,0,20,0.9)); border: 1px solid #00f2ff; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,242,255,0.1); }
@@ -514,7 +525,7 @@ export default function MestrePage() {
         .papiro-body-real::-webkit-scrollbar { display: none; }
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
-        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; }
         .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
         .ff-add-btn-gold-small:hover { background: #ffcc00; color: #000; box-shadow: 0 0 15px #ffcc00; }
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; margin-right: 10px; font-weight: bold; }
@@ -538,9 +549,9 @@ export default function MestrePage() {
         .fichas-trigger-btn img { width: 70%; height: 70%; object-fit: contain; }
 
         /* LISTA DE FICHAS */
-        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; width: 100%; flex-wrap: wrap; gap: 10px; }
+        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; width: 100%; }
         .ficha-list-item:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
-        .ficha-row-name { display: flex; flex-direction: column; flex: 1; }
+        .ficha-row-name { display: flex; flex-direction: column; flex: 1; margin-right: 15px; }
         .ficha-row-name strong { color: #fff; font-size: 16px; }
         .ficha-row-name small { color: #aaa; font-size: 12px; }
       `}</style>
