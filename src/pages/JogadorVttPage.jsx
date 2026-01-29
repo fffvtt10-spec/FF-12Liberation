@@ -88,115 +88,130 @@ export default function JogadorVttPage() {
   return (
     <div className="jogador-container">
       
-      {/* --- FUNDO DA PÁGINA (Apenas a Imagem, sem animações de éter por cima) --- */}
+      {/* 1. CAMADA DE FUNDO (Z-Index 0) - Correção aplicada aqui */}
       <div 
-        style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundImage: `url(${fundoJogador})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            zIndex: -1 /* Garante que fique atrás de tudo */
-        }}
+        className="background-layer"
+        style={{ backgroundImage: `url(${fundoJogador})` }}
       />
       
-      {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
-      <div className="char-hud">
-        <div className="char-avatar">
-           <div className="avatar-circle"></div>
+      {/* 2. CAMADA DE CONTEÚDO (Z-Index 10) - Garante que UI fique acima do fundo */}
+      <div className="content-layer">
+
+        {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
+        <div className="char-hud">
+          <div className="char-avatar">
+             <div className="avatar-circle"></div>
+          </div>
+          <div className="char-info">
+             <h2 className="char-name">{personagem.name}</h2>
+             <span className="char-meta">{personagem.race} // {personagem.class}</span>
+          </div>
         </div>
-        <div className="char-info">
-           <h2 className="char-name">{personagem.name}</h2>
-           <span className="char-meta">{personagem.race} // {personagem.class}</span>
-        </div>
+
+        {/* ÁREA CENTRAL: SESSÕES ATIVAS */}
+        {sessoesAtivas.length > 0 && (
+          <div className="active-sessions-banner fade-in">
+             <h3>SESSÃO EM ANDAMENTO!</h3>
+             {sessoesAtivas.map(sessao => (
+               <div key={sessao.id} className="session-entry-row">
+                  <span>{sessao.missaoNome}</span>
+                  <button className="btn-enter-session" onClick={() => enterVTT(sessao)}>ENTRAR AGORA</button>
+               </div>
+             ))}
+          </div>
+        )}
+
+        {/* BOTÕES FLUTUANTES (CANTOS INFERIORES) */}
+        <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Quadro de Missões">
+            📜
+        </button>
+
+        <Bazar isMestre={false} /> 
+
+        {/* MODAL DO QUADRO DE MISSÕES */}
+        {showMissionModal && (
+          <div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}>
+             <div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}>
+                
+                <div className="modal-header-row">
+                  <h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3>
+                  <button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button>
+                </div>
+
+                <div className="missions-list-player">
+                   {missoes.map(m => (
+                     <div key={m.id} className={`mission-poster-player rank-${m.rank}`}>
+                        <div className="mp-header">
+                          <span className="mp-rank">{m.rank}</span>
+                          <h4>{m.nome}</h4>
+                        </div>
+                        <div className="mp-details">
+                          <p><strong>Local:</strong> {m.local}</p>
+                          <p><strong>Recompensa:</strong> {m.gilRecompensa} Gil</p>
+                          <p className="mp-desc">{m.descricaoMissao}</p>
+                        </div>
+                        
+                        {m.candidatos && m.candidatos.length > 0 && (
+                          <div className="candidates-box">
+                             <small>Grupo em formação:</small>
+                             <div className="cand-tags">
+                               {m.candidatos.map((c, idx) => (
+                                 <span key={idx} className={`cand-tag ${c.isLeader ? 'leader' : ''}`}>
+                                   {c.isLeader && '👑'} {c.nome}
+                                 </span>
+                               ))}
+                             </div>
+                          </div>
+                        )}
+
+                        <button 
+                          className="btn-candidatar" 
+                          disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)}
+                          onClick={() => handleCandidatar(m)}
+                        >
+                          {m.candidatos?.some(c => c.uid === auth.currentUser.uid) ? "CANDIDATURA ENVIADA" : "ACEITAR CONTRATO"}
+                        </button>
+                     </div>
+                   ))}
+                   {missoes.length === 0 && <p style={{textAlign: 'center', padding: '20px'}}>Nenhum contrato disponível no momento.</p>}
+                </div>
+             </div>
+          </div>
+        )}
       </div>
 
-      {/* ÁREA CENTRAL: SESSÕES ATIVAS */}
-      {sessoesAtivas.length > 0 && (
-        <div className="active-sessions-banner fade-in">
-           <h3>SESSÃO EM ANDAMENTO!</h3>
-           {sessoesAtivas.map(sessao => (
-             <div key={sessao.id} className="session-entry-row">
-                <span>{sessao.missaoNome}</span>
-                <button className="btn-enter-session" onClick={() => enterVTT(sessao)}>ENTRAR AGORA</button>
-             </div>
-           ))}
-        </div>
-      )}
-
-      {/* BOTÕES FLUTUANTES (CANTOS INFERIORES) */}
-      <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Quadro de Missões">
-          📜
-      </button>
-
-      <Bazar isMestre={false} /> 
-
-      {/* MODAL DO QUADRO DE MISSÕES */}
-      {showMissionModal && (
-        <div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}>
-           <div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}>
-              
-              <div className="modal-header-row">
-                <h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3>
-                <button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button>
-              </div>
-
-              <div className="missions-list-player">
-                 {missoes.map(m => (
-                   <div key={m.id} className={`mission-poster-player rank-${m.rank}`}>
-                      <div className="mp-header">
-                        <span className="mp-rank">{m.rank}</span>
-                        <h4>{m.nome}</h4>
-                      </div>
-                      <div className="mp-details">
-                        <p><strong>Local:</strong> {m.local}</p>
-                        <p><strong>Recompensa:</strong> {m.gilRecompensa} Gil</p>
-                        <p className="mp-desc">{m.descricaoMissao}</p>
-                      </div>
-                      
-                      {m.candidatos && m.candidatos.length > 0 && (
-                        <div className="candidates-box">
-                           <small>Grupo em formação:</small>
-                           <div className="cand-tags">
-                             {m.candidatos.map((c, idx) => (
-                               <span key={idx} className={`cand-tag ${c.isLeader ? 'leader' : ''}`}>
-                                 {c.isLeader && '👑'} {c.nome}
-                               </span>
-                             ))}
-                           </div>
-                        </div>
-                      )}
-
-                      <button 
-                        className="btn-candidatar" 
-                        disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)}
-                        onClick={() => handleCandidatar(m)}
-                      >
-                        {m.candidatos?.some(c => c.uid === auth.currentUser.uid) ? "CANDIDATURA ENVIADA" : "ACEITAR CONTRATO"}
-                      </button>
-                   </div>
-                 ))}
-                 {missoes.length === 0 && <p style={{textAlign: 'center', padding: '20px'}}>Nenhum contrato disponível no momento.</p>}
-              </div>
-           </div>
-        </div>
-      )}
-
       <style>{`
+        /* ESTRUTURA DE CAMADAS (LAYERS) */
         .jogador-container { 
-            width: 100vw; height: 100vh; 
-            position: relative; overflow: hidden; 
-            font-family: 'Cinzel', serif; color: white; 
+            position: relative; 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden; 
+            background: #000; /* Fallback */
+            font-family: 'Cinzel', serif; 
+            color: white; 
         }
 
-        /* Removido styles de .ether-container aqui para não conflitar.
-           A imagem é controlada direto na div inline acima.
-        */
+        .background-layer {
+            position: absolute;
+            top: 0; 
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0; /* Base */
+        }
 
+        .content-layer {
+            position: relative;
+            z-index: 10; /* Conteúdo sempre acima do fundo */
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ESTILOS DA INTERFACE */
         .loading-screen { 
             width: 100vw; height: 100vh; background: #000; color: #ffcc00; 
             display: flex; align-items: center; justify-content: center; 
@@ -209,7 +224,6 @@ export default function JogadorVttPage() {
             background: rgba(0,0,0,0.8); padding: 15px 25px; 
             border-radius: 50px; border: 1px solid #ffcc00; 
             box-shadow: 0 0 15px rgba(255,204,0,0.3); 
-            z-index: 10;
             backdrop-filter: blur(5px);
         }
 
@@ -229,7 +243,7 @@ export default function JogadorVttPage() {
             position: absolute; top: 120px; left: 50%; transform: translateX(-50%); 
             background: rgba(20, 0, 0, 0.9); border: 2px solid #f00; padding: 20px; 
             border-radius: 8px; text-align: center; box-shadow: 0 0 30px #f00; 
-            animation: pulseRed 2s infinite; z-index: 5;
+            animation: pulseRed 2s infinite;
         }
 
         .session-entry-row { display: flex; gap: 20px; align-items: center; margin-top: 10px; justify-content: center; }
