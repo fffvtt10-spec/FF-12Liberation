@@ -2,20 +2,58 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
 import fundoJogador from '../assets/fundo-jogador.jpg';
-import sanchezImg from '../assets/sanchez.jpeg'; // Importação adicionada
-import papiroImg from '../assets/papiro.png';     // Importação adicionada
+import sanchezImg from '../assets/sanchez.jpeg'; 
+import papiroImg from '../assets/papiro.png'; 
 import Bazar from '../components/Bazar';
+
+// Componente de Contagem Regressiva para Sessões Futuras
+const CountdownTimer = ({ targetDate, onComplete }) => {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = new Date(targetDate).getTime() - now;
+
+      if (distance < 0) {
+        clearInterval(interval);
+        if (onComplete) onComplete();
+        setTimeLeft("AGORA");
+      } else {
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((distance % (1000 * 60)) / 1000);
+        setTimeLeft(`${days}d ${hours}h ${mins}m ${secs}s`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [targetDate, onComplete]);
+
+  return <span className="countdown-text">{timeLeft}</span>;
+};
 
 export default function JogadorVttPage() {
   const [personagem, setPersonagem] = useState(null);
   const [missoes, setMissoes] = useState([]);
-  const [sessoesAtivas, setSessoesAtivas] = useState([]);
-  const [showMissionModal, setShowMissionModal] = useState(false);
   
-  // --- NOVOS STATES PARA RESENHAS ---
+  // Estados de Sessão
+  const [sessoesAtivas, setSessoesAtivas] = useState([]); // Já começou
+  const [sessoesFuturas, setSessoesFuturas] = useState([]); // Vai começar
+  
+  // Modais e Visualizações
+  const [showMissionModal, setShowMissionModal] = useState(false);
+  const [showMissionDetails, setShowMissionDetails] = useState(null); // Detalhes da missão
+  
+  // Estados de Resenhas
   const [resenhas, setResenhas] = useState([]);
   const [showResenhasList, setShowResenhasList] = useState(false);
   const [viewResenha, setViewResenha] = useState(null);
+
+  // Estado do VTT (Status no canto superior)
+  const [vttStatus, setVttStatus] = useState(null); // null, 'waiting', 'connected'
+  const [currentVttSession, setCurrentVttSession] = useState(null);
 
   // --- CARREGAR DADOS DO PERSONAGEM ---
   useEffect(() => {
@@ -44,39 +82,53 @@ export default function JogadorVttPage() {
     const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
     const unsubSessoes = onSnapshot(qSessoes, (snap) => {
       const agora = new Date();
-      const sessoesValidas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => {
+      const todasSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const ativas = [];
+      const futuras = [];
+
+      todasSessoes.forEach(s => {
         const inicio = new Date(s.dataInicio);
         const fim = new Date(s.expiraEm);
-        return agora >= inicio && agora <= fim; 
+
+        if (agora >= inicio && agora <= fim) {
+           ativas.push(s);
+        } else if (agora < inicio) {
+           futuras.push(s);
+        }
       });
-      setSessoesAtivas(sessoesValidas);
+
+      setSessoesAtivas(ativas);
+      setSessoesFuturas(futuras);
+      
+      // Lógica automática para atualizar o status do VTT se estiver conectado
+      if (currentVttSession) {
+         const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
+         if (sessionUpdated) {
+            setVttStatus('connected'); // Se está na lista de ativas, o mestre "abriu" (pelo horário)
+         }
+      }
     });
 
-    // 3. Ouvir Resenhas endereçadas ao Personagem (NOVO)
+    // 3. Ouvir Resenhas
     const qResenhas = query(collection(db, "resenhas"), where("destinatarios", "array-contains", personagem.name));
     const unsubResenhas = onSnapshot(qResenhas, (snap) => {
-       // Ordenar por data (opcional, mas bom)
        const loadedResenhas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-       // Filtra apenas as que não expiraram (opcional, igual ao mestre)
        const agora = new Date();
        const validas = loadedResenhas.filter(r => new Date(r.expiraEm) > agora);
        setResenhas(validas);
     });
 
     return () => { unsubMissoes(); unsubSessoes(); unsubResenhas(); };
-  }, [personagem]);
+  }, [personagem, currentVttSession]);
 
   // --- CANDIDATURA À MISSÃO ---
   const handleCandidatar = async (missao) => {
     if (!personagem) return;
-
-    // Verifica se já é candidato
     const jaCandidato = missao.candidatos?.some(c => c.uid === auth.currentUser.uid);
     if (jaCandidato) return alert("Você já se candidatou para esta missão!");
 
-    // Lógica de Líder: Se não houver candidatos, o primeiro é o líder
     const isLeader = !missao.candidatos || missao.candidatos.length === 0;
-
     const candidatoObj = {
       uid: auth.currentUser.uid,
       nome: personagem.name,
@@ -87,9 +139,7 @@ export default function JogadorVttPage() {
 
     try {
       const missaoRef = doc(db, "missoes", missao.id);
-      await updateDoc(missaoRef, {
-        candidatos: arrayUnion(candidatoObj)
-      });
+      await updateDoc(missaoRef, { candidatos: arrayUnion(candidatoObj) });
       alert(isLeader ? "Você se candidatou e foi marcado como LÍDER DO GRUPO!" : "Candidatura realizada com sucesso!");
     } catch (erro) {
       console.error("Erro ao candidatar:", erro);
@@ -97,8 +147,18 @@ export default function JogadorVttPage() {
     }
   };
 
+  // --- ENTRAR NO VTT (ACIONA O STATUS) ---
   const enterVTT = (sessao) => {
-    alert(`Entrando na sessão: ${sessao.missaoNome}\nBom jogo, ${personagem.name}!`);
+     setCurrentVttSession(sessao);
+     // Verifica se a sessão já está ativa (horário)
+     const agora = new Date();
+     const inicio = new Date(sessao.dataInicio);
+     
+     if (agora >= inicio) {
+        setVttStatus('connected');
+     } else {
+        setVttStatus('waiting');
+     }
   };
 
   if (!personagem) return <div className="loading-screen">Carregando Grimório...</div>;
@@ -106,13 +166,13 @@ export default function JogadorVttPage() {
   return (
     <div className="jogador-container">
       
-      {/* 1. CAMADA DE FUNDO (Z-Index 0) */}
+      {/* 1. CAMADA DE FUNDO */}
       <div 
         className="background-layer"
         style={{ backgroundImage: `url(${fundoJogador})` }}
       />
       
-      {/* 2. CAMADA DE CONTEÚDO (Z-Index 10) */}
+      {/* 2. CAMADA DE CONTEÚDO */}
       <div className="content-layer">
 
         {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
@@ -126,7 +186,22 @@ export default function JogadorVttPage() {
           </div>
         </div>
 
-        {/* ÁREA CENTRAL: SESSÕES ATIVAS */}
+        {/* ÁREA CENTRAL: SESSÕES (FUTURAS E ATIVAS) */}
+        
+        {/* 1. Sessões Futuras (Countdown) */}
+        {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && (
+           <div className="upcoming-sessions-banner">
+              <h3>A SESSÃO VAI COMEÇAR EM BREVE</h3>
+              {sessoesFuturas.map(sessao => (
+                 <div key={sessao.id} className="countdown-row">
+                    <span>{sessao.missaoNome}</span>
+                    <CountdownTimer targetDate={sessao.dataInicio} />
+                 </div>
+              ))}
+           </div>
+        )}
+
+        {/* 2. Sessões Ativas (Banner Vermelho) */}
         {sessoesAtivas.length > 0 && (
           <div className="active-sessions-banner fade-in">
              <h3>SESSÃO EM ANDAMENTO!</h3>
@@ -139,14 +214,32 @@ export default function JogadorVttPage() {
           </div>
         )}
 
-        {/* BOTÕES FLUTUANTES (CANTOS INFERIORES) */}
-        
-        {/* Botão Missões */}
+        {/* STATUS DO VTT (CANTO SUPERIOR DIREITO) */}
+        {vttStatus && currentVttSession && (
+           <div className={`vtt-status-widget ${vttStatus}`}>
+              <div className="status-indicator"></div>
+              <div className="status-text">
+                 {vttStatus === 'waiting' && (
+                    <>
+                      <h4>AGUARDANDO MESTRE</h4>
+                      <small>Preparando o tabuleiro...</small>
+                    </>
+                 )}
+                 {vttStatus === 'connected' && (
+                    <>
+                      <h4>BEM-VINDO, AVENTUREIRO</h4>
+                      <small>Sessão Conectada!</small>
+                    </>
+                 )}
+              </div>
+           </div>
+        )}
+
+        {/* BOTÕES FLUTUANTES */}
         <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Quadro de Missões">
             📜
         </button>
 
-        {/* Botão Resenhas do Sanchez (NOVO - Só aparece se tiver resenhas) */}
         {resenhas.length > 0 && (
            <button className="floating-sanchez-btn" onClick={() => setShowResenhasList(true)} title="Resenhas do Sanchez">
                <div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>
@@ -191,14 +284,17 @@ export default function JogadorVttPage() {
                              </div>
                           </div>
                         )}
-
-                        <button 
-                          className="btn-candidatar" 
-                          disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)}
-                          onClick={() => handleCandidatar(m)}
-                        >
-                          {m.candidatos?.some(c => c.uid === auth.currentUser.uid) ? "CANDIDATURA ENVIADA" : "ACEITAR CONTRATO"}
-                        </button>
+                        
+                        <div className="mp-actions-row">
+                             <button className="btn-details-outline" onClick={() => setShowMissionDetails(m)}>DETALHES</button>
+                             <button 
+                              className="btn-candidatar" 
+                              disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)}
+                              onClick={() => handleCandidatar(m)}
+                             >
+                              {m.candidatos?.some(c => c.uid === auth.currentUser.uid) ? "ENVIADO" : "ACEITAR"}
+                             </button>
+                        </div>
                      </div>
                    ))}
                    {missoes.length === 0 && <p style={{textAlign: 'center', padding: '20px'}}>Nenhum contrato disponível no momento.</p>}
@@ -207,7 +303,63 @@ export default function JogadorVttPage() {
           </div>
         )}
 
-        {/* MODAL DE LISTA DE RESENHAS (NOVO) */}
+        {/* MODAL DE DETALHES DA MISSÃO (NOVO) */}
+        {showMissionDetails && (
+            <div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}>
+                <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
+                    <div className="detail-header-modern">
+                        <div className={`detail-rank-badge rank-${showMissionDetails.rank}`}>{showMissionDetails.rank}</div>
+                        <div className="detail-title-col">
+                            <h2>{showMissionDetails.nome}</h2>
+                            <span className="detail-narrator">Narrador: {showMissionDetails.mestreNome}</span>
+                        </div>
+                    </div>
+                    <div className="detail-body-grid">
+                        <div className="detail-info-row">
+                            <div className="info-item">
+                                <label>🌍 LOCAL</label>
+                                <span>{showMissionDetails.local || "Desconhecido"}</span>
+                            </div>
+                            <div className="info-item">
+                                <label>👤 CONTRATANTE</label>
+                                <span>{showMissionDetails.contratante || "Anônimo"}</span>
+                            </div>
+                        </div>
+                        <div className="detail-section">
+                            <label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label>
+                            <p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p>
+                        </div>
+                        <div className="detail-section">
+                            <label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label>
+                            <p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p>
+                        </div>
+                        <div className="detail-section">
+                            <label className="section-label">⚡ REQUISITOS</label>
+                            <p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p>
+                        </div>
+                        <div className="detail-section reward-section">
+                            <label className="section-label">💎 RECOMPENSAS</label>
+                            <div className="reward-content-box">
+                                <div className="gil-display-row">
+                                    <span className="gil-icon">💰</span> 
+                                    <span className="gil-value">{showMissionDetails.gilRecompensa || 0} GIL</span>
+                                </div>
+                                {showMissionDetails.recompensa && (
+                                    <div className="extra-rewards-list">
+                                        {showMissionDetails.recompensa.split('\n').map((r,i) => (
+                                            <div key={i} className="reward-item">• {r}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <button className="ff-final-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR RELATÓRIO</button>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL DE LISTA DE RESENHAS */}
         {showResenhasList && (
            <div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}>
               <div className="ff-modal-content ff-card" style={{height: 'auto', maxHeight: '600px'}} onClick={e => e.stopPropagation()}>
@@ -231,7 +383,7 @@ export default function JogadorVttPage() {
            </div>
         )}
 
-        {/* MODAL DE LEITURA (PAPIRO) (NOVO - Igual ao MestrePage) */}
+        {/* MODAL DE LEITURA (PAPIRO) */}
         {viewResenha && (
            <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
               <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -247,168 +399,79 @@ export default function JogadorVttPage() {
       </div>
 
       <style>{`
-        /* ESTRUTURA DE CAMADAS (LAYERS) */
-        .jogador-container { 
-            position: relative; 
-            width: 100vw; 
-            height: 100vh; 
-            overflow: hidden; 
-            background: #000; 
-            font-family: 'Cinzel', serif; 
-            color: white; 
-        }
+        /* ESTRUTURA DE CAMADAS */
+        .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
+        .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; background-repeat: no-repeat; z-index: 0; }
+        .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
 
-        .background-layer {
-            position: absolute;
-            top: 0; 
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            z-index: 0; 
-        }
-
-        .content-layer {
-            position: relative;
-            z-index: 10; 
-            width: 100%;
-            height: 100%;
-        }
-
-        /* ESTILOS DA INTERFACE */
-        .loading-screen { 
-            width: 100vw; height: 100vh; background: #000; color: #ffcc00; 
-            display: flex; align-items: center; justify-content: center; 
-            font-size: 24px; font-family: 'Cinzel', serif; 
-        }
-
-        .char-hud { 
-            position: absolute; top: 20px; left: 20px; 
-            display: flex; align-items: center; gap: 15px; 
-            background: rgba(0,0,0,0.8); padding: 15px 25px; 
-            border-radius: 50px; border: 1px solid #ffcc00; 
-            box-shadow: 0 0 15px rgba(255,204,0,0.3); 
-            backdrop-filter: blur(5px);
-        }
-
-        .avatar-circle { 
-            width: 60px; height: 60px; 
-            background: #222; border-radius: 50%; border: 2px solid #fff; 
-        }
-
-        .char-info h2 { 
-            margin: 0; font-size: 20px; color: #fff; 
-            text-transform: uppercase; letter-spacing: 1px; 
-        }
-
+        /* INTERFACE GERAL */
+        .loading-screen { width: 100vw; height: 100vh; background: #000; color: #ffcc00; display: flex; align-items: center; justify-content: center; font-size: 24px; font-family: 'Cinzel', serif; }
+        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; box-shadow: 0 0 15px rgba(255,204,0,0.3); backdrop-filter: blur(5px); z-index: 50; }
+        .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; }
+        .char-info h2 { margin: 0; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
         .char-meta { font-size: 12px; color: #00f2ff; font-weight: bold; }
 
-        .active-sessions-banner { 
-            position: absolute; top: 120px; left: 50%; transform: translateX(-50%); 
-            background: rgba(20, 0, 0, 0.9); border: 2px solid #f00; padding: 20px; 
-            border-radius: 8px; text-align: center; box-shadow: 0 0 30px #f00; 
-            animation: pulseRed 2s infinite;
-        }
+        /* SESSÕES FUTURAS (COUNTDOWN) */
+        .upcoming-sessions-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(255,204,0,0.3); z-index: 5; width: 400px; }
+        .upcoming-sessions-banner h3 { color: #ffcc00; margin-bottom: 10px; font-size: 18px; }
+        .countdown-row { display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; }
+        .countdown-text { font-size: 24px; color: #fff; font-weight: bold; font-family: 'Lato', sans-serif; }
 
+        /* SESSÕES ATIVAS */
+        .active-sessions-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(20, 0, 0, 0.9); border: 2px solid #f00; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px #f00; animation: pulseRed 2s infinite; z-index: 5; }
         .session-entry-row { display: flex; gap: 20px; align-items: center; margin-top: 10px; justify-content: center; }
-
-        .btn-enter-session { 
-            background: #f00; color: #fff; border: none; padding: 10px 20px; 
-            font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; font-size: 16px; 
-        }
-
+        .btn-enter-session { background: #f00; color: #fff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; font-size: 16px; }
         .btn-enter-session:hover { background: #fff; color: #f00; }
-
         @keyframes pulseRed { 0% { box-shadow: 0 0 10px #f00; } 50% { box-shadow: 0 0 30px #f00; } 100% { box-shadow: 0 0 10px #f00; } }
 
+        /* WIDGET STATUS VTT */
+        .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 9999; width: 280px; transition: 0.5s; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
+        .vtt-status-widget.waiting { border-color: #ffcc00; }
+        .vtt-status-widget.connected { border-color: #0f0; box-shadow: 0 0 20px rgba(0,255,0,0.3); }
+        .status-indicator { width: 15px; height: 15px; border-radius: 50%; }
+        .waiting .status-indicator { background: #ffcc00; animation: blink 1s infinite; }
+        .connected .status-indicator { background: #0f0; box-shadow: 0 0 10px #0f0; }
+        .status-text h4 { margin: 0; font-size: 14px; color: #fff; text-transform: uppercase; }
+        .status-text small { font-size: 11px; color: #ccc; }
+        .waiting .status-text h4 { color: #ffcc00; }
+        .connected .status-text h4 { color: #0f0; }
+        @keyframes blink { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
         /* BOTÕES FLUTUANTES */
-        .floating-mission-btn {
-            position: fixed; bottom: 30px; left: 30px;
-            width: 70px; height: 70px;
-            border-radius: 50%;
-            border: 2px solid #ffcc00;
-            background: #000;
-            color: #fff;
-            font-size: 30px;
-            cursor: pointer;
-            z-index: 999;
-            box-shadow: 0 0 15px rgba(0,0,0,0.8);
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: flex; align-items: center; justify-content: center;
-        }
-
+        .floating-mission-btn { position: fixed; bottom: 30px; left: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 30px; cursor: pointer; z-index: 999; box-shadow: 0 0 15px rgba(0,0,0,0.8); transition: transform 0.2s, box-shadow 0.2s; display: flex; align-items: center; justify-content: center; }
         .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #ffcc00; }
-
-        /* NOVO BOTÃO SANCHEZ */
-        .floating-sanchez-btn {
-            position: fixed; bottom: 110px; left: 30px; /* Acima do botão de missão */
-            width: 70px; height: 70px;
-            border-radius: 50%;
-            border: 2px solid #00f2ff;
-            background: #000;
-            cursor: pointer;
-            z-index: 999;
-            box-shadow: 0 0 15px rgba(0,242,255,0.5);
-            transition: transform 0.2s;
-            display: flex; align-items: center; justify-content: center;
-            overflow: visible;
-        }
+        .floating-sanchez-btn { position: fixed; bottom: 110px; left: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 999; box-shadow: 0 0 15px rgba(0,242,255,0.5); transition: transform 0.2s; display: flex; align-items: center; justify-content: center; overflow: visible; }
         .floating-sanchez-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #00f2ff; }
-        
-        .sanchez-icon-face {
-            width: 100%; height: 100%;
-            border-radius: 50%;
-            background-size: cover;
-            background-position: center;
-        }
-        .notification-badge {
-            position: absolute; top: -5px; right: -5px;
-            background: #f00; color: #fff;
-            border-radius: 50%; width: 24px; height: 24px;
-            font-size: 12px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center;
-            border: 2px solid #fff;
-        }
+        .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; }
+        .notification-badge { position: absolute; top: -5px; right: -5px; background: #f00; color: #fff; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
 
-        /* MODAIS */
-        .ff-modal-overlay-flex {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.85); z-index: 99999;
-            display: flex; align-items: center; justify-content: center;
-            backdrop-filter: blur(10px);
-        }
-
-        .ff-modal-content {
-            width: 600px; max-width: 95vw; max-height: 85vh;
-            background: #0d0d15; border: 2px solid #ffcc00; padding: 25px;
-            border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.9);
-            overflow-y: auto; display: flex; flex-direction: column;
-        }
-
+        /* MODAIS GERAIS */
+        .ff-modal-overlay-flex { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .ff-modal-content { width: 600px; max-width: 95vw; max-height: 85vh; background: #0d0d15; border: 2px solid #ffcc00; padding: 25px; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.9); overflow-y: auto; display: flex; flex-direction: column; }
         .modal-header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; }
         .modal-title-ff { color: #ffcc00; margin: 0; font-size: 22px; letter-spacing: 2px; }
         .btn-close-x { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; }
         .btn-close-x:hover { color: #f00; }
 
+        /* LISTA DE MISSÕES */
         .missions-list-player { display: grid; grid-template-columns: 1fr; gap: 15px; }
         .mission-poster-player { background: rgba(255,255,255,0.05); border: 1px solid #444; padding: 15px; border-radius: 4px; position: relative; }
         .mp-header { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 8px; }
         .mp-rank { font-size: 24px; font-weight: bold; color: #ffcc00; }
         .mp-details p { margin: 4px 0; font-size: 14px; color: #ccc; }
         .mp-desc { font-style: italic; color: #aaa; margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        
-        .btn-candidatar { width: 100%; margin-top: 15px; background: #00f2ff; color: #000; font-weight: bold; border: none; padding: 10px; cursor: pointer; transition: 0.3s; }
+        .mp-actions-row { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-details-outline { flex: 1; border: 1px solid #00f2ff; color: #00f2ff; background: transparent; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-details-outline:hover { background: #00f2ff; color: #000; }
+        .btn-candidatar { flex: 2; background: #00f2ff; color: #000; font-weight: bold; border: none; padding: 10px; cursor: pointer; transition: 0.3s; }
         .btn-candidatar:hover:not(:disabled) { background: #fff; box-shadow: 0 0 10px #00f2ff; }
         .btn-candidatar:disabled { background: #333; color: #666; cursor: not-allowed; }
-        
         .candidates-box { margin-top: 10px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; }
         .cand-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
         .cand-tag { font-size: 11px; padding: 2px 6px; background: #222; border: 1px solid #444; border-radius: 3px; color: #ddd; }
         .cand-tag.leader { border-color: #ffcc00; color: #ffcc00; }
-        
-        /* ESTILOS DA LISTA DE RESENHAS */
+
+        /* LISTA DE RESENHAS */
         .resenhas-list-container { display: flex; flex-direction: column; gap: 10px; }
         .resenha-row-player { display: flex; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
         .resenha-row-player:hover { background: rgba(255,255,255,0.1); border-color: #ffcc00; }
@@ -418,7 +481,28 @@ export default function JogadorVttPage() {
         .r-info small { color: #aaa; }
         .btn-read-arrow { background: none; border: none; color: #00f2ff; font-weight: bold; cursor: pointer; }
 
-        /* PAPIRO VIEW (Igual ao Mestre) */
+        /* VISUALIZAÇÃO DE DETALHES (Estilo do Mestre) */
+        .detail-view-main { width: 600px; background: #000814; border: 1px solid #ffcc00; padding: 0; box-shadow: 0 0 40px rgba(255, 204, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; }
+        .detail-header-modern { background: linear-gradient(90deg, #1a1a1a 0%, #000 100%); padding: 25px 30px; display: flex; align-items: center; border-bottom: 1px solid #333; gap: 20px; }
+        .detail-rank-badge { font-size: 32px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); border: 2px solid #ffcc00; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.5); }
+        .detail-title-col h2 { margin: 0; font-size: 24px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        .detail-narrator { color: #00f2ff; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 4px; display: block; }
+        .detail-body-grid { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
+        .detail-info-row { display: flex; gap: 25px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 15px; }
+        .info-item { flex: 1; }
+        .info-item label { color: #ffcc00; font-size: 10px; display: block; margin-bottom: 5px; font-weight: bold; opacity: 0.8; }
+        .info-item span { color: #fff; font-size: 14px; font-weight: bold; letter-spacing: 0.5px; }
+        .detail-section { margin-bottom: 5px; }
+        .section-label { color: #ffcc00; font-size: 11px; font-weight: bold; display: block; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .section-text { font-size: 15px; line-height: 1.5; color: #ddd; margin: 0; white-space: pre-wrap; }
+        .reward-section { margin-top: 10px; background: rgba(255,204,0,0.05); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,204,0,0.2); }
+        .gil-display-row { display: flex; align-items: center; gap: 10px; font-size: 18px; color: #ffcc00; font-weight: bold; margin-bottom: 8px; }
+        .extra-rewards-list { margin-top: 8px; padding-left: 5px; }
+        .reward-item { color: #aaa; font-size: 14px; margin-bottom: 4px; font-style: italic; }
+        .ff-final-close-btn { width: 100%; background: #111; color: #fff; border: none; border-top: 1px solid #333; padding: 20px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; transition: 0.2s; }
+        .ff-final-close-btn:hover { background: #222; color: #ffcc00; }
+
+        /* PAPIRO VIEW */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
         .papiro-real-container { width: 1000px; height: 800px; max-width: 95vw; max-height: 95vh; background-size: 100% 100%; background-repeat: no-repeat; padding: 110px 160px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); opacity: 0.9; }
