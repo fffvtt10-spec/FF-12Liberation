@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { doc, updateDoc } from "firebase/firestore";
 
 export default function Ficha({ characterData, isMaster, onClose }) {
-  // Estado com estrutura expandida para suportar as novas solicitações
+  // Estado local da ficha
   const [sheet, setSheet] = useState(characterData.character_sheet || {
     basic_info: { 
         character_name: characterData.name, 
@@ -12,8 +12,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         race: characterData.race, 
         class: characterData.class,
         guild_rank: "Iniciado",
-        guild_insignia: "", // Nova imagem
-        guild_rank_image: "" // Nova imagem
+        guild_insignia: "", 
+        guild_rank_image: "" 
     },
     attributes: { 
         FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
@@ -24,7 +24,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         mp: { current: 5, max: 5 }, 
         arm: { value: 0 }, 
         res: { value: 0 },
-        mov: { value: 3 } // Novo status MOVIMENTO
+        mov: { value: 3 }
     },
     equipment: { 
         slots: Array(7).fill({ item_name: "", item_img: "", effect: "-" }) 
@@ -46,40 +46,66 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     imgUrl: "" 
   });
 
-  const [activeTab, setActiveTab] = useState('geral'); // 'geral' ou 'habilidades'
+  const [activeTab, setActiveTab] = useState('geral'); 
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Indicador visual
 
-  // Função para atualizar o Firebase (Deep Update)
-  const updateField = async (path, value) => {
+  // Efeito para atualizar a ficha do JOGADOR em tempo real quando o mestre salvar no banco
+  useEffect(() => {
+    if (!isMaster && characterData.character_sheet) {
+        setSheet(characterData.character_sheet);
+    }
+  }, [characterData, isMaster]);
+
+  // Função para atualizar o ESTADO LOCAL (Edição)
+  const updateField = (path, value) => {
     if (!isMaster) return;
     
     const newSheet = JSON.parse(JSON.stringify(sheet));
     const keys = path.split('.');
     let ref = newSheet;
     
-    // Navega até o penúltimo nível
     for (let i = 0; i < keys.length - 1; i++) {
-        if (!ref[keys[i]]) ref[keys[i]] = {}; // Cria objeto se não existir (segurança para campos novos)
+        if (!ref[keys[i]]) ref[keys[i]] = {}; 
         ref = ref[keys[i]];
     }
     
     ref[keys[keys.length - 1]] = value;
     setSheet(newSheet);
-    
-    const charRef = doc(db, "characters", characterData.uid || characterData.id);
-    await updateDoc(charRef, { character_sheet: newSheet });
+    setHasUnsavedChanges(true);
+  };
+
+  // Função para SALVAR NO FIREBASE (Botão do Mestre)
+  const saveSheetToDb = async () => {
+      try {
+        const charRef = doc(db, "characters", characterData.uid || characterData.id);
+        await updateDoc(charRef, { character_sheet: sheet });
+        setHasUnsavedChanges(false);
+        alert("Ficha salva com sucesso!");
+      } catch (error) {
+          console.error("Erro ao salvar:", error);
+          alert("Erro ao salvar ficha.");
+      }
   };
 
   const handleLevelUp = async () => {
+    if(!isMaster) return;
     setShowLevelUpAnim(true);
     setTimeout(async () => {
         setShowLevelUpAnim(false);
         const currentLvl = sheet.basic_info.level || 1;
         const newXpMax = Math.floor(sheet.basic_info.experience.max * 1.5);
         
-        await updateField('basic_info.level', currentLvl + 1);
-        await updateField('basic_info.experience.current', 0);
-        await updateField('basic_info.experience.max', newXpMax);
+        // Atualiza localmente e salva automaticamente pois é um evento crítico
+        const newSheet = JSON.parse(JSON.stringify(sheet));
+        newSheet.basic_info.level = currentLvl + 1;
+        newSheet.basic_info.experience.current = 0;
+        newSheet.basic_info.experience.max = newXpMax;
+        
+        setSheet(newSheet);
+        
+        const charRef = doc(db, "characters", characterData.uid || characterData.id);
+        await updateDoc(charRef, { character_sheet: newSheet });
     }, 4000);
   };
 
@@ -107,19 +133,30 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
         
-        {/* --- CABEÇALHO (Expandido) --- */}
+        {/* BOTÃO DE SALVAR (APENAS MESTRE) */}
+        {isMaster && (
+            <button 
+                className={`save-btn-master ${hasUnsavedChanges ? 'unsaved' : ''}`} 
+                onClick={saveSheetToDb}
+            >
+                {hasUnsavedChanges ? "💾 SALVAR ALTERAÇÕES" : "FICHA SALVA"}
+            </button>
+        )}
+
+        {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
-            {/* Esquerda: Insígnia */}
+            {/* Esquerda: Signo (Antiga Insignia) */}
             <div className="guild-insignia-box">
+                <span className="header-label-top">SIGNO</span>
                 {isMaster ? (
                     <input 
                         className="guild-img-input" 
-                        placeholder="URL Insígnia"
+                        placeholder="URL Img"
                         value={sheet.basic_info.guild_insignia || ""}
                         onChange={e => updateField('basic_info.guild_insignia', e.target.value)}
                     />
                 ) : null}
-                <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=Guild'})`}}></div>
+                <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=Signo'})`}}></div>
             </div>
 
             {/* Centro: Infos Básicas */}
@@ -147,6 +184,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
             {/* Direita: Rank Guilda */}
             <div className="guild-rank-box">
+                <span className="header-label-top">RANK</span>
                 {isMaster ? (
                     <>
                         <input className="rank-name-input" value={sheet.basic_info.guild_rank} onChange={e => updateField('basic_info.guild_rank', e.target.value)} />
@@ -165,12 +203,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             <button className={`tab-btn ${activeTab === 'habilidades' ? 'active' : ''}`} onClick={() => setActiveTab('habilidades')}>GRIMÓRIO DE HABILIDADES</button>
         </div>
 
-        {/* --- CORPO (Renderização Condicional) --- */}
+        {/* --- CORPO --- */}
         <div className="ficha-body">
             
             {activeTab === 'geral' ? (
                 <>
-                    {/* COLUNA ESQUERDA: ATRIBUTOS & STATUS */}
+                    {/* COLUNA ESQUERDA: ATRIBUTOS */}
                     <div className="col-attributes">
                         <h3 className="section-title">ATRIBUTOS</h3>
                         <div className="radar-wrapper">
@@ -205,7 +243,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         </div>
                     </div>
 
-                    {/* COLUNA CENTRAL: EQUIPAMENTOS (ORBITAIS QUADRADOS) */}
+                    {/* COLUNA CENTRAL: EQUIPAMENTOS (Ajustado Posições) */}
                     <div className="col-center-equip">
                         <div className="char-image-frame">
                             {isMaster ? <input className="img-url-input" placeholder="Link da Imagem" value={sheet.imgUrl} onChange={e => updateField('imgUrl', e.target.value)} /> : null}
@@ -214,32 +252,27 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         
                         <div className="equip-slots-overlay">
                             {[
-                                {id: 0, label: "CABEÇA", top: '5%', left: '50%'},
-                                {id: 1, label: "CORPO", top: '30%', right: '-10%'},
-                                {id: 2, label: "MÃO DIR.", top: '60%', right: '-10%'},
-                                {id: 3, label: "MÃO ESQ.", top: '60%', left: '-10%'},
-                                {id: 4, label: "ACESS. 1", top: '30%', left: '-10%'},
-                                {id: 5, label: "ACESS. 2", bottom: '-5%', left: '30%'},
-                                {id: 6, label: "PÉS", bottom: '-5%', right: '30%'}
+                                {id: 0, label: "CABEÇA", top: '0%', left: '50%'}, // Mais pra cima
+                                {id: 1, label: "CORPO", top: '25%', right: '-25%'}, // Mais pra fora
+                                {id: 2, label: "MÃO DIR.", bottom: '25%', right: '-25%'}, // Mais pra fora
+                                {id: 3, label: "MÃO ESQ.", bottom: '25%', left: '-25%'}, // Mais pra fora
+                                {id: 4, label: "ACESS. 1", top: '25%', left: '-25%'}, // Mais pra fora
+                                {id: 5, label: "ACESS. 2", bottom: '-15%', left: '20%'}, // Mais pra baixo
+                                {id: 6, label: "PÉS", bottom: '-15%', right: '20%'} // Mais pra baixo
                             ].map((slot, idx) => (
                                 <div key={idx} className="equip-slot" style={{top: slot.top, left: slot.left, right: slot.right, bottom: slot.bottom}}>
                                     <div className="slot-label">{slot.label}</div>
                                     <div className="slot-square">
-                                        {/* Se tiver imagem do item, mostra, senão mostra texto */}
                                         {sheet.equipment?.slots?.[idx]?.item_img ? (
                                             <div className="item-bg" style={{backgroundImage: `url(${sheet.equipment.slots[idx].item_img})`}}></div>
                                         ) : (
                                             <span className="empty-text">{sheet.equipment?.slots?.[idx]?.item_name || "Vazio"}</span>
                                         )}
-                                        
-                                        {/* Input invisível pro mestre editar nome/link se clicar (simplificado, ideal seria modal) */}
                                         {isMaster && (
-                                            <input 
-                                                className="slot-input-overlay" 
-                                                title="Digite o nome ou URL da imagem"
-                                                value={sheet.equipment?.slots?.[idx]?.item_name || ""}
-                                                onChange={e => updateField(`equipment.slots.${idx}.item_name`, e.target.value)}
-                                            />
+                                            <div className="master-slot-edit">
+                                                <input className="slot-mini-in" placeholder="Nome" value={sheet.equipment?.slots?.[idx]?.item_name || ""} onChange={e => updateField(`equipment.slots.${idx}.item_name`, e.target.value)} />
+                                                <input className="slot-mini-in" placeholder="Img URL" value={sheet.equipment?.slots?.[idx]?.item_img || ""} onChange={e => updateField(`equipment.slots.${idx}.item_img`, e.target.value)} />
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -342,20 +375,25 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .ficha-container { width: 1100px; height: 850px; max-width: 98vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
         .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 10; font-weight: bold; }
         
-        /* HEADER ATUALIZADO */
-        .ficha-header { padding: 15px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 120px; }
-        .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; }
-        .insignia-display, .rank-display { width: 60px; height: 60px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; margin-top: 5px; }
-        .guild-img-input { position: absolute; top: 0; width: 100%; font-size: 9px; background: rgba(0,0,0,0.8); border: none; color: #fff; z-index: 2; opacity: 0; transition: opacity 0.2s; }
-        .guild-insignia-box:hover .guild-img-input, .guild-rank-box:hover .guild-img-input { opacity: 1; }
-        .rank-name { font-size: 10px; color: #ffcc00; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
-        .rank-name-input { width: 100%; background: transparent; border: none; color: #ffcc00; font-size: 10px; text-align: center; border-bottom: 1px solid #444; }
+        .save-btn-master { position: absolute; top: 10px; right: 60px; background: #222; border: 1px solid #444; color: #aaa; padding: 5px 15px; cursor: default; font-weight: bold; font-size: 11px; z-index: 10; transition: 0.3s; }
+        .save-btn-master.unsaved { background: #00f2ff; color: #000; cursor: pointer; border-color: #fff; box-shadow: 0 0 15px #00f2ff; animation: pulseSave 1.5s infinite; }
+        @keyframes pulseSave { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        /* HEADER */
+        .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
+        .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
+        .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
+        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; }
+        .guild-img-input { position: absolute; top: 20px; width: 100%; font-size: 9px; background: rgba(0,0,0,0.8); border: none; color: #fff; z-index: 2; opacity: 0; transition: opacity 0.2s; }
+        .guild-insignia-box:hover .guild-img-input, .guild-rank-box:hover .guild-img-input { opacity: 1; }
+        .rank-name { font-size: 10px; color: #ffcc00; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-top: 5px; }
+        .rank-name-input { width: 100%; background: transparent; border: none; color: #ffcc00; font-size: 10px; text-align: center; border-bottom: 1px solid #444; margin-top: 5px; }
+
+        .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
-        .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+        .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
         
-        .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; }
+        .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: 5px; }
         .lvl-box { display: flex; flex-direction: column; align-items: center; background: #222; border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .lvl-box small { font-size: 8px; color: #ffcc00; }
         .lvl-box span { font-size: 24px; font-weight: bold; line-height: 1; }
@@ -367,14 +405,14 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         @keyframes glow { from { box-shadow: 0 0 10px #ffcc00; } to { box-shadow: 0 0 30px #ffcc00; transform: scale(1.05); } }
 
         /* TABS */
-        .ficha-tabs { display: flex; background: #111; border-bottom: 1px solid #333; }
+        .ficha-tabs { display: flex; background: #111; border-bottom: 1px solid #333; margin-top: 0; }
         .tab-btn { flex: 1; background: transparent; border: none; padding: 15px; color: #666; font-family: 'Cinzel', serif; font-size: 16px; cursor: pointer; transition: 0.3s; border-bottom: 3px solid transparent; }
         .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
         .tab-btn.active { color: #ffcc00; border-bottom: 3px solid #ffcc00; background: rgba(255, 204, 0, 0.05); }
 
-        .ficha-body { flex: 1; display: flex; padding: 20px; gap: 20px; overflow: hidden; }
+        .ficha-body { flex: 1; display: flex; padding: 30px 20px; gap: 20px; overflow: hidden; position: relative; }
         
-        /* COLUNA ATRIBUTOS (Geral) */
+        /* COLUNA ATRIBUTOS */
         .col-attributes { width: 300px; display: flex; flex-direction: column; align-items: center; border-right: 1px solid #333; padding-right: 20px; }
         .section-title { color: #aaa; font-size: 14px; border-bottom: 1px solid #00f2ff; width: 100%; text-align: center; margin-bottom: 15px; padding-bottom: 5px; }
         .radar-wrapper { position: relative; margin-bottom: 20px; }
@@ -395,23 +433,23 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
 
-        /* COLUNA EQUIPAMENTOS (Geral) */
+        /* COLUNA EQUIPAMENTOS (Ajustado) */
         .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
-        .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; }
+        .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; }
         .img-url-input { position: absolute; top: 10px; left: 20px; right: 20px; z-index: 5; background: rgba(0,0,0,0.7); border: 1px solid #555; color: #fff; font-size: 10px; padding: 2px; text-align: center; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
         
         .equip-slots-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        /* Slots Quadrados */
-        .equip-slot { position: absolute; width: 70px; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: auto; }
+        .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; }
         .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; }
         .empty-text { font-size: 9px; color: #666; text-align: center; line-height: 1; padding: 2px; }
-        .slot-input-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: text; }
-        .slot-square:hover { border-color: #fff; box-shadow: 0 0 10px #ffcc00; }
+        .master-slot-edit { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); opacity: 0; transition: opacity 0.2s; display: flex; flex-direction: column; }
+        .slot-square:hover .master-slot-edit { opacity: 1; }
+        .slot-mini-in { width: 100%; height: 50%; border: none; border-bottom: 1px solid #333; background: transparent; color: #fff; font-size: 8px; padding: 2px; text-align: center; }
 
-        /* COLUNA INVENTÁRIO (Geral) */
+        /* COLUNA INVENTÁRIO */
         .col-inventory { width: 280px; border-left: 1px solid #333; padding-left: 20px; display: flex; flex-direction: column; }
         .gil-display { background: linear-gradient(90deg, rgba(255,204,0,0.1), transparent); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .coin-icon { font-size: 20px; }
@@ -427,7 +465,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .i-name { color: #ddd; }
         .i-qtd { color: #00f2ff; font-weight: bold; }
         .add-item-btn { width: 100%; background: #222; border: 1px dashed #555; color: #888; padding: 5px; cursor: pointer; margin-top: 10px; font-size: 10px; }
-        
+        .add-item-btn:hover { border-color: #fff; color: #fff; }
+
         /* ABA HABILIDADES */
         .skills-tab-content { display: flex; width: 100%; height: 100%; gap: 30px; }
         .skills-col { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); border: 1px solid #333; padding: 15px; border-radius: 4px; }
@@ -445,7 +484,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .skill-name-in { flex: 1; font-weight: bold; color: #ffcc00; }
         .skill-cost-in { width: 50px; text-align: right; color: #00f2ff; }
         .skill-desc-in { width: 100%; background: transparent; border: none; color: #ccc; font-size: 12px; resize: none; font-family: sans-serif; }
-        
         .extra-abilities-box { margin-top: 20px; border-top: 2px solid #444; padding-top: 15px; }
         .ability-row { display: flex; align-items: center; margin-bottom: 10px; background: #222; padding: 8px; border-radius: 4px; border-left: 3px solid #ffcc00; }
         .ability-row label { font-size: 10px; color: #888; width: 60px; font-weight: bold; }
