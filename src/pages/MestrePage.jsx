@@ -44,7 +44,7 @@ export default function MestrePage() {
   const [showDetails, setShowDetails] = useState(null); 
   const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
-  const [viewMembers, setViewMembers] = useState(null); // Estado para ver membros da sessão
+  const [viewMembers, setViewMembers] = useState(null); 
 
   // Resenha
   const [resenha, setResenha] = useState("");
@@ -289,7 +289,7 @@ export default function MestrePage() {
           <div className="ff-modal-scrollable ff-card">
             <h3 className="modal-title-ff">NOVA MISSÃO</h3>
             <form onSubmit={handleCreateMission}>
-              {/* Campos da Missão omitidos para brevidade, mantenha os que já existem */}
+              {/* CAMPOS MANTIDOS... */}
               <div className="modal-input-group">
                 <label>NOME DA MISSÃO</label>
                 <input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />

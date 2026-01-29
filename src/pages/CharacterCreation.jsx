@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
 import bgCharacter from '../assets/fundo-character.jpg';
-// IMPORTS DO FIREBASE
 import { db, auth } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
@@ -33,8 +32,8 @@ const CharacterCreation = () => {
             const docSnap = await getDoc(docRef);
             
             if (docSnap.exists()) {
-                // Já tem personagem! Não deixa criar outro.
-                navigate('/jogador-vtt');
+                console.log("Personagem já existe. Redirecionando...");
+                navigate('/jogador-vtt'); // VAI PRO VTT, NÃO PRA LANDING
             }
         } catch (error) {
             console.error("Erro ao verificar personagem:", error);
@@ -52,9 +51,7 @@ const CharacterCreation = () => {
         try {
           el.pause();
           el.currentTime = 0; 
-        } catch (e) {
-          console.error("Erro ao pausar audio:", e);
-        }
+        } catch (e) {}
       });
     };
     stopAudio();
@@ -132,7 +129,6 @@ const CharacterCreation = () => {
     if (!charName.trim() || !auth.currentUser) return;
 
     try {
-      // Salva na coleção 'characters' usando o UID do usuário
       await setDoc(doc(db, "characters", auth.currentUser.uid), {
         uid: auth.currentUser.uid,
         email: auth.currentUser.email,
@@ -143,13 +139,12 @@ const CharacterCreation = () => {
         createdAt: serverTimestamp()
       });
 
-      console.log(`Personagem Criado e Salvo: ${charName}`);
-      // REDIRECIONA PARA A TELA DO JOGADOR
-      navigate('/jogador-vtt'); 
+      console.log(`Personagem Criado: ${charName}`);
+      navigate('/jogador-vtt'); // FORÇA IR PARA O VTT DO JOGADOR
 
     } catch (error) {
       console.error("Erro ao salvar personagem:", error);
-      alert("Falha ao invocar personagem no banco de dados.");
+      alert("Falha ao invocar personagem.");
     }
   };
 
@@ -157,8 +152,6 @@ const CharacterCreation = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      
-      {/* CSS DO MODAL DE NOME (Estilo Dourado/Pergaminho) */}
       <style>{`
         @keyframes scaleIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .rpg-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
