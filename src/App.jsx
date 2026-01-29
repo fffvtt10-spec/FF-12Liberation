@@ -103,6 +103,8 @@ export default function App() {
 
       <Route path="/admin-login" element={<AdminLoginPage />} />
 
+      <Route path="/jogador-vtt" element={<JogadorVttPage />} />
+
       {/* PROTEGENDO A PÁGINA ADMIN (Passando o usuário atualizado) */}
       <Route 
         path="/admin" 

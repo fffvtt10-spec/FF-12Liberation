@@ -49,13 +49,29 @@ export default function LoginPage() {
         if (userData.role === 'mestre') {
           navigate('/mestre'); 
         } else {
-          // Jogadores são redirecionados para a tela de Criação de Personagem
-          navigate('/create-character'); 
+          // É JOGADOR: Verifica se já tem personagem criado antes de redirecionar
+          const charRef = doc(db, "characters", user.uid);
+          const charSnap = await getDoc(charRef);
+
+          if (charSnap.exists()) {
+             // Se já tem ficha, vai para o jogo
+             navigate('/jogador-vtt');
+          } else {
+             // Se não tem, vai para a criação
+             navigate('/create-character'); 
+          }
         }
       } else {
-        // Se o usuário existe no Auth mas não no Firestore, 
-        // manda para criação de personagem para criar o registro
-        navigate('/create-character');
+        // Fallback: Se o usuário existe no Auth mas não na tabela users
+        // Verifica também se tem personagem por segurança
+        const charRef = doc(db, "characters", user.uid);
+        const charSnap = await getDoc(charRef);
+
+        if (charSnap.exists()) {
+           navigate('/jogador-vtt');
+        } else {
+           navigate('/create-character');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -65,7 +81,7 @@ export default function LoginPage() {
 
   return (
     <div className="login-container">
-      {/* --- AUDIO DE FUNDO (SÓ TOCA NO LOGIN COM VOLUME 50%) --- */}
+      {/* --- AUDIO DE FUNDO (SÓ TOCA NO LOGIN COM VOLUME 20%) --- */}
       {/* O React desmontará este elemento ao mudar de página, parando a música */}
       <audio ref={audioRef} autoPlay loop>
         <source src={musicaLogin} type="audio/mp3" />

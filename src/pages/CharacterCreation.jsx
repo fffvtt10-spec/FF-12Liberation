@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
 import bgCharacter from '../assets/fundo-character.jpg';
+// IMPORTS DO FIREBASE
 import { db, auth } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
@@ -33,7 +34,8 @@ const CharacterCreation = () => {
             
             if (docSnap.exists()) {
                 console.log("Personagem já existe. Redirecionando...");
-                navigate('/jogador-vtt'); // VAI PRO VTT, NÃO PRA LANDING
+                // AGORA VAI FUNCIONAR PORQUE A ROTA EXISTE NO APP.JSX
+                navigate('/jogador-vtt'); 
             }
         } catch (error) {
             console.error("Erro ao verificar personagem:", error);
@@ -129,6 +131,7 @@ const CharacterCreation = () => {
     if (!charName.trim() || !auth.currentUser) return;
 
     try {
+      // Salva na coleção 'characters' usando o UID do usuário
       await setDoc(doc(db, "characters", auth.currentUser.uid), {
         uid: auth.currentUser.uid,
         email: auth.currentUser.email,
@@ -140,11 +143,11 @@ const CharacterCreation = () => {
       });
 
       console.log(`Personagem Criado: ${charName}`);
-      navigate('/jogador-vtt'); // FORÇA IR PARA O VTT DO JOGADOR
+      navigate('/jogador-vtt'); // VAI FUNCIONAR AGORA
 
     } catch (error) {
       console.error("Erro ao salvar personagem:", error);
-      alert("Falha ao invocar personagem.");
+      alert("Falha ao invocar personagem no banco de dados.");
     }
   };
 
@@ -152,6 +155,8 @@ const CharacterCreation = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
+      
+      {/* CSS DO MODAL DE NOME (Estilo Dourado/Pergaminho) */}
       <style>{`
         @keyframes scaleIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .rpg-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
