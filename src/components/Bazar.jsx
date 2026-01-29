@@ -32,9 +32,12 @@ export default function Bazar({ isMestre, playerData }) {
 
   useEffect(() => {
     if (!isOpen || !isMestre) return;
+    // Pega itens do cofre para o mestre colocar a venda (apenas os sem dono)
     const q = query(collection(db, "game_items"), where("status", "==", "vault"), orderBy("nome", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      setVaultItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Filtra apenas os que não tem dono para venda geral
+      const available = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.ownerId);
+      setVaultItems(available);
     });
     return () => unsub();
   }, [isOpen, isMestre]);
@@ -110,8 +113,6 @@ export default function Bazar({ isMestre, playerData }) {
             await updateDoc(charRef, { character_sheet: updatedSheet });
 
             // 2. Atualiza o item para "solicitado"
-            // O Prompt diz: "botão de compra vira 'solicitado' e vai pro bazar do mestre"
-            // Vou usar um status intermediário 'requested'
             await updateDoc(doc(db, "game_items", item.id), { 
                 status: 'requested', 
                 ownerId: auth.currentUser.uid, 
@@ -140,22 +141,18 @@ export default function Bazar({ isMestre, playerData }) {
   }, [isMestre, isOpen]);
 
   const handleApprovePurchase = async (item) => {
-      // Move para o inventário do jogador (Lógica simplificada: item ganha status 'inventory')
-      // O Prompt diz "vai pro inventário e o mestre encaixa". 
-      // Então vamos mudar status para 'inventory'. O mestre depois edita a ficha pra por no slot se quiser.
-      // E também adicionamos o item na array de itens da ficha do jogador (Duplicidade de dados, mas segura para visualização rápida na ficha)
+      // ALTERAÇÃO: Item volta para 'vault' mas mantém o ownerId
+      // Isso permite que ele apareça na Forja (marcado) e na Ficha do Jogador (filtrado)
       
       try {
-          // 1. Atualiza status do item global
-          await updateDoc(doc(db, "game_items", item.id), { status: 'inventory', updatedAt: serverTimestamp() });
+          await updateDoc(doc(db, "game_items", item.id), { 
+              status: 'vault', // Volta para o banco de dados da forja
+              ownerId: item.ownerId, // Mantém o dono definido na compra
+              buyerName: item.buyerName, // Mantém nome para exibição na forja
+              updatedAt: serverTimestamp() 
+          });
           
-          // 2. Adiciona na ficha do jogador (Array items)
-          // Precisamos ler a ficha do jogador dono (ownerId)
-          // Isso seria complexo aqui sem ler o banco. Vamos assumir que o item com status 'inventory' já é suficiente pro sistema global,
-          // mas para aparecer na ficha JSON, o mestre teria que adicionar manualmente ou implementamos uma cloud function.
-          // Para simplificar e seguir o prompt "o mestre encaixa", apenas aprovamos a venda aqui.
-          
-          alert(`Venda aprovada! O item agora pertence a ${item.buyerName}.`);
+          alert(`Venda aprovada! O item "${item.nome}" foi enviado para o Cofre Pessoal de ${item.buyerName}.`);
       } catch (e) {
           alert("Erro ao aprovar.");
       }
@@ -186,7 +183,7 @@ export default function Bazar({ isMestre, playerData }) {
           <div className="bazar-modal-centered" onClick={e => e.stopPropagation()}>
             
             <div className="bazar-header">
-              <h2>MERCADO NEGRO</h2>
+              <h2>BAZAR</h2>
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
             </div>
 

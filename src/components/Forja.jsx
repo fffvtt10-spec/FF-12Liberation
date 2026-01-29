@@ -20,7 +20,7 @@ export default function Forja() {
   useEffect(() => {
     if (!isOpen) return;
     
-    // Filtra apenas itens que NÃO estão no bazar e NEM com jogadores
+    // Mostra itens que estão no cofre (incluindo os comprados que voltaram pra cá)
     const q = query(
         collection(db, "game_items"), 
         where("status", "==", "vault"), 
@@ -65,7 +65,6 @@ export default function Forja() {
   };
 
   const handleDelete = async (id) => {
-    // AQUI É O ÚNICO LUGAR QUE DELETA DO BANCO REALMENTE
     if (window.confirm("ATENÇÃO: Isso destruirá o item permanentemente. Deseja continuar?")) {
       await deleteDoc(doc(db, "game_items", id));
     }
@@ -132,8 +131,14 @@ export default function Forja() {
                   <div className="item-img" style={{backgroundImage: `url(${item.imagem || 'https://via.placeholder.com/150?text=?'})`}}></div>
                   <div className="item-info">
                     <h4>{item.nome}</h4>
+                    {/* ETIQUETA DE DONO (NOVO) */}
+                    {item.ownerId && (
+                        <div className="owner-tag">
+                            COMPRADO POR: {item.buyerName || "Jogador"}
+                        </div>
+                    )}
                     <p className="desc">{item.descricao}</p>
-                    <small style={{color: '#666'}}>Status: Cofre</small>
+                    <small style={{color: '#666'}}>Status: {item.ownerId ? "Cofre Pessoal" : "Cofre Global"}</small>
                   </div>
                   <div className="item-actions">
                     <button className="btn-icon edit" onClick={() => handleEditClick(item)} title="Editar">🔨</button>
@@ -189,6 +194,9 @@ export default function Forja() {
         .item-info { flex: 1; }
         .item-info h4 { margin: 0 0 5px 0; color: #fff; font-size: 18px; }
         .item-info .desc { margin: 0; color: #aaa; font-size: 12px; font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        /* NOVA ETIQUETA DE DONO */
+        .owner-tag { background: #00f2ff; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
 
         .item-actions { display: flex; gap: 8px; margin-left: 15px; }
         .btn-icon { background: transparent; border: 1px solid #444; color: #fff; padding: 8px; cursor: pointer; border-radius: 4px; }

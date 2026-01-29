@@ -80,12 +80,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
-  // --- CORREÇÃO DE PERSISTÊNCIA ---
-  // Esse Effect garante que se os dados vierem do banco (MestrePage), o estado local atualiza.
-  // Isso resolve o problema de abrir a ficha e ela estar "limpa" ou desatualizada.
+  // Efeito para atualizar a ficha do JOGADOR em tempo real quando o mestre salvar
   useEffect(() => {
     if (characterData && characterData.character_sheet) {
-        // Atualiza o sheet local com os dados vindos da prop (que vem do Firestore via MestrePage)
         setSheet(characterData.character_sheet);
     }
   }, [characterData]); 
@@ -126,9 +123,18 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const handleOpenForgeSelector = async (slotIndex) => {
       if(!isMaster) return;
       setActiveSlotIndex(slotIndex);
+      
+      // ALTERAÇÃO: Busca itens 'vault'
       const q = query(collection(db, "game_items"), where("status", "==", "vault"));
       const snap = await getDocs(q);
-      setForgeItems(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      const allVaultItems = snap.docs.map(d => ({id: d.id, ...d.data()}));
+
+      // FILTRO: Itens sem dono (Globais) OU Itens do próprio jogador
+      const filteredItems = allVaultItems.filter(item => {
+          return !item.ownerId || item.ownerId === (characterData.uid || characterData.id);
+      });
+
+      setForgeItems(filteredItems);
       setShowForgeSelector(true);
   };
 
@@ -161,7 +167,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       if(slot.item_id) {
           if(window.confirm("Isso devolverá o item para a Forja (Cofre). Confirmar?")) {
               const itemRef = doc(db, "game_items", slot.item_id);
-              await updateDoc(itemRef, { status: 'vault', ownerId: null, slotIndex: null, updatedAt: serverTimestamp() });
+              // Mantém o ownerId se o item já tinha dono, para voltar pro cofre pessoal dele
+              // Se foi global, volta pra global. Mas como saber?
+              // Lógica simplificada: Se foi equipado, volta pro 'vault' mas mantém o owner atual (que é o charData.id)
+              // Assim, ele volta pro cofre pessoal desse jogador.
+              await updateDoc(itemRef, { status: 'vault', slotIndex: null, updatedAt: serverTimestamp() });
           }
       }
       
@@ -218,6 +228,17 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             onSave={uploadCallback} 
             label={uploadLabel} 
         />
+
+        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
+        {isMaster && hasUnsavedChanges && (
+            <button 
+                className="save-fab glowing" 
+                onClick={saveSheetToDb}
+                title="Salvar Alterações"
+            >
+                💾
+            </button>
+        )}
 
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
@@ -405,7 +426,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     </div>
                 </>
             ) : (
-                // --- ABA DE HABILIDADES ---
+                // --- ABA DE HABILIDADES (Mantida) ---
                 <div className="skills-tab-content">
                     <div className="skills-col">
                         <h3 className="class-header">
@@ -459,17 +480,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             )}
         </div>
 
-        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
-        {isMaster && hasUnsavedChanges && (
-            <button 
-                className="save-fab glowing" 
-                onClick={saveSheetToDb}
-                title="Salvar Alterações"
-            >
-                💾
-            </button>
-        )}
-
         {/* MODAL SELETOR DE ITENS DA FORJA */}
         {showForgeSelector && (
             <div className="item-selector-overlay" onClick={() => setShowForgeSelector(false)}>
@@ -482,6 +492,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 <img src={item.imagem} alt={item.nome} />
                                 <div>
                                     <strong>{item.nome}</strong>
+                                    {/* Exibe se é do próprio jogador */}
+                                    {item.ownerId && <small style={{color:'#0f0'}}> (Seu Item)</small>}
                                     <p>{item.descricao.substring(0, 40)}...</p>
                                 </div>
                             </div>
