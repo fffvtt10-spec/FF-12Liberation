@@ -33,19 +33,25 @@ export default function MestrePage() {
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
-  // Estado para armazenar os personagens reais do banco
   const [personagensDb, setPersonagensDb] = useState([]);
 
+  // Modais
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
+  
+  // Visualizações
   const [showDetails, setShowDetails] = useState(null); 
   const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
+  const [viewMembers, setViewMembers] = useState(null); // Estado para ver membros da sessão
 
+  // Resenha
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
+  
+  // Sessão
   const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
 
   const [form, setForm] = useState({
@@ -87,7 +93,6 @@ export default function MestrePage() {
         setSessoes(loadedSessoes);
     });
 
-    // BUSCAR PERSONAGENS REAIS
     const fetchChars = async () => {
         const snap = await getDocs(collection(db, "characters"));
         setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -155,7 +160,7 @@ export default function MestrePage() {
             mestreId: auth.currentUser.uid,
             dataInicio: sessionForm.dataInicio,
             expiraEm: fim.toISOString(),
-            participantes: sessaoDestinatarios, // Nomes dos personagens selecionados
+            participantes: sessaoDestinatarios, 
             cenarios: sessionForm.cenarios,
             tokens: sessionForm.tokens,
             createdAt: serverTimestamp()
@@ -202,7 +207,6 @@ export default function MestrePage() {
                   <h4>{m.nome}</h4>
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
                   
-                  {/* EXIBIR CANDIDATOS PARA O MESTRE VER */}
                   {m.candidatos && m.candidatos.length > 0 && (
                     <div className="candidates-mini-box">
                        <strong>Candidatos:</strong>
@@ -267,6 +271,7 @@ export default function MestrePage() {
                                🖼️ {s.cenarios?.length || 0} Cenários • ♟️ {s.tokens?.length || 0} Tokens
                            </div>
                            <div className="poster-actions" style={{marginTop: '15px'}}>
+                               <button className="btn-cyan" onClick={() => setViewMembers(s)}>👥 MEMBROS</button>
                                <button className="btn-play-vtt" onClick={() => enterVTT(s)}>▶ ACESSAR VTT</button>
                                <button className="btn-red" onClick={() => deleteDoc(doc(db, "sessoes", s.id))}>CANCELAR</button>
                            </div>
@@ -284,6 +289,7 @@ export default function MestrePage() {
           <div className="ff-modal-scrollable ff-card">
             <h3 className="modal-title-ff">NOVA MISSÃO</h3>
             <form onSubmit={handleCreateMission}>
+              {/* Campos da Missão omitidos para brevidade, mantenha os que já existem */}
               <div className="modal-input-group">
                 <label>NOME DA MISSÃO</label>
                 <input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
@@ -347,7 +353,38 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO DE SESSÃO (AGORA USA PERSONAGENS REAIS) */}
+      {/* MODAL DE CRIAÇÃO DE RESENHA */}
+      {showResenhaModal && (
+        <div className="ff-modal-overlay-fixed">
+          <div className="ff-modal-scrollable ff-card">
+            <h3 className="modal-title-ff">ESCREVER CRÔNICA</h3>
+            <div className="modal-input-group">
+               <label>TÍTULO DA CRÔNICA</label>
+               <input className="ff-modal-input-dark" placeholder="Título..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
+            </div>
+            <div className="modal-input-group">
+               <label>CORPO DO TEXTO</label>
+               <textarea className="tall-area-ff-dark" placeholder="Use **texto** para negrito." value={resenha} onChange={(e) => setResenha(e.target.value)} />
+            </div>
+            <div className="player-selector-box-fixed">
+              <label>DESTINATÁRIOS:</label>
+              <div className="destinatarios-grid-fixed">
+                {personagensDb.length > 0 ? personagensDb.map(p => (
+                  <label key={p.id} className="chip-label-ff">
+                    <input type="checkbox" checked={destinatarios.includes(p.name)} onChange={() => destinatarios.includes(p.name) ? setDestinatarios(destinatarios.filter(x=>x!==p.name)) : setDestinatarios([...destinatarios, p.name])} /> {p.name}
+                  </label>
+                )) : <p>Nenhum personagem disponível.</p>}
+              </div>
+            </div>
+            <div className="btn-group-ff">
+              <button className="btn-forjar-main" onClick={publicarResenha}>PUBLICAR</button>
+              <button className="btn-cancelar-main" onClick={() => setShowResenhaModal(false)}>FECHAR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CRIAÇÃO DE SESSÃO */}
       {showSessionModal && (
           <div className="ff-modal-overlay-fixed">
               <div className="ff-modal-scrollable ff-card">
@@ -384,44 +421,20 @@ export default function MestrePage() {
 
                       <div className="upload-section-box">
                           <h4 className="upload-section-title">IMPORTAR IMAGENS (IMGUR)</h4>
-                          
                           <div className="link-import-row">
-                              <input 
-                                className="ff-input-dark" 
-                                placeholder="Cole o link da imagem aqui..." 
-                                value={tempLink} 
-                                onChange={e => setTempLink(e.target.value)} 
-                              />
+                              <input className="ff-input-dark" placeholder="Cole o link da imagem aqui..." value={tempLink} onChange={e => setTempLink(e.target.value)} />
                               <select className="ff-select-dark small-select" value={tempType} onChange={e => setTempType(e.target.value)}>
                                   <option value="cenario">Cenário</option>
                                   <option value="token">Token</option>
                               </select>
                               <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
                           </div>
-
                           <div className="assets-lists">
                               {sessionForm.cenarios.length > 0 && (
-                                <div className="asset-group">
-                                    <label>CENÁRIOS:</label>
-                                    {sessionForm.cenarios.map((link, i) => (
-                                        <div key={i} className="asset-item">
-                                            <span className="truncate-link">{link}</span>
-                                            <button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenario', i)}>×</button>
-                                        </div>
-                                    ))}
-                                </div>
+                                <div className="asset-group"><label>CENÁRIOS:</label>{sessionForm.cenarios.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenario', i)}>×</button></div>))}</div>
                               )}
-
                               {sessionForm.tokens.length > 0 && (
-                                <div className="asset-group">
-                                    <label>TOKENS:</label>
-                                    {sessionForm.tokens.map((link, i) => (
-                                        <div key={i} className="asset-item">
-                                            <span className="truncate-link">{link}</span>
-                                            <button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('token', i)}>×</button>
-                                        </div>
-                                    ))}
-                                </div>
+                                <div className="asset-group"><label>TOKENS:</label>{sessionForm.tokens.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('token', i)}>×</button></div>))}</div>
                               )}
                           </div>
                       </div>
@@ -435,7 +448,25 @@ export default function MestrePage() {
           </div>
       )}
 
-      {/* MODAL DE DETALHES */}
+      {/* MODAL DE MEMBROS DA SESSÃO */}
+      {viewMembers && (
+        <div className="ff-modal-overlay-fixed" onClick={() => setViewMembers(null)}>
+           <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{height: 'auto', maxHeight: '500px'}}>
+              <h3 className="modal-title-ff">MEMBROS ALOCADOS</h3>
+              <p style={{color: '#aaa', marginBottom: '20px'}}>Personagens selecionados para esta sessão:</p>
+              <div className="destinatarios-grid-fixed">
+                 {viewMembers.participantes?.length > 0 ? viewMembers.participantes.map((nome, idx) => (
+                    <div key={idx} className="chip-label-ff" style={{cursor: 'default', color: '#fff', borderColor: '#00f2ff'}}>
+                       👤 {nome}
+                    </div>
+                 )) : <p>Nenhum membro alocado ainda.</p>}
+              </div>
+              <button className="btn-cancelar-main" style={{marginTop: '20px', width: '100%'}} onClick={() => setViewMembers(null)}>FECHAR</button>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL DE DETALHES DA MISSÃO */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
@@ -491,6 +522,17 @@ export default function MestrePage() {
         </div>
       )}
 
+      {/* VISUALIZAR CARTAZ */}
+      {viewImage && (
+        <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
+          <div className="lightbox-wrap">
+            <button className="close-lightbox" onClick={() => setViewImage(null)}>×</button>
+            <img src={viewImage} alt="Cartaz" className="cartaz-full-view" />
+          </div>
+        </div>
+      )}
+
+      {/* VISUALIZAR RESENHA */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -504,45 +546,32 @@ export default function MestrePage() {
         </div>
       )}
 
-      {viewImage && (
-        <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
-          <div className="lightbox-wrap">
-            <button className="close-lightbox" onClick={() => setViewImage(null)}>×</button>
-            <img src={viewImage} alt="Cartaz" className="cartaz-full-view" />
-          </div>
-        </div>
-      )}
-
       {/* --- BOTÕES FLUTUANTES (Forja e Bazar) --- */}
       <Forja /> 
       <Bazar isMestre={true} />
 
       <style>{`
+        /* ESTILOS MANTIDOS E UNIFICADOS DO ARQUIVO ANTERIOR */
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
         .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
         .mestre-content { position: relative; z-index: 1; padding: 30px; }
         .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; margin-bottom: 30px; font-size: 2.5rem; }
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
-        
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
         .card-header.no-border { border-bottom: none; }
         .board-column { height: 600px; display: flex; flex-direction: column; }
-
         .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; }
         .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 5px 10px; font-weight: bold; font-family: 'serif'; outline: none; }
-
         .mission-scroll { flex: 1; overflow-y: auto; padding-right: 8px; }
         .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
         .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
         .candidates-mini-box { margin-top: 8px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; }
-
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         .sanchez-header-top.no-border { border-bottom: none; }
         .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
-
         .sessao-card { background: linear-gradient(135deg, rgba(20,20,50,0.9), rgba(0,0,20,0.9)); border: 1px solid #00f2ff; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,242,255,0.1); }
         .sessao-status { font-size: 10px; color: #f44; font-weight: bold; margin-bottom: 8px; animation: pulse 2s infinite; }
         .sessao-title { color: #fff; font-size: 18px; margin: 0 0 10px 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
@@ -550,14 +579,11 @@ export default function MestrePage() {
         .sessao-assets-count { font-size: 11px; color: #ffcc00; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; display: inline-block; }
         .btn-play-vtt { background: #00f2ff; color: #000; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; flex: 1; margin-right: 10px; transition: 0.3s; }
         .btn-play-vtt:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
-        
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-
         .upload-section-box { border: 1px dashed #444; padding: 15px; margin: 20px 0; background: rgba(0,0,0,0.3); }
         .upload-section-title { color: #00f2ff; font-size: 12px; margin-bottom: 15px; border-bottom: 1px solid #00f2ff; padding-bottom: 5px; display: inline-block; }
         .ff-select-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; }
         .ff-input-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; color-scheme: dark; }
-
         .link-import-row { display: flex; gap: 10px; margin-bottom: 15px; }
         .small-select { width: 120px; }
         .assets-lists { display: flex; flex-direction: column; gap: 10px; }
@@ -566,23 +592,18 @@ export default function MestrePage() {
         .asset-item { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #ddd; margin-bottom: 4px; }
         .truncate-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
         .btn-remove-x { background: transparent; border: none; color: #f44; font-weight: bold; cursor: pointer; font-size: 14px; }
-
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.94); z-index: 99999; display: flex; align-items: center; justify-content: center; }
         .ff-modal-scrollable { width: 550px; max-height: 90vh; overflow-y: auto; background: #000c1d; border: 2px solid #ffcc00; padding: 35px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
         .modal-title-ff { color: #fff; font-size: 22px; border-bottom: 1px solid #ffcc00; padding-bottom: 10px; margin-bottom: 20px; letter-spacing: 2px; }
-        
         .modal-input-group { margin-bottom: 20px; }
         .modal-input-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
         .modal-input-group input { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; font-size: 14px; }
-        
         .row-double-ff { display: flex; gap: 20px; margin-bottom: 20px; }
         .field-group { flex: 1; display: flex; flex-direction: column; }
         .field-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; }
         .field-group input, .field-group select { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; font-family: 'serif'; outline: none; }
-        
         .tall-area-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; height: 110px; resize: none; font-family: 'serif'; outline: none; }
         .tall-area-ff-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #fff; padding: 15px; height: 250px; resize: none; font-family: 'serif'; outline: none; font-size: 16px; border-radius: 4px; }
-        
         .detail-view-main { width: 600px; background: #000814; border: 1px solid #ffcc00; padding: 0; box-shadow: 0 0 40px rgba(255, 204, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; }
         .detail-header-modern { background: linear-gradient(90deg, #1a1a1a 0%, #000 100%); padding: 25px 30px; display: flex; align-items: center; border-bottom: 1px solid #333; gap: 20px; }
         .detail-rank-badge { font-size: 32px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); border: 2px solid #ffcc00; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.5); }
@@ -602,7 +623,6 @@ export default function MestrePage() {
         .reward-item { color: #aaa; font-size: 14px; margin-bottom: 4px; font-style: italic; }
         .ff-final-close-btn { width: 100%; background: #111; color: #fff; border: none; border-top: 1px solid #333; padding: 20px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; transition: 0.2s; }
         .ff-final-close-btn:hover { background: #222; color: #ffcc00; }
-        
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
         .papiro-real-container { width: 1000px; height: 800px; max-width: 95vw; max-height: 95vh; background-size: 100% 100%; background-repeat: no-repeat; padding: 110px 160px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); opacity: 0.9; }
@@ -611,7 +631,6 @@ export default function MestrePage() {
         .papiro-body-real::-webkit-scrollbar { display: none; }
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
-
         .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
         .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
         .ff-add-btn-gold-small:hover { background: #ffcc00; color: #000; box-shadow: 0 0 15px #ffcc00; }
@@ -620,15 +639,12 @@ export default function MestrePage() {
         .btn-group-ff { display: flex; gap: 20px; margin-top: 25px; }
         .btn-forjar-main { flex: 1; background: #ffcc00; color: #000; border: none; padding: 14px; font-weight: bold; cursor: pointer; font-size: 14px; text-transform: uppercase; }
         .btn-cancelar-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
-        
         .player-selector-box-fixed { margin: 25px 0; border-top: 1px solid #333; padding-top: 15px; }
         .destinatarios-grid-fixed { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
         .chip-label-ff { background: rgba(0, 10, 30, 0.8); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 18px; border-radius: 4px; font-size: 12px; cursor: pointer; display: inline-block; }
-
         .mission-timer { font-size: 12px; color: #00f2ff; display: block; margin-top: 10px; font-weight: bold; letter-spacing: 1px; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }

@@ -45,12 +45,15 @@ export default function AdminPage() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     const adminEmail = 'fffvtt10@gmail.com'; 
-    const adminPassOriginal = 'SUA_SENHA_AQUI'; // Coloque sua senha ou use uma variavel
+    // !!! ATENÇÃO !!! VOCÊ PRECISA COLOCAR A SENHA REAL AQUI ABAIXO !!!
+    const adminPassOriginal = 'SUA_SENHA_AQUI'; 
 
     try {
+      // 1. Cria usuário (Desloga o admin)
       const userCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
       const user = userCredential.user;
 
+      // 2. Salva no banco
       await setDoc(doc(db, "users", user.uid), {
         email: newEmail,
         role: newRole,
@@ -59,11 +62,12 @@ export default function AdminPage() {
       });
 
       alert("Usuário invocado! Reconectando Admin...");
+      // 3. Reloga o admin (Isso quebrava sem a senha correta)
       await login(adminEmail, adminPassOriginal); 
       
       setNewEmail(''); setNewPassword(''); fetchData();
     } catch (err) {
-      alert("Erro no processo: " + err.message);
+      alert("Erro no processo (Verifique a senha no código!): " + err.message);
     }
   };
 
@@ -71,7 +75,7 @@ export default function AdminPage() {
     if (window.confirm(`Deseja banir permanentemente ${email} do Éter?`)) {
       try {
         await deleteDoc(doc(db, "users", id));
-        // Tenta deletar o personagem associado também, se existir
+        // Tenta deletar o personagem associado também
         await deleteDoc(doc(db, "characters", id)); 
         alert("Conta e personagem banidos com sucesso.");
         fetchData();
@@ -81,10 +85,22 @@ export default function AdminPage() {
     }
   };
 
-  // Encontra o personagem associado ao UID do usuário
+  // NOVA FUNÇÃO: Deleta APENAS o personagem, mantendo a conta
+  const handleDeleteChar = async (uid) => {
+    if (window.confirm("Tem certeza que deseja apagar APENAS o personagem deste usuário? Ele terá que criar outro.")) {
+      try {
+        await deleteDoc(doc(db, "characters", uid));
+        alert("Personagem deletado. O usuário continua ativo.");
+        fetchData();
+      } catch (err) {
+        alert("Erro ao deletar personagem: " + err.message);
+      }
+    }
+  };
+
   const getCharName = (uid) => {
     const char = characters.find(c => c.uid === uid);
-    return char ? `Personagem: ${char.name} (${char.class})` : "Sem Personagem";
+    return char ? char : null;
   };
 
   const handleUpdateAdminPass = async () => {
@@ -124,23 +140,37 @@ export default function AdminPage() {
           <div className="ff-card fade-in">
             <h3>VIAJANTES E MESTRES</h3>
             <div className="list-box">
-              {users.map(u => (
-                <div key={u.id} className="item">
-                  <div style={{flex: 1}}>
-                    <span className={`badge ${u.role}`}>{u.role.toUpperCase()}</span>
-                    <p className="email-text">{u.email}</p>
-                    {/* Mostra o nome do personagem aqui */}
-                    <p style={{fontSize: '10px', color: '#ffcc00', margin: '2px 10px'}}>{getCharName(u.id)}</p>
+              {users.map(u => {
+                const charInfo = getCharName(u.id);
+                return (
+                  <div key={u.id} className="item">
+                    <div style={{flex: 1}}>
+                      <span className={`badge ${u.role}`}>{u.role.toUpperCase()}</span>
+                      <p className="email-text">{u.email}</p>
+                      
+                      {/* Exibir Personagem com botão de exclusão independente */}
+                      {charInfo && (
+                        <div style={{display: 'flex', alignItems: 'center', marginTop: '4px'}}>
+                           <span style={{fontSize: '10px', color: '#ffcc00', marginRight: '10px'}}>
+                             ⚔️ {charInfo.name} ({charInfo.class})
+                           </span>
+                           <button className="btn-mini-del" onClick={() => handleDeleteChar(u.id)} title="Apagar Personagem">
+                             💀 Excluir Char
+                           </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="btn-group">
+                      <button onClick={() => {
+                        sendPasswordResetEmail(auth, u.email);
+                        alert("E-mail de reset enviado.");
+                      }}>RESET</button>
+                      <button className="del" onClick={() => handleDeleteUser(u.id, u.email)}>BANIR</button>
+                    </div>
                   </div>
-                  <div className="btn-group">
-                    <button onClick={() => {
-                      sendPasswordResetEmail(auth, u.email);
-                      alert("E-mail de reset enviado.");
-                    }}>RESET</button>
-                    <button className="del" onClick={() => handleDeleteUser(u.id, u.email)}>BANIR</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -162,18 +192,20 @@ export default function AdminPage() {
         .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; }
         .ff-card { background: rgba(0, 10, 30, 0.85); border: 1px solid rgba(0, 242, 255, 0.5); padding: 25px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,242,255,0.1); backdrop-filter: blur(10px); }
         h3 { color: #00f2ff; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-        .item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #111; }
-        .email-text { font-size: 11px; color: #ccc; margin: 0 10px; flex-grow: 1; overflow: hidden; text-overflow: ellipsis; }
+        .item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #111; }
+        .email-text { font-size: 11px; color: #ccc; margin: 2px 0; overflow: hidden; text-overflow: ellipsis; }
         .badge { font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: bold; color: #000; }
         .badge.mestre { background: #ffcc00; }
         .badge.jogador { background: #00f2ff; }
-        .btn-group { display: flex; gap: 8px; }
+        .btn-group { display: flex; gap: 8px; align-items: center; }
         input, select { background: rgba(0,0,0,0.8); border: 1px solid #444; color: #fff; padding: 12px; width: 100%; margin-bottom: 15px; outline: none; transition: 0.3s; }
         input:focus { border-color: #ffcc00; }
         button { background: transparent; border: 1px solid #00f2ff; color: #fff; padding: 8px 15px; cursor: pointer; transition: 0.3s; font-size: 11px; }
         button:hover { background: #fff; color: #000; box-shadow: 0 0 10px #fff; }
         button.del { border-color: #ff4444; color: #ff4444; }
         button.del:hover { background: #ff4444; color: white; border-color: #ff4444; }
+        .btn-mini-del { padding: 2px 6px; font-size: 9px; border-color: #ff4444; color: #ff4444; margin-left: 0; }
+        .btn-mini-del:hover { background: #ff4444; color: #fff; }
         .list-box { max-height: 250px; overflow-y: auto; }
         .list-box::-webkit-scrollbar { width: 4px; }
         .list-box::-webkit-scrollbar-thumb { background: #00f2ff; }

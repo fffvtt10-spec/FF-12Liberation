@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
 import bgCharacter from '../assets/fundo-character.jpg';
-// IMPORTS DO FIREBASE ADICIONADOS
+// IMPORTS DO FIREBASE
 import { db, auth } from '../firebase';
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
@@ -24,7 +24,26 @@ const CharacterCreation = () => {
 
   const races = racesData.races;
 
-  // 1. Limpeza de Audio
+  // 1. VERIFICAÇÃO DE SEGURANÇA: Se já tem personagem, expulsa para a Home do Jogador
+  useEffect(() => {
+    const checkExistingCharacter = async () => {
+        if (!auth.currentUser) return;
+        try {
+            const docRef = doc(db, "characters", auth.currentUser.uid);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                // Já tem personagem! Não deixa criar outro.
+                navigate('/jogador-vtt');
+            }
+        } catch (error) {
+            console.error("Erro ao verificar personagem:", error);
+        }
+    };
+    checkExistingCharacter();
+  }, [navigate]);
+
+  // 2. Limpeza de Audio
   useEffect(() => {
     const stopAudio = () => {
       const audioElements = document.querySelectorAll('audio, video');
@@ -43,7 +62,7 @@ const CharacterCreation = () => {
     return () => clearTimeout(timeout);
   }, []);
 
-  // 2. Centralização do Carousel
+  // 3. Centralização do Carousel
   useEffect(() => {
     if (viewState === 'carousel' && carouselRef.current) {
       const itemSize = 300; 
@@ -53,7 +72,7 @@ const CharacterCreation = () => {
     }
   }, [activeIndex, viewState]);
 
-  // 3. Scroll RÁPIDO
+  // 4. Scroll RÁPIDO
   const handleWheelScroll = (e) => {
     if (carouselRef.current) {
       carouselRef.current.scrollLeft += e.deltaY * 4; 
@@ -113,8 +132,7 @@ const CharacterCreation = () => {
     if (!charName.trim() || !auth.currentUser) return;
 
     try {
-      // Salva na coleção 'characters' usando o UID do usuário como ID do documento
-      // Isso facilita buscar "o personagem deste usuário"
+      // Salva na coleção 'characters' usando o UID do usuário
       await setDoc(doc(db, "characters", auth.currentUser.uid), {
         uid: auth.currentUser.uid,
         email: auth.currentUser.email,
@@ -126,7 +144,7 @@ const CharacterCreation = () => {
       });
 
       console.log(`Personagem Criado e Salvo: ${charName}`);
-      // Redireciona para a nova página do jogador
+      // REDIRECIONA PARA A TELA DO JOGADOR
       navigate('/jogador-vtt'); 
 
     } catch (error) {
@@ -140,6 +158,7 @@ const CharacterCreation = () => {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       
+      {/* CSS DO MODAL DE NOME (Estilo Dourado/Pergaminho) */}
       <style>{`
         @keyframes scaleIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .rpg-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }

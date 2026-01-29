@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import Bazar from '../components/Bazar';
 
@@ -34,14 +34,15 @@ export default function JogadorVttPage() {
     });
 
     // 2. Ouvir Sessões onde o jogador foi incluído
-    // O Mestre adiciona o NOME do personagem ou UID no array 'participantes'
+    // O Mestre adiciona o NOME do personagem no array 'participantes'
     const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
     const unsubSessoes = onSnapshot(qSessoes, (snap) => {
       const agora = new Date();
       const sessoesValidas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => {
         const inicio = new Date(s.dataInicio);
         const fim = new Date(s.expiraEm);
-        return agora >= inicio && agora <= fim; // Só mostra se estiver no horário
+        // Mostra se estiver dentro do horário (ou um pouco antes/depois se quiser ajustar)
+        return agora >= inicio && agora <= fim; 
       });
       setSessoesAtivas(sessoesValidas);
     });
@@ -81,9 +82,9 @@ export default function JogadorVttPage() {
   };
 
   const enterVTT = (sessao) => {
-    // Aqui redirecionaria para a rota do VTT real
+    // Redirecionamento para a mesa de jogo (VTT)
+    // Se tiver uma rota específica, use navigate(`/vtt/${sessao.id}`)
     alert(`Entrando na sessão: ${sessao.missaoNome}\nBom jogo, ${personagem.name}!`);
-    // navigate(`/vtt/${sessao.id}`);
   };
 
   if (!personagem) return <div className="loading-screen">Carregando Grimório...</div>;
@@ -95,7 +96,6 @@ export default function JogadorVttPage() {
       {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
       <div className="char-hud">
         <div className="char-avatar">
-           {/* Imagem do personagem ou placeholder da classe */}
            <div className="avatar-circle">{personagem.name.charAt(0)}</div>
         </div>
         <div className="char-info">
@@ -123,7 +123,7 @@ export default function JogadorVttPage() {
            📜 QUADRO DE MISSÕES
         </button>
         <div className="dock-spacer"></div>
-        {/* O Bazar já tem seu botão flutuante, mas podemos integrá-lo aqui se quiser, ou deixar ele renderizar seu próprio botão */}
+        {/* O Bazar renderiza seu próprio botão flutuante, mas deixamos aqui logicamente */}
         <Bazar isMestre={false} /> 
       </div>
 
@@ -194,7 +194,6 @@ export default function JogadorVttPage() {
         .dock-btn { background: linear-gradient(to top, #3a2205, #5c3a0b); border: 2px solid #ffcc00; color: #ffcc00; padding: 15px 30px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 8px; font-family: 'Cinzel', serif; text-shadow: 0 2px 0 #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; }
         .dock-btn:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(255, 204, 0, 0.3); color: #fff; border-color: #fff; }
         
-        /* Estilos do Modal de Missões (Player) */
         .missions-list-player { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 20px; }
         .mission-poster-player { background: rgba(255,255,255,0.05); border: 1px solid #444; padding: 15px; border-radius: 4px; position: relative; }
         .mp-header { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 8px; }
@@ -212,6 +211,8 @@ export default function JogadorVttPage() {
         
         .btn-close-modal { width: 100%; background: #333; color: #fff; border: 1px solid #555; padding: 12px; margin-top: 20px; cursor: pointer; font-weight: bold; }
         .btn-close-modal:hover { background: #444; }
+        
+        .loading-screen { width: 100vw; height: 100vh; background: #000; color: #ffcc00; display: flex; align-items: center; justify-content: center; font-size: 24px; font-family: 'Cinzel', serif; }
       `}</style>
     </div>
   );
