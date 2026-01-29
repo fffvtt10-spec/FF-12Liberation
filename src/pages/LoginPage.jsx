@@ -16,11 +16,35 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [erro, setErro] = useState('');
 
-  // --- EFEITO PARA REDUZIR VOLUME ---
+  // --- FUNÇÃO PARA PARAR A MÚSICA IMEDIATAMENTE ---
+  const pararMusica = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  // --- EFEITO: VOLUME BAIXO + PLAY MANUAL ---
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = 0.2; // Define o volume em 20%
+      // 1. Define o volume ANTES de tocar (Coloquei 0.1 para garantir que comece suave)
+      audioRef.current.volume = 0.1; 
+      
+      // 2. Tenta tocar programaticamente
+      const playPromise = audioRef.current.play();
+      
+      // Tratamento de erro caso o navegador bloqueie o autoplay
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log("Autoplay bloqueado pelo navegador (interação necessária):", error);
+        });
+      }
     }
+
+    // 3. Garante que pare ao desmontar o componente (sair da tela)
+    return () => {
+      pararMusica();
+    };
   }, []);
 
   const handleLogin = async (e) => {
@@ -46,6 +70,9 @@ export default function LoginPage() {
         }
 
         // 4. Redirecionamento Atualizado
+        // PARAR A MÚSICA ANTES DE NAVEGAR
+        pararMusica();
+
         if (userData.role === 'mestre') {
           navigate('/mestre'); 
         } else {
@@ -63,9 +90,10 @@ export default function LoginPage() {
         }
       } else {
         // Fallback: Se o usuário existe no Auth mas não na tabela users
-        // Verifica também se tem personagem por segurança
         const charRef = doc(db, "characters", user.uid);
         const charSnap = await getDoc(charRef);
+        
+        pararMusica(); // Para a música
 
         if (charSnap.exists()) {
            navigate('/jogador-vtt');
@@ -79,11 +107,17 @@ export default function LoginPage() {
     }
   };
 
+  // Função para ir pro Admin (parando a música)
+  const irParaAdmin = () => {
+    pararMusica();
+    navigate('/admin-login');
+  };
+
   return (
     <div className="login-container">
-      {/* --- AUDIO DE FUNDO (SÓ TOCA NO LOGIN COM VOLUME 20%) --- */}
-      {/* O React desmontará este elemento ao mudar de página, parando a música */}
-      <audio ref={audioRef} autoPlay loop>
+      {/* --- AUDIO DE FUNDO --- */}
+      {/* REMOVIDO o atributo 'autoPlay' para controlar via código e evitar estouro de volume */}
+      <audio ref={audioRef} loop>
         <source src={musicaLogin} type="audio/mp3" />
       </audio>
 
@@ -138,7 +172,7 @@ export default function LoginPage() {
       {/* 3. BOTÃO DE ADMIN */}
       <button 
         className="admin-portal-btn" 
-        onClick={() => navigate('/admin-login')} 
+        onClick={irParaAdmin} 
         title="Acesso ao Narrador"
       >
         <img src={iconAdmin} alt="Portal Admin" />
