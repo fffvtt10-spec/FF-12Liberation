@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"; // Add arrayRemove
+import { onAuthStateChanged } from "firebase/auth"; 
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
@@ -54,73 +55,93 @@ export default function JogadorVttPage() {
     audioRef.current.volume = 0.2;
   }, []);
 
+  // PERSISTÊNCIA E CARREGAMENTO
   useEffect(() => {
-    const fetchChar = async () => {
-      if (!auth.currentUser) return;
-      const docRef = doc(db, "characters", auth.currentUser.uid);
-      const unsub = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists()) {
-              const data = docSnap.data();
-              const currentLevel = data.character_sheet?.basic_info?.level || 1;
-              if (prevLevelRef.current !== null && currentLevel > prevLevelRef.current) {
-                  setShowLevelUpModal(true);
-                  audioRef.current.currentTime = 0;
-                  audioRef.current.play().catch(e => console.log("Autoplay bloqueado:", e));
-              }
-              prevLevelRef.current = currentLevel;
-              setPersonagem(data);
-          }
-      });
-      return () => unsub();
-    };
-    fetchChar();
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            const docRef = doc(db, "characters", user.uid);
+            const unsubChar = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const currentLevel = data.character_sheet?.basic_info?.level || 1;
+                    if (prevLevelRef.current !== null && currentLevel > prevLevelRef.current) {
+                        setShowLevelUpModal(true);
+                        audioRef.current.currentTime = 0;
+                        audioRef.current.play().catch(e => console.log("Autoplay bloqueado:", e));
+                    }
+                    prevLevelRef.current = currentLevel;
+                    setPersonagem(data);
+                }
+            });
+
+            const qMissoes = query(collection(db, "missoes"));
+            const unsubMissoes = onSnapshot(qMissoes, (snap) => {
+                setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            });
+
+            return () => { unsubChar(); unsubMissoes(); };
+        }
+    });
+    return () => unsubscribeAuth();
   }, []);
+
+  // DADOS DEPENDENTES DO PERSONAGEM
+  useEffect(() => {
+      if (!personagem) return;
+      
+      const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
+      const unsubSessoes = onSnapshot(qSessoes, (snap) => {
+        const agora = new Date();
+        const todasSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const ativas = [];
+        const futuras = [];
+        todasSessoes.forEach(s => {
+            const inicio = new Date(s.dataInicio);
+            const fim = new Date(s.expiraEm);
+            if (agora >= inicio && agora <= fim) {
+                ativas.push(s);
+            } else if (agora < inicio) {
+                futuras.push(s);
+            }
+        });
+        setSessoesAtivas(ativas);
+        setSessoesFuturas(futuras);
+        if (currentVttSession) {
+            const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
+            if (sessionUpdated) {
+                setVttStatus('connected'); 
+            }
+        }
+      });
+
+      const qResenhas = query(collection(db, "resenhas"), where("destinatarios", "array-contains", personagem.name));
+      const unsubResenhas = onSnapshot(qResenhas, (snap) => {
+        const loadedResenhas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const agora = new Date();
+        const validas = loadedResenhas.filter(r => new Date(r.expiraEm) > agora);
+        setResenhas(validas);
+      });
+
+      return () => { unsubSessoes(); unsubResenhas(); };
+  }, [personagem, currentVttSession]);
+
+  // CLEANUP AO SAIR: REMOVE JOGADOR DA LISTA ONLINE
+  useEffect(() => {
+      return () => {
+          if (currentVttSession && auth.currentUser) {
+             const sessionRef = doc(db, "sessoes", currentVttSession.id);
+             updateDoc(sessionRef, {
+                 connected_players: arrayRemove(auth.currentUser.uid)
+             }).catch(console.error);
+          }
+      }
+  }, [currentVttSession]);
 
   const handleConfirmLevelUp = () => {
       setShowLevelUpModal(false);
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
   };
-
-  useEffect(() => {
-    if (!auth.currentUser || !personagem) return;
-    const qMissoes = query(collection(db, "missoes"));
-    const unsubMissoes = onSnapshot(qMissoes, (snap) => {
-      setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
-    const unsubSessoes = onSnapshot(qSessoes, (snap) => {
-      const agora = new Date();
-      const todasSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const ativas = [];
-      const futuras = [];
-      todasSessoes.forEach(s => {
-        const inicio = new Date(s.dataInicio);
-        const fim = new Date(s.expiraEm);
-        if (agora >= inicio && agora <= fim) {
-           ativas.push(s);
-        } else if (agora < inicio) {
-           futuras.push(s);
-        }
-      });
-      setSessoesAtivas(ativas);
-      setSessoesFuturas(futuras);
-      if (currentVttSession) {
-         const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
-         if (sessionUpdated) {
-            setVttStatus('connected'); 
-         }
-      }
-    });
-    const qResenhas = query(collection(db, "resenhas"), where("destinatarios", "array-contains", personagem.name));
-    const unsubResenhas = onSnapshot(qResenhas, (snap) => {
-       const loadedResenhas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-       const agora = new Date();
-       const validas = loadedResenhas.filter(r => new Date(r.expiraEm) > agora);
-       setResenhas(validas);
-    });
-    return () => { unsubMissoes(); unsubSessoes(); unsubResenhas(); };
-  }, [personagem, currentVttSession]);
 
   const handleCandidatar = async (missao) => {
     if (!personagem) return;
@@ -144,9 +165,20 @@ export default function JogadorVttPage() {
     }
   };
 
-  const enterVTT = (sessao) => {
+  const enterVTT = async (sessao) => {
      setCurrentVttSession(sessao);
      setHasJoinedSession(true); 
+     
+     // MARCA ONLINE NO BANCO
+     try {
+         const sessionRef = doc(db, "sessoes", sessao.id);
+         await updateDoc(sessionRef, {
+             connected_players: arrayUnion(auth.currentUser.uid)
+         });
+     } catch (e) {
+         console.error("Erro ao conectar na sessão db", e);
+     }
+
      const agora = new Date();
      const inicio = new Date(sessao.dataInicio);
      if (agora >= inicio) {
@@ -260,7 +292,6 @@ export default function JogadorVttPage() {
                             <p className="mp-desc">{m.descricaoMissao}</p>
                             </div>
                             
-                            {/* Visualização de Vagas */}
                             <div className="vagas-container-player" style={{marginTop:'10px', background:'rgba(0,0,0,0.3)', padding:'5px', borderRadius:'4px'}}>
                                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#ccc'}}>
                                     <span>VAGAS PREENCHIDAS</span>
@@ -327,7 +358,6 @@ export default function JogadorVttPage() {
                             <div className="info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div>
                         </div>
                         
-                        {/* Vagas no Detalhe */}
                         <div className="detail-section">
                             <label className="section-label">STATUS DO GRUPO</label>
                             <div style={{background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'4px'}}>

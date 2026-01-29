@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
-// --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
+// --- MODAL DE UPLOAD DE IMAGEM ---
 const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
 
@@ -28,83 +28,42 @@ const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
 };
 
 export default function Ficha({ characterData, isMaster, onClose }) {
-  const [sheet, setSheet] = useState(characterData.character_sheet || {
-    basic_info: { 
-        character_name: characterData.name, 
-        level: 1, 
-        experience: { current: 0, max: 100 }, 
-        race: characterData.race, 
-        class: characterData.class,
-        guild_rank: "Iniciado",
-        guild_insignia: "", 
-        guild_rank_image: "",
-        special_image: "" 
-    },
-    attributes: { 
-        FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
-        SOR: { value: 0 }, CAR: { value: 0 }, VEL: { value: 0 } 
-    },
-    status: { 
-        hp: { current: 10, max: 10 }, 
-        mp: { current: 5, max: 5 }, 
-        arm: { value: 0 }, 
-        res: { value: 0 },
-        mov: { value: 3 }
-    },
-    equipment: { 
-        slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
-    },
-    job_system: {
-        primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-        secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-        reaction_ability: { name: "", effect: "" },
-        passive_ability: { name: "", effect: "" },
-        class_bonus: { value: "" }
-    },
-    inventory: { gil: 0, items: [] },
-    imgUrl: "" 
-  });
+  // Estado local da ficha
+  const [sheet, setSheet] = useState(characterData.character_sheet || {});
 
   const [activeTab, setActiveTab] = useState('geral'); 
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
   
-  // Estados de Upload e Forja
+  // Estados de Upload
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCallback, setUploadCallback] = useState(null);
+
+  // Estados de Forja
   const [showForgeSelector, setShowForgeSelector] = useState(false); 
   const [forgeItems, setForgeItems] = useState([]); 
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
-  // Estado para Drag and Drop
+  // Estado para Drag and Drop de Skills
   const [draggedSkill, setDraggedSkill] = useState(null);
   const [dragSource, setDragSource] = useState(null); 
 
-  // Função auxiliar para gerar ID único para skills
-  const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
+  // Ref para level up
+  const prevLevelRef = useRef(sheet.basic_info?.level);
 
+  // Efeito para atualizar a ficha em tempo real (Corrigido para funcionar para Mestre também)
   useEffect(() => {
     if (characterData && characterData.character_sheet) {
-        const incomingSheet = characterData.character_sheet;
-        ['primary_class', 'secondary_class'].forEach(clsType => {
-            if (incomingSheet.job_system && incomingSheet.job_system[clsType] && incomingSheet.job_system[clsType].skills) {
-                incomingSheet.job_system[clsType].skills = incomingSheet.job_system[clsType].skills.map(s => ({
-                    ...s,
-                    id: s.id || generateId(),
-                    xp: s.xp || { current: 0, max: 100 },
-                    master: s.master || false
-                }));
-            }
-        });
-        if (!incomingSheet.basic_info.special_image) incomingSheet.basic_info.special_image = "";
-        setSheet(incomingSheet);
+        setSheet(characterData.character_sheet);
     }
   }, [characterData]); 
 
   const updateField = (path, value) => {
+    // Mestre pode editar
     if (!isMaster) return;
+    
     const newSheet = JSON.parse(JSON.stringify(sheet));
     const keys = path.split('.');
     let ref = newSheet;
@@ -135,40 +94,56 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setUploadModalOpen(true);
   };
 
-  // --- LÓGICA DE SKILLS ---
+  // --- LÓGICA DE SKILLS (DRAG AND DROP & XP) ---
   const handleDragStart = (e, skill, source, index) => {
       if (!isMaster) return; 
       setDraggedSkill({ skill, index });
       setDragSource(source);
       e.dataTransfer.effectAllowed = "move";
   };
-  const handleDragOver = (e) => e.preventDefault();
+
+  const handleDragOver = (e) => {
+      e.preventDefault();
+  };
+
   const handleDrop = (e, targetSource, targetIndex) => {
       e.preventDefault();
       if (!draggedSkill || !isMaster) return;
+
       const newSheet = JSON.parse(JSON.stringify(sheet));
       const sourceList = newSheet.job_system[dragSource === 'primary' ? 'primary_class' : 'secondary_class'].skills;
       const targetList = newSheet.job_system[targetSource === 'primary' ? 'primary_class' : 'secondary_class'].skills;
+
       const [movedItem] = sourceList.splice(draggedSkill.index, 1);
-      if (dragSource === targetSource) { sourceList.splice(targetIndex, 0, movedItem); } else { targetList.splice(targetIndex, 0, movedItem); }
+
+      if (dragSource === targetSource) {
+          sourceList.splice(targetIndex, 0, movedItem);
+      } else {
+          targetList.splice(targetIndex, 0, movedItem);
+      }
+
       setSheet(newSheet);
       setHasUnsavedChanges(true);
       setDraggedSkill(null);
       setDragSource(null);
   };
+
   const addSkillSlot = (classType) => {
+      const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
       const newSheet = JSON.parse(JSON.stringify(sheet));
       newSheet.job_system[classType].skills.push({ id: generateId(), name: "", cost: "", effect: "", xp: { current: 0, max: 100 }, master: false });
       setSheet(newSheet);
       setHasUnsavedChanges(true);
   };
+
   const removeSkillSlot = (classType, index) => {
-      if (!window.confirm("Remover este slot?")) return;
+      if (!window.confirm("Remover este slot de habilidade?")) return;
       const newSheet = JSON.parse(JSON.stringify(sheet));
       newSheet.job_system[classType].skills.splice(index, 1);
       setSheet(newSheet);
       setHasUnsavedChanges(true);
   };
+
   const toggleMastery = (classType, index) => {
       const newSheet = JSON.parse(JSON.stringify(sheet));
       const skill = newSheet.job_system[classType].skills[index];
@@ -178,7 +153,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setHasUnsavedChanges(true);
   };
 
-  // --- FORJA ---
+  // --- FORJA & EQUIPAMENTOS ---
   const handleOpenForgeSelector = async (slotIndex) => {
       if(!isMaster) return;
       setActiveSlotIndex(slotIndex);
@@ -189,15 +164,23 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setForgeItems(filteredItems);
       setShowForgeSelector(true);
   };
+
   const handleEquipItem = async (item) => {
       const newSheet = JSON.parse(JSON.stringify(sheet));
-      newSheet.equipment.slots[activeSlotIndex] = { item_id: item.id, item_name: item.nome, item_img: item.imagem, description: item.descricao, effect: "" };
+      newSheet.equipment.slots[activeSlotIndex] = {
+          item_id: item.id,
+          item_name: item.nome,
+          item_img: item.imagem,
+          description: item.descricao,
+          effect: "" 
+      };
       setSheet(newSheet);
       setHasUnsavedChanges(true);
       const itemRef = doc(db, "game_items", item.id);
       await updateDoc(itemRef, { status: 'equipped', ownerId: characterData.uid || characterData.id, slotIndex: activeSlotIndex, updatedAt: serverTimestamp() });
       setShowForgeSelector(false);
   };
+
   const handleUnequipItem = async (slotIndex) => {
       if(!isMaster) return;
       const slot = sheet.equipment.slots[slotIndex];
@@ -283,37 +266,30 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 </div>
             </div>
             
-            {/* Direita: Grupo (Quadrado) e Rank (Circulo) - ALINHADOS */}
+            {/* Direita: Grupo (Novo Quadrado) e Rank */}
             <div className="header-right-group">
-                {/* GRUPO/ESPECIAL */}
                 <div className="guild-item-box">
-                     <span className="header-label-top">SÍMBOLO</span>
+                     <span className="header-label-top">GRUPO</span>
                      <div 
                         className={`special-display ${isMaster ? 'clickable' : ''}`} 
                         style={{backgroundImage: `url(${sheet.basic_info.special_image || 'https://via.placeholder.com/60?text=?'})`}}
                         onClick={() => openUploadModal('Especial', (url) => updateField('basic_info.special_image', url))}
+                        title={isMaster ? "Clique para alterar imagem especial" : ""}
                      ></div>
                 </div>
 
-                {/* RANK */}
                 <div className="guild-item-box">
                     <span className="header-label-top">RANK</span>
-                    <div 
-                        className={`rank-display ${isMaster ? 'clickable' : ''}`} 
-                        style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}} 
-                        onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}
-                    ></div>
+                    <div className={`rank-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
                 </div>
             </div>
         </div>
 
-        {/* --- NAVEGAÇÃO DE ABAS --- */}
         <div className="ficha-tabs">
             <button className={`tab-btn ${activeTab === 'geral' ? 'active' : ''}`} onClick={() => setActiveTab('geral')}>VISÃO GERAL</button>
             <button className={`tab-btn ${activeTab === 'habilidades' ? 'active' : ''}`} onClick={() => setActiveTab('habilidades')}>GRIMÓRIO DE HABILIDADES</button>
         </div>
 
-        {/* --- CORPO --- */}
         <div className="ficha-body">
             {activeTab === 'geral' ? (
                 <>
@@ -344,11 +320,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
                     <div className="col-center-equip">
                         <div className={`char-image-frame ${isMaster ? 'clickable' : ''}`} onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))} title={isMaster ? "Clique para alterar foto" : ""}>
-                            {/* Ícone de Cruz sutil para indicar upload */}
-                            {isMaster && !sheet.imgUrl && (
-                                <div style={{position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '60px', color: 'rgba(255, 204, 0, 0.3)', pointerEvents: 'none'}}>+</div>
-                            )}
-                            <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text='})`}}></div>
+                            <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
                         </div>
                         <div className="equip-slots-overlay">
                             {[
