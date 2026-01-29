@@ -148,7 +148,7 @@ export default function JogadorVttPage() {
 
         {/* Botão Resenhas do Sanchez (NOVO - Só aparece se tiver resenhas) */}
         {resenhas.length > 0 && (
-           <button className="floating-sanchez-btn" onClick={() => setShowResenhasList(true)} title="Crônicas do Sanchez">
+           <button className="floating-sanchez-btn" onClick={() => setShowResenhasList(true)} title="Resenhas do Sanchez">
                <div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>
                <span className="notification-badge">{resenhas.length}</span>
            </button>
@@ -212,7 +212,7 @@ export default function JogadorVttPage() {
            <div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}>
               <div className="ff-modal-content ff-card" style={{height: 'auto', maxHeight: '600px'}} onClick={e => e.stopPropagation()}>
                  <div className="modal-header-row">
-                    <h3 className="modal-title-ff">CRÔNICAS RECEBIDAS</h3>
+                    <h3 className="modal-title-ff">RESENHAS RECEBIDAS</h3>
                     <button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button>
                  </div>
                  <div className="resenhas-list-container">
