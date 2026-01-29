@@ -48,16 +48,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   const [activeTab, setActiveTab] = useState('geral'); 
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Indicador visual
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
 
-  // Efeito para atualizar a ficha do JOGADOR em tempo real quando o mestre salvar no banco
+  // Efeito para atualizar a ficha do JOGADOR em tempo real quando o mestre salvar
   useEffect(() => {
     if (!isMaster && characterData.character_sheet) {
         setSheet(characterData.character_sheet);
     }
   }, [characterData, isMaster]);
 
-  // Função para atualizar o ESTADO LOCAL (Edição)
   const updateField = (path, value) => {
     if (!isMaster) return;
     
@@ -75,7 +74,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     setHasUnsavedChanges(true);
   };
 
-  // Função para SALVAR NO FIREBASE (Botão do Mestre)
   const saveSheetToDb = async () => {
       try {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
@@ -96,7 +94,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         const currentLvl = sheet.basic_info.level || 1;
         const newXpMax = Math.floor(sheet.basic_info.experience.max * 1.5);
         
-        // Atualiza localmente e salva automaticamente pois é um evento crítico
         const newSheet = JSON.parse(JSON.stringify(sheet));
         newSheet.basic_info.level = currentLvl + 1;
         newSheet.basic_info.experience.current = 0;
@@ -109,7 +106,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     }, 4000);
   };
 
-  // --- RADAR CHART LOGIC ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
   const radius = 90;
@@ -133,7 +129,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
         
-        {/* BOTÃO DE SALVAR (APENAS MESTRE) */}
         {isMaster && (
             <button 
                 className={`save-btn-master ${hasUnsavedChanges ? 'unsaved' : ''}`} 
@@ -145,7 +140,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
-            {/* Esquerda: Signo (Antiga Insignia) */}
+            {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
                 {isMaster ? (
@@ -164,7 +159,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 <h1>{sheet.basic_info.character_name}</h1>
                 <span className="sub-header">{sheet.basic_info.race} // {characterData.class}</span>
                 
-                {/* XP BAR */}
+                {/* XP BAR - Subido para não sobrepor abas */}
                 <div className="xp-container">
                     <div className="lvl-box">
                         <small>LVL</small>
@@ -182,17 +177,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 </div>
             </div>
 
-            {/* Direita: Rank Guilda */}
+            {/* Direita: Rank Guilda (Sem texto "Iniciado") */}
             <div className="guild-rank-box">
                 <span className="header-label-top">RANK</span>
                 {isMaster ? (
                     <>
-                        <input className="rank-name-input" value={sheet.basic_info.guild_rank} onChange={e => updateField('basic_info.guild_rank', e.target.value)} />
+                        <input className="rank-name-input" placeholder="Nome Rank" value={sheet.basic_info.guild_rank} onChange={e => updateField('basic_info.guild_rank', e.target.value)} />
                         <input className="guild-img-input rank" placeholder="URL Rank" value={sheet.basic_info.guild_rank_image || ""} onChange={e => updateField('basic_info.guild_rank_image', e.target.value)} />
                     </>
-                ) : (
-                    <span className="rank-name">{sheet.basic_info.guild_rank}</span>
-                )}
+                ) : null /* Texto removido para o jogador */}
                 <div className="rank-display" style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=Rank'})`}}></div>
             </div>
         </div>
@@ -243,24 +236,25 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         </div>
                     </div>
 
-                    {/* COLUNA CENTRAL: EQUIPAMENTOS (Ajustado Posições) */}
+                    {/* COLUNA CENTRAL: EQUIPAMENTOS (Ajustado para Bordas) */}
                     <div className="col-center-equip">
                         <div className="char-image-frame">
                             {isMaster ? <input className="img-url-input" placeholder="Link da Imagem" value={sheet.imgUrl} onChange={e => updateField('imgUrl', e.target.value)} /> : null}
                             <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Sem+Imagem'})`}}></div>
                         </div>
                         
+                        {/* Overlay com tamanho exato da moldura para posicionamento preciso nas bordas */}
                         <div className="equip-slots-overlay">
                             {[
-                                {id: 0, label: "CABEÇA", top: '0%', left: '50%'}, // Mais pra cima
-                                {id: 1, label: "CORPO", top: '25%', right: '-25%'}, // Mais pra fora
-                                {id: 2, label: "MÃO DIR.", bottom: '25%', right: '-25%'}, // Mais pra fora
-                                {id: 3, label: "MÃO ESQ.", bottom: '25%', left: '-25%'}, // Mais pra fora
-                                {id: 4, label: "ACESS. 1", top: '25%', left: '-25%'}, // Mais pra fora
-                                {id: 5, label: "ACESS. 2", bottom: '-15%', left: '20%'}, // Mais pra baixo
-                                {id: 6, label: "PÉS", bottom: '-15%', right: '20%'} // Mais pra baixo
+                                {id: 0, label: "CABEÇA", style: { top: '-40px', left: '50%', transform: 'translateX(-50%)' }}, 
+                                {id: 1, label: "CORPO", style: { top: '80px', right: '-40px' }}, 
+                                {id: 2, label: "MÃO DIR.", style: { bottom: '120px', right: '-40px' }}, 
+                                {id: 3, label: "MÃO ESQ.", style: { bottom: '120px', left: '-40px' }}, 
+                                {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-40px' }}, 
+                                {id: 5, label: "ACESS. 2", style: { bottom: '-30px', left: '40px' }}, 
+                                {id: 6, label: "PÉS", style: { bottom: '-30px', right: '40px' }} 
                             ].map((slot, idx) => (
-                                <div key={idx} className="equip-slot" style={{top: slot.top, left: slot.left, right: slot.right, bottom: slot.bottom}}>
+                                <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
                                     <div className="slot-square">
                                         {sheet.equipment?.slots?.[idx]?.item_img ? (
@@ -386,14 +380,14 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; }
         .guild-img-input { position: absolute; top: 20px; width: 100%; font-size: 9px; background: rgba(0,0,0,0.8); border: none; color: #fff; z-index: 2; opacity: 0; transition: opacity 0.2s; }
         .guild-insignia-box:hover .guild-img-input, .guild-rank-box:hover .guild-img-input { opacity: 1; }
-        .rank-name { font-size: 10px; color: #ffcc00; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-top: 5px; }
+        /* Nome do Rank removido visualmente para o jogador, mantido apenas o input para mestre se necessário */
         .rank-name-input { width: 100%; background: transparent; border: none; color: #ffcc00; font-size: 10px; text-align: center; border-bottom: 1px solid #444; margin-top: 5px; }
 
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
-        .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
+        .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
         
-        .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: 5px; }
+        .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: -5px; } /* Ajuste de margem para subir */
         .lvl-box { display: flex; flex-direction: column; align-items: center; background: #222; border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .lvl-box small { font-size: 8px; color: #ffcc00; }
         .lvl-box span { font-size: 24px; font-weight: bold; line-height: 1; }
@@ -433,15 +427,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
 
-        /* COLUNA EQUIPAMENTOS (Ajustado) */
+        /* COLUNA EQUIPAMENTOS (Centralizada e Aproximada) */
         .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
-        .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; }
+        .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; }
         .img-url-input { position: absolute; top: 10px; left: 20px; right: 20px; z-index: 5; background: rgba(0,0,0,0.7); border: 1px solid #555; color: #fff; font-size: 10px; padding: 2px; text-align: center; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
         
-        .equip-slots-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: auto; }
-        .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }
+        .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
+        .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; }
         .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; }
         .empty-text { font-size: 9px; color: #666; text-align: center; line-height: 1; padding: 2px; }
