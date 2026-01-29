@@ -3,7 +3,8 @@ import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
 // COMPONENTE AUXILIAR: Botão Pequeno de Upload de Imagem (+)
-const ImageUploader = ({ currentValue, onSave, label }) => {
+// Agora aceita className para estilização específica (cruz, centro, etc)
+const ImageUploader = ({ onSave, label, customClass = "btn-plus-gold" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [tempUrl, setTempUrl] = useState("");
 
@@ -13,8 +14,8 @@ const ImageUploader = ({ currentValue, onSave, label }) => {
     };
 
     return (
-        <div className="img-uploader-wrapper">
-            <button className="btn-plus-gold" onClick={() => setIsOpen(true)} title={`Adicionar Imagem de ${label}`}>+</button>
+        <div className={`img-uploader-wrapper ${customClass}-wrapper`}>
+            <button className={customClass} onClick={() => setIsOpen(true)} title={`Adicionar Imagem de ${label}`}>+</button>
             {isOpen && (
                 <div className="mini-popover">
                     <input 
@@ -76,10 +77,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
   
   // Estados para Gestão de Itens (Forja)
-  const [showForgeSelector, setShowForgeSelector] = useState(false); // Modal de seleção
-  const [forgeItems, setForgeItems] = useState([]); // Itens vindos da Forja
-  const [activeSlotIndex, setActiveSlotIndex] = useState(null); // Qual slot está sendo editado
-  const [viewItemDetails, setViewItemDetails] = useState(null); // Detalhes do item (olho)
+  const [showForgeSelector, setShowForgeSelector] = useState(false); 
+  const [forgeItems, setForgeItems] = useState([]); 
+  const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
+  const [viewItemDetails, setViewItemDetails] = useState(null); 
 
   // Sincronização em tempo real (para o jogador)
   useEffect(() => {
@@ -117,8 +118,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   };
 
   // --- LÓGICA DE ITENS (FORJA INTEGRATION) ---
-  
-  // 1. Abrir Modal de Seleção (Busca itens no cofre)
   const handleOpenForgeSelector = async (slotIndex) => {
       if(!isMaster) return;
       setActiveSlotIndex(slotIndex);
@@ -128,21 +127,18 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setShowForgeSelector(true);
   };
 
-  // 2. Equipar Item (Tira da forja, põe no slot, atualiza banco do item)
   const handleEquipItem = async (item) => {
-      // Atualiza Slot Localmente
       const newSheet = JSON.parse(JSON.stringify(sheet));
       newSheet.equipment.slots[activeSlotIndex] = {
           item_id: item.id,
           item_name: item.nome,
           item_img: item.imagem,
           description: item.descricao,
-          effect: "" // Pode ser editado depois
+          effect: "" 
       };
       setSheet(newSheet);
       setHasUnsavedChanges(true);
 
-      // Atualiza Item na Coleção Global (Rastreio)
       const itemRef = doc(db, "game_items", item.id);
       await updateDoc(itemRef, { 
           status: 'equipped', 
@@ -154,19 +150,16 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setShowForgeSelector(false);
   };
 
-  // 3. Devolver para Forja (Desequipar)
   const handleUnequipItem = async (slotIndex) => {
       if(!isMaster) return;
       const slot = sheet.equipment.slots[slotIndex];
       if(slot.item_id) {
           if(window.confirm("Isso devolverá o item para a Forja (Cofre). Confirmar?")) {
-              // Devolve pro Cofre Global
               const itemRef = doc(db, "game_items", slot.item_id);
               await updateDoc(itemRef, { status: 'vault', ownerId: null, slotIndex: null, updatedAt: serverTimestamp() });
           }
       }
       
-      // Limpa Slot Local
       const newSheet = JSON.parse(JSON.stringify(sheet));
       newSheet.equipment.slots[slotIndex] = { item_name: "", item_img: "", effect: "" };
       setSheet(newSheet);
@@ -187,16 +180,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         newSheet.basic_info.experience.max = newXpMax;
         
         setSheet(newSheet);
-        // Salva direto pois level up é crítico
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
         await updateDoc(charRef, { character_sheet: newSheet });
     }, 4000);
   };
 
-  // --- RADAR CHART LOGIC (AJUSTADO RAIO 110) ---
+  // --- RADAR CHART LOGIC ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
-  const radius = 110; // Aumentado a sensibilidade visual
+  const radius = 110; 
   const center = 150;
 
   const getPoint = (value, index, total) => {
@@ -214,31 +206,33 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   return (
     <div className="ficha-overlay-fixed">
-      <div className="ficha-container fade-in">
-        <button className="close-btn-ficha" onClick={onClose}>✕</button>
-        
-        {/* BOTÃO DE SALVAR (Reposicionado para Esquerda) */}
+        {/* BOTÃO DE SALVAR (LADO DE FORA) */}
         {isMaster && (
             <button 
-                className={`save-btn-master ${hasUnsavedChanges ? 'unsaved' : ''}`} 
+                className={`save-btn-floating ${hasUnsavedChanges ? 'unsaved' : ''}`} 
                 onClick={saveSheetToDb}
             >
-                {hasUnsavedChanges ? "💾 SALVAR" : "SALVO"}
+                {hasUnsavedChanges ? "💾 SALVAR ALTERAÇÕES" : "✅ FICHA SALVA"}
             </button>
         )}
 
+      <div className="ficha-container fade-in">
+        <button className="close-btn-ficha" onClick={onClose}>✕</button>
+        
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
             {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
-                {isMaster && (
-                    <ImageUploader 
-                        label="Signo" 
-                        onSave={(url) => updateField('basic_info.guild_insignia', url)} 
-                    />
-                )}
-                <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=Signo'})`}}></div>
+                <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}}>
+                    {isMaster && (
+                        <ImageUploader 
+                            label="Signo" 
+                            customClass="btn-center-add"
+                            onSave={(url) => updateField('basic_info.guild_insignia', url)} 
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Centro: Infos Básicas */}
@@ -280,16 +274,16 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             {/* Direita: Rank Guilda */}
             <div className="guild-rank-box">
                 <span className="header-label-top">RANK</span>
-                {isMaster && (
-                    <>
-                        <input className="rank-name-input" placeholder="Nome Rank" value={sheet.basic_info.guild_rank} onChange={e => updateField('basic_info.guild_rank', e.target.value)} />
+                {/* Texto Iniciado Removido */}
+                <div className="rank-display" style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}}>
+                    {isMaster && (
                         <ImageUploader 
                             label="Rank" 
+                            customClass="btn-center-add"
                             onSave={(url) => updateField('basic_info.guild_rank_image', url)} 
                         />
-                    </>
-                )}
-                <div className="rank-display" style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=Rank'})`}}></div>
+                    )}
+                </div>
             </div>
         </div>
 
@@ -314,7 +308,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 ))}
                                 <polygon points={polyPoints} fill="rgba(0, 242, 255, 0.2)" stroke="#00f2ff" strokeWidth="2" />
                                 {stats.map((stat, i) => {
-                                    const {x, y} = getPoint(125, i, 6); // Ajustado label position
+                                    const {x, y} = getPoint(125, i, 6);
                                     const val = sheet.attributes?.[stat]?.value || 0;
                                     return (
                                         <foreignObject x={x - 20} y={y - 15} width="40" height="30" key={stat}>
@@ -343,8 +337,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     <div className="col-center-equip">
                         <div className="char-image-frame">
                             {isMaster && (
-                                <div style={{position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', zIndex: 100}}>
-                                    <ImageUploader label="Personagem" onSave={(url) => updateField('imgUrl', url)} />
+                                <div style={{position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100}}>
+                                    <ImageUploader label="Personagem" onSave={(url) => updateField('imgUrl', url)} customClass="btn-cross-ff" />
                                 </div>
                             )}
                             <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
@@ -352,13 +346,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         
                         <div className="equip-slots-overlay">
                             {[
-                                {id: 0, label: "CABEÇA", style: { top: '-40px', left: '50%', transform: 'translateX(-50%)' }}, 
-                                {id: 1, label: "CORPO", style: { top: '80px', right: '-35px' }}, 
-                                {id: 2, label: "MÃO DIR.", style: { bottom: '120px', right: '-35px' }}, 
-                                {id: 3, label: "MÃO ESQ.", style: { bottom: '120px', left: '-35px' }}, 
-                                {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-35px' }}, 
-                                {id: 5, label: "ACESS. 2", style: { bottom: '-30px', left: '40px' }}, 
-                                {id: 6, label: "PÉS", style: { bottom: '-30px', right: '40px' }} 
+                                {id: 0, label: "CABEÇA", style: { top: '-30px', left: '50%', transform: 'translateX(-50%)' }}, 
+                                {id: 1, label: "CORPO", style: { top: '80px', right: '-15px' }}, 
+                                {id: 2, label: "MÃO DIR.", style: { bottom: '120px', right: '-15px' }}, 
+                                {id: 3, label: "MÃO ESQ.", style: { bottom: '120px', left: '-15px' }}, 
+                                {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-15px' }}, 
+                                {id: 5, label: "ACESS. 2", style: { bottom: '-20px', left: '60px' }}, 
+                                {id: 6, label: "PÉS", style: { bottom: '-20px', right: '60px' }} 
                             ].map((slot, idx) => (
                                 <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
@@ -517,17 +511,26 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       <style>{`
         /* GERAL */
         .ficha-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-        .ficha-container { width: 1100px; height: 850px; max-width: 98vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
-        .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 10; font-weight: bold; }
+        /* Ajustado max-width e padding para não cortar bordas */
+        .ficha-container { width: 1100px; height: 850px; max-width: 95vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
         
-        .save-btn-master { position: absolute; top: 10px; left: 10px; background: #222; border: 1px solid #444; color: #aaa; padding: 5px 15px; cursor: default; font-weight: bold; font-size: 11px; z-index: 200; transition: 0.3s; }
-        .save-btn-master.unsaved { background: #00f2ff; color: #000; cursor: pointer; border-color: #fff; box-shadow: 0 0 15px #00f2ff; animation: pulseSave 1.5s infinite; }
-        @keyframes pulseSave { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        /* Botão de Fechar */
+        .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 200; font-weight: bold; }
+        
+        /* Botão Salvar (Fixo no topo da tela, fora da ficha) */
+        .save-btn-floating { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #222; border: 1px solid #444; color: #aaa; padding: 10px 20px; cursor: default; font-weight: bold; font-size: 14px; z-index: 200001; transition: 0.3s; box-shadow: 0 0 10px #000; border-radius: 4px; }
+        .save-btn-floating.unsaved { background: #00f2ff; color: #000; cursor: pointer; border-color: #fff; box-shadow: 0 0 25px #00f2ff; animation: pulseSave 1.5s infinite; }
+        @keyframes pulseSave { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } 100% { transform: translateX(-50%) scale(1); } }
 
         /* UPLOADER E INPUTS */
-        .img-uploader-wrapper { position: absolute; top: 0; right: 0; z-index: 10; }
-        .btn-plus-gold { background: #ffcc00; color: #000; border: 1px solid #fff; width: 16px; height: 16px; border-radius: 50%; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 5px #ffcc00; }
-        .mini-popover { position: absolute; top: 20px; left: -100px; background: #000; border: 1px solid #ffcc00; padding: 5px; width: 200px; z-index: 50; display: flex; gap: 5px; flex-direction: column; }
+        .img-uploader-wrapper { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: absolute; top:0; left:0; pointer-events: none; }
+        .btn-plus-gold { pointer-events: auto; background: rgba(0,0,0,0.5); color: #ffcc00; border: 1px solid #ffcc00; width: 20px; height: 20px; border-radius: 50%; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-center-add { pointer-events: auto; background: transparent; color: #ffcc00; border: none; font-size: 24px; font-weight: bold; cursor: pointer; text-shadow: 0 0 5px #000; }
+        
+        .btn-cross-ff { pointer-events: auto; width: 40px; height: 40px; background: rgba(0,0,0,0.5); border: 2px solid #ffcc00; border-radius: 50%; color: #ffcc00; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 0 15px #ffcc00; }
+        .btn-cross-ff:hover { background: rgba(255, 204, 0, 0.2); transform: scale(1.1); }
+
+        .mini-popover { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background: #000; border: 1px solid #ffcc00; padding: 5px; width: 200px; z-index: 500; display: flex; gap: 5px; flex-direction: column; pointer-events: auto; }
         .mini-popover input { background: #111; color: #fff; border: 1px solid #444; font-size: 10px; padding: 3px; width: 100%; }
         .pop-actions { display: flex; gap: 5px; }
         .pop-confirm { background: #00f2ff; border: none; color: #000; font-size: 9px; flex: 1; cursor: pointer; font-weight: bold; }
@@ -537,15 +540,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
         .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
         .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; }
-        .rank-name { font-size: 10px; color: #ffcc00; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-top: 5px; }
-        .rank-name-input { width: 100%; background: transparent; border: none; color: #ffcc00; font-size: 10px; text-align: center; border-bottom: 1px solid #444; margin-top: 5px; }
-
+        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; }
+        
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
         .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
         
-        /* XP Container */
         .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: -5px; }
         .lvl-box { display: flex; flex-direction: column; align-items: center; background: #222; border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .lvl-box small { font-size: 8px; color: #ffcc00; }
@@ -588,7 +588,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
 
-        /* COLUNA EQUIPAMENTOS */
+        /* COLUNA EQUIPAMENTOS (Ajustado) */
         .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
         .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }

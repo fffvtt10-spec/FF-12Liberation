@@ -7,7 +7,8 @@ import sanchezImg from '../assets/sanchez.jpeg';
 import papiroImg from '../assets/papiro.png'; 
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
-import Ficha from '../components/Ficha'; // NOVO IMPORT
+import Ficha from '../components/Ficha'; 
+import fichaIcon from '../assets/ficha-icon.png'; // Ícone genérico se não tiver pode usar url direto
 
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -40,8 +41,8 @@ export default function MestrePage() {
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
-  const [showFichasList, setShowFichasList] = useState(false); // NOVO
-  const [selectedFicha, setSelectedFicha] = useState(null); // NOVO
+  const [showFichasList, setShowFichasList] = useState(false); 
+  const [selectedFicha, setSelectedFicha] = useState(null); 
   
   // Visualizações
   const [showDetails, setShowDetails] = useState(null); 
@@ -105,8 +106,6 @@ export default function MestrePage() {
     return () => { unsubM(); unsubR(); unsubS(); };
   }, []);
 
-  // ... (Funções handleCreateMission, publicarResenha, handleAddAsset, handleRemoveAsset, criarSessao, enterVTT mantidas iguais) -> Ocultando para brevidade pois não mudaram
-  // Vou reimplementar o handleCreateMission para garantir a consistencia
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
@@ -193,11 +192,6 @@ export default function MestrePage() {
           <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
         </div>
         
-        {/* BOTÃO DE GERENCIAR FICHAS NOVO */}
-        <div style={{textAlign: 'center', marginBottom: '20px'}}>
-            <button className="btn-cyan big-btn" onClick={() => setShowFichasList(true)}>📜 GERENCIAR FICHAS DE PERSONAGEM</button>
-        </div>
-
         <div className="mestre-grid">
           {/* COLUNA 1: MISSÕES */}
           <div className="ff-card board-column">
@@ -289,19 +283,19 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL DE LISTA DE FICHAS (NOVO) */}
+      {/* MODAL DE LISTA DE FICHAS */}
       {showFichasList && (
           <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
               <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()}>
                   <h3 className="modal-title-ff">PERSONAGENS REGISTRADOS</h3>
                   <div className="destinatarios-grid-fixed">
                       {personagensDb.map(p => (
-                          <div key={p.id} className="ficha-list-item" onClick={() => { setSelectedFicha(p); setShowFichasList(false); }}>
+                          <div key={p.id} className="ficha-list-item">
                               <div className="ficha-row-name">
                                   <strong>{p.name}</strong> 
                                   <small>{p.race} // {p.class}</small>
                               </div>
-                              <button className="btn-cyan">ABRIR FICHA ➔</button>
+                              <button className="btn-cyan" onClick={() => { setSelectedFicha(p); setShowFichasList(false); }}>ABRIR FICHA ➔</button>
                           </div>
                       ))}
                   </div>
@@ -310,7 +304,7 @@ export default function MestrePage() {
           </div>
       )}
 
-      {/* MODAL DA FICHA EM MODO MESTRE (EDIÇÃO) */}
+      {/* MODAL DA FICHA EM MODO MESTRE */}
       {selectedFicha && (
           <Ficha 
             characterData={selectedFicha} 
@@ -319,7 +313,7 @@ export default function MestrePage() {
           />
       )}
 
-      {/* --- OUTROS MODAIS MANTIDOS (Resenha, Sessão, Detalhes, etc) --- */}
+      {/* --- OUTROS MODAIS --- */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -426,22 +420,30 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- BOTÕES FLUTUANTES (Forja e Bazar) --- */}
-      <Forja /> 
-      <Bazar isMestre={true} />
+      {/* --- BOTÕES FLUTUANTES (Forja e Bazar) + GERENCIAR FICHAS --- */}
+      <div className="master-floating-group">
+          <Forja /> 
+          <Bazar isMestre={true} />
+          {/* BOTÃO FLUTUANTE DE FICHAS */}
+          <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Gerenciar Fichas">
+            <img src={fichaIcon} alt="Fichas" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='FICHAS'}} />
+          </button>
+      </div>
 
       <style>{`
         /* ESTILOS MANTIDOS + NOVOS */
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
         .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
-        .mestre-content { position: relative; z-index: 1; padding: 30px; }
+        .mestre-content { position: relative; z-index: 1; padding: 30px; display: flex; flex-direction: column; height: 100vh; }
         .ff-title { color: #ffcc00; text-align: center; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; margin-bottom: 30px; font-size: 2.5rem; }
-        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
+        
+        /* GRID RESPONSIVO */
+        .mestre-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 25px; flex: 1; overflow-y: auto; padding-bottom: 80px; }
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 20px; border-radius: 4px; backdrop-filter: blur(10px); }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
         .card-header.no-border { border-bottom: none; }
-        .board-column { height: 600px; display: flex; flex-direction: column; }
-        .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; }
+        .board-column { height: 75vh; display: flex; flex-direction: column; }
+        .mestre-identity-box { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; border: 1px solid #ffcc00; padding: 12px 20px; background: rgba(0, 10, 30, 0.9); width: fit-content; align-self: center; }
         .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 5px 10px; font-weight: bold; font-family: 'serif'; outline: none; }
         .mission-scroll { flex: 1; overflow-y: auto; padding-right: 8px; }
         .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
@@ -507,6 +509,7 @@ export default function MestrePage() {
         .papiro-real-container { width: 1000px; height: 800px; max-width: 95vw; max-height: 95vh; background-size: 100% 100%; background-repeat: no-repeat; padding: 110px 160px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); opacity: 0.9; }
         .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
+        .papiro-mestre-sub { font-size: 14px; font-style: italic; opacity: 0.8; margin-top: 5px; }
         .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; scrollbar-width: none; -ms-overflow-style: none; }
         .papiro-body-real::-webkit-scrollbar { display: none; }
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
@@ -528,10 +531,16 @@ export default function MestrePage() {
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
-        .big-btn { width: 80%; max-width: 400px; padding: 15px; font-size: 14px; letter-spacing: 1px; }
-        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; }
+        
+        /* BOTÃO FLUTUANTE DE FICHAS */
+        .fichas-trigger-btn { position: fixed; bottom: 30px; right: 190px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 9999; transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center; }
+        .fichas-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #00f2ff; }
+        .fichas-trigger-btn img { width: 70%; height: 70%; object-fit: contain; }
+
+        /* LISTA DE FICHAS */
+        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; width: 100%; flex-wrap: wrap; gap: 10px; }
         .ficha-list-item:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
-        .ficha-row-name { display: flex; flex-direction: column; }
+        .ficha-row-name { display: flex; flex-direction: column; flex: 1; }
         .ficha-row-name strong { color: #fff; font-size: 16px; }
         .ficha-row-name small { color: #aaa; font-size: 12px; }
       `}</style>
