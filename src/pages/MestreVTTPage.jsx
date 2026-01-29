@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { doc, updateDoc, onSnapshot, collection, query, where, serverTimestamp } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth"; // Essencial para F5
 import fundoMestre from '../assets/fundo-mestre.jpg';
 import chocoboGif from '../assets/chocobo-loading.gif';
 import Ficha from '../components/Ficha';
 import Bazar from '../components/Bazar';
 import Forja from '../components/Forja';
 
+// Ícones placeholder (CSS puro para evitar erro de imagem externa)
 const IconTabletop = () => <span>🗺️</span>;
 const IconDice = () => <span>🎲</span>;
 const IconNPC = () => <span>👹</span>;
@@ -21,10 +22,11 @@ export default function MestreVTTPage() {
   const [selectedFicha, setSelectedFicha] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // --- 1. DETECÇÃO DE AUTH E SESSÃO (PERSISTENTE NO F5) ---
+  // --- 1. DETECÇÃO DE AUTH E SESSÃO (BLINDADO CONTRA F5) ---
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
+            // Busca a sessão ativa criada pelo mestre
             const q = query(
               collection(db, "sessoes"), 
               where("mestreId", "==", user.uid)
@@ -32,6 +34,8 @@ export default function MestreVTTPage() {
 
             const unsubSession = onSnapshot(q, (snap) => {
               const sessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              
+              // Filtra a sessão mais recente válida
               const ativa = sessoes.find(s => {
                   const agora = new Date();
                   const fim = new Date(s.expiraEm);
@@ -42,24 +46,24 @@ export default function MestreVTTPage() {
                 setSessaoAtiva(ativa);
                 setConnectedPlayers(ativa.connected_players || []); 
                 
-                // Mestre Online
+                // Garante que o mestre está marcado como online
                 if (!ativa.dm_online) {
                     updateDoc(doc(db, "sessoes", ativa.id), { dm_online: true }).catch(console.error);
                 }
               }
-              setLoading(false); 
+              setLoading(false); // Carregamento concluído (com ou sem sessão)
             });
 
             return () => unsubSession();
         } else {
-            setLoading(false);
+            setLoading(false); // Sem usuário logado
         }
     });
 
     return () => unsubscribeAuth();
   }, []);
 
-  // Cleanup Mestre Offline
+  // Cleanup: Marca mestre como offline ao sair
   useEffect(() => {
     return () => {
         if (sessaoAtiva && auth.currentUser) {
@@ -72,9 +76,11 @@ export default function MestreVTTPage() {
   useEffect(() => {
     if (!sessaoAtiva || !sessaoAtiva.participantes) return;
 
+    // Escuta mudanças nos personagens para atualizar HP/MP/XP em tempo real na barra lateral
     const q = query(collection(db, "characters"));
     const unsub = onSnapshot(q, (snap) => {
         const allChars = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Filtra apenas os personagens que estão na lista de participantes desta sessão
         const sessionChars = allChars.filter(c => sessaoAtiva.participantes.includes(c.name));
         setPersonagensData(sessionChars);
     });
@@ -82,11 +88,13 @@ export default function MestreVTTPage() {
     return () => unsub();
   }, [sessaoAtiva]);
 
+  // Relógio
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // --- TELA DE CARREGAMENTO (CHOCOBO) ---
   if (loading) {
       return (
         <div className="ether-loading">
@@ -112,18 +120,25 @@ export default function MestreVTTPage() {
       );
   }
 
-  if (!sessaoAtiva) return <div className="loading-screen-master">NENHUMA SESSÃO ATIVA ENCONTRADA. CRIE UMA NO DASHBOARD.</div>;
+  // Caso não encontre sessão
+  if (!sessaoAtiva) return (
+      <div style={{width:'100vw', height:'100vh', background:'#000', color:'#f44', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'serif'}}>
+          NENHUMA SESSÃO ATIVA ENCONTRADA. CRIE UMA NO DASHBOARD.
+      </div>
+  );
 
   return (
     <div className="mestre-vtt-container">
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${fundoMestre})` }} />
       
+      {/* --- HUD LATERAL ESQUERDA: LISTA DE JOGADORES --- */}
       <div className="dm-players-sidebar">
           <h3 className="sidebar-title">AVENTUREIROS</h3>
           <div className="players-list-scroll">
               {personagensData.map(char => {
-                  // VERIFICAÇÃO DE ONLINE: UID do jogador está no array da sessão?
                   const isOnline = connectedPlayers.includes(char.uid); 
+                  const bgImage = char.character_sheet?.imgUrl;
+                  
                   return (
                       <div 
                         key={char.id} 
@@ -132,8 +147,8 @@ export default function MestreVTTPage() {
                         title="Clique para editar ficha"
                       >
                           <div className="mini-avatar">
-                              {char.character_sheet?.imgUrl ? (
-                                  <div className="avatar-img" style={{backgroundImage: `url(${char.character_sheet.imgUrl})`}}></div>
+                              {bgImage ? (
+                                  <div className="avatar-img" style={{backgroundImage: `url(${bgImage})`}}></div>
                               ) : (
                                   <div className="avatar-placeholder">{char.name.charAt(0)}</div>
                               )}
@@ -151,6 +166,7 @@ export default function MestreVTTPage() {
           </div>
       </div>
 
+      {/* --- STATUS DA SESSÃO (CENTRO/TOPO) --- */}
       <div className="session-status-top">
           <div className="status-indicator active"></div>
           <div className="status-info">
@@ -159,13 +175,16 @@ export default function MestreVTTPage() {
           </div>
       </div>
 
+      {/* --- ÁREA CENTRAL (TABLETOP VAZIO POR ENQUANTO) --- */}
       <div className="vtt-workspace">
           <div className="empty-tabletop-msg">
               SELECIONE UMA FERRAMENTA PARA INICIAR
           </div>
       </div>
 
+      {/* --- FERRAMENTAS DO MESTRE (DIREITA/FLUTUANTES) --- */}
       <div className="dm-tools-dock">
+          {/* Componentes Já Criados */}
           <div className="tool-group">
             <Bazar isMestre={true} />
             <div className="tool-label">BAZAR</div>
@@ -176,12 +195,29 @@ export default function MestreVTTPage() {
             <div className="tool-label">FORJA</div>
           </div>
 
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => alert("Em breve")}><IconTabletop /></button><div className="tool-label">MAPA</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => alert("Em breve")}><IconDice /></button><div className="tool-label">DADOS</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => alert("Em breve")}><IconNPC /></button><div className="tool-label">NPCS</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => alert("Em breve")}><IconEnemies /></button><div className="tool-label">COMBATE</div></div>
+          {/* Placeholders Futuros */}
+          <div className="tool-group">
+            <button className="tool-btn-placeholder" onClick={() => alert("Em breve: Grid de Batalha")}><IconTabletop /></button>
+            <div className="tool-label">MAPA</div>
+          </div>
+
+          <div className="tool-group">
+            <button className="tool-btn-placeholder" onClick={() => alert("Em breve: Rolagem de Dados")}><IconDice /></button>
+            <div className="tool-label">DADOS</div>
+          </div>
+
+          <div className="tool-group">
+            <button className="tool-btn-placeholder" onClick={() => alert("Em breve: Gerenciador de NPCs")}><IconNPC /></button>
+            <div className="tool-label">NPCS</div>
+          </div>
+
+          <div className="tool-group">
+            <button className="tool-btn-placeholder" onClick={() => alert("Em breve: Gerenciador de Combate")}><IconEnemies /></button>
+            <div className="tool-label">COMBATE</div>
+          </div>
       </div>
 
+      {/* --- MODAL DA FICHA (EDIÇÃO DE MESTRE) --- */}
       {selectedFicha && (
           <Ficha 
             characterData={selectedFicha} 
@@ -193,20 +229,20 @@ export default function MestreVTTPage() {
       <style>{`
         .mestre-vtt-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #000; font-family: 'Cinzel', serif; color: #fff; }
         .mestre-bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.4; z-index: 0; }
-        .loading-screen-master { display: flex; align-items: center; justify-content: center; height: 100vh; color: #ffcc00; font-size: 18px; letter-spacing: 2px; background: #050505; z-index: 9999; }
-
+        
+        /* SIDEBAR JOGADORES */
         .dm-players-sidebar { position: absolute; top: 20px; left: 20px; width: 280px; background: rgba(0, 10, 20, 0.95); border: 2px solid #ffcc00; border-radius: 8px; padding: 15px; z-index: 50; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
         .sidebar-title { color: #ffcc00; font-size: 16px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; text-align: center; letter-spacing: 2px; }
         .players-list-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scrollbar-width: none; }
         
         .mini-player-card { display: flex; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 4px; cursor: pointer; transition: 0.2s; }
         .mini-player-card:hover { border-color: #ffcc00; background: rgba(255, 204, 0, 0.1); }
-        .mini-player-card.online { border-left: 3px solid #00f2ff; }
+        .mini-player-card.online { border-left: 3px solid #00f2ff; background: rgba(0, 242, 255, 0.05); }
         .mini-player-card.offline { border-left: 3px solid #666; opacity: 0.7; filter: grayscale(0.8); }
         
         .mini-avatar { position: relative; margin-right: 12px; }
-        .avatar-img { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #fff; }
-        .avatar-placeholder { width: 40px; height: 40px; border-radius: 50%; background: #222; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .avatar-img { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #fff; background-color: #000; }
+        .avatar-placeholder { width: 40px; height: 40px; border-radius: 50%; background: #222; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #aaa; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; position: absolute; bottom: 0; right: 0; border: 1px solid #000; }
         .status-dot.green { background: #00f2ff; box-shadow: 0 0 5px #00f2ff; }
         .status-dot.gray { background: #666; }
@@ -217,20 +253,24 @@ export default function MestreVTTPage() {
         .p-lvl { font-size: 10px; color: #ffcc00; font-weight: bold; }
         .empty-slot { font-size: 12px; color: #666; text-align: center; padding: 20px 0; font-style: italic; }
 
+        /* STATUS TOP */
         .session-status-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; padding: 10px 30px; border-radius: 30px; display: flex; align-items: center; gap: 15px; z-index: 40; box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); }
         .status-indicator { width: 12px; height: 12px; background: #00f2ff; border-radius: 50%; box-shadow: 0 0 10px #00f2ff; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
         .status-info h2 { margin: 0; font-size: 16px; color: #fff; letter-spacing: 1px; }
         .status-info p { margin: 0; font-size: 10px; color: #00f2ff; text-transform: uppercase; letter-spacing: 1px; }
 
+        /* WORKSPACE */
         .vtt-workspace { position: relative; z-index: 10; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
         .empty-tabletop-msg { font-size: 30px; color: rgba(255,255,255,0.1); font-weight: bold; letter-spacing: 5px; }
 
+        /* DOCK DE FERRAMENTAS */
         .dm-tools-dock { position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 60; align-items: flex-end; }
         .tool-group { display: flex; align-items: center; gap: 10px; flex-direction: row-reverse; }
         .tool-label { background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #ffcc00; opacity: 0; transition: 0.2s; pointer-events: none; transform: translateX(10px); }
         .tool-group:hover .tool-label { opacity: 1; transform: translateX(0); }
         
+        /* Ajuste para os botões já existentes (Bazar/Forja) ficarem no estilo dock */
         .dm-tools-dock .bazar-trigger-btn, 
         .dm-tools-dock .forja-trigger-btn { position: relative; bottom: auto; right: auto; margin: 0; box-shadow: 0 0 10px #000; width: 60px; height: 60px; }
         

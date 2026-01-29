@@ -7,6 +7,7 @@ import { backgroundMusic } from './LandingPage';
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
+import chocoboGif from '../assets/chocobo-loading.gif';
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
 import Ficha from '../components/Ficha'; 
@@ -35,10 +36,14 @@ const Timer = ({ expiry }) => {
 
 export default function MestrePage() {
   const navigate = useNavigate();
+  
+  // Estados de Dados
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
+  
+  const [loading, setLoading] = useState(true);
 
   // Modais
   const [showModal, setShowModal] = useState(false); 
@@ -53,12 +58,11 @@ export default function MestrePage() {
   const [viewImage, setViewImage] = useState(null); 
   const [viewMembers, setViewMembers] = useState(null); 
 
-  // Resenha
+  // Forms
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
   
-  // Sessão
   const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
 
   const [form, setForm] = useState({
@@ -76,14 +80,14 @@ export default function MestrePage() {
   const [tempType, setTempType] = useState("cenario");
 
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
-    return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
+    return localStorage.getItem('mestreAssinatura') || "Narrador";
   });
 
   useEffect(() => {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // --- SINCRONIZAÇÃO FIREBASE COM PERSISTÊNCIA ---
+  // --- SINCRONIZAÇÃO BLINDADA (F5) ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
 
@@ -106,14 +110,16 @@ export default function MestrePage() {
                 setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
 
+            setLoading(false);
             return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
+        } else {
+            setLoading(false); // Se não tiver user, para o loading (vai pra login ou fica vazio)
         }
     });
 
     return () => unsubscribeAuth();
   }, []);
 
-  // Atualiza a ficha selecionada se os dados do banco mudarem enquanto ela está aberta
   useEffect(() => {
       if (selectedFicha) {
           const updated = personagensDb.find(p => p.id === selectedFicha.id);
@@ -121,8 +127,10 @@ export default function MestrePage() {
       }
   }, [personagensDb]);
 
+  // --- HANDLERS ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
+    if (!auth.currentUser) return;
     try {
       const msToAdd = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000 + 
                       (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000 + 
@@ -136,7 +144,7 @@ export default function MestrePage() {
   };
 
   const publicarResenha = async () => {
-    if (!tituloResenha || !resenha) return alert("Preencha título e conteúdo!");
+    if (!tituloResenha || !resenha || !auth.currentUser) return alert("Preencha título e conteúdo!");
     try {
       const expiraEm = new Date(); expiraEm.setDate(expiraEm.getDate() + 1); 
       await addDoc(collection(db, "resenhas"), {
@@ -175,7 +183,7 @@ export default function MestrePage() {
 
   const criarSessao = async (e) => {
       e.preventDefault();
-      if (!sessionForm.missaoId || !sessionForm.dataInicio) return alert("Selecione a missão e o horário!");
+      if (!sessionForm.missaoId || !sessionForm.dataInicio || !auth.currentUser) return alert("Selecione a missão e o horário!");
       try {
         const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
         const inicio = new Date(sessionForm.dataInicio);
@@ -189,7 +197,7 @@ export default function MestrePage() {
             participantes: sessaoDestinatarios, 
             cenarios: sessionForm.cenarios,
             tokens: sessionForm.tokens,
-            connected_players: [], // Inicializa array vazio
+            connected_players: [],
             dm_online: false,
             createdAt: serverTimestamp()
         });
@@ -205,6 +213,31 @@ export default function MestrePage() {
   const enterVTT = (sessao) => {
       navigate('/mestre-vtt');
   };
+
+  if (loading) {
+    return (
+      <div className="ether-loading">
+          <div className="loading-blur-bg"></div>
+          <div className="loading-content">
+          <img src={chocoboGif} alt="Carregando..." className="chocobo-anim" />
+          <div className="loading-bar"><div className="loading-fill"></div></div>
+          <p>CARREGANDO DADOS DO MESTRE...</p>
+          </div>
+          <style>{`
+          .ether-loading { height: 100vh; width: 100vw; background: #000; display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; z-index: 9999; }
+          .loading-blur-bg { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #001a33 0%, #000 100%); filter: blur(40px); animation: pulseBlur 2s infinite alternate; }
+          .loading-content { position: relative; z-index: 10; text-align: center; }
+          .chocobo-anim { width: 120px; filter: drop-shadow(0 0 10px #ffcc00); margin-bottom: 20px; }
+          .loading-bar { width: 200px; height: 2px; background: rgba(255, 255, 255, 0.1); margin: 0 auto 15px auto; border-radius: 10px; overflow: hidden; }
+          .loading-fill { height: 100%; width: 0%; background: #ffcc00; box-shadow: 0 0 10px #ffcc00; animation: fillProgress 1s ease-in-out forwards; }
+          p { color: #ffcc00; font-family: 'serif'; font-size: 10px; letter-spacing: 3px; animation: fadeText 1s infinite alternate; }
+          @keyframes fillProgress { from { width: 0%; } to { width: 100%; } }
+          @keyframes pulseBlur { from { opacity: 0.5; } to { opacity: 0.8; } }
+          @keyframes fadeText { from { opacity: 0.4; } to { opacity: 1; } }
+          `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="mestre-container">
@@ -604,7 +637,7 @@ export default function MestrePage() {
         .btn-red { border: 1px solid #f44; color: #f44; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; font-weight: bold; }
         .btn-group-ff { display: flex; gap: 20px; margin-top: 25px; }
         .btn-forjar-main { flex: 1; background: #ffcc00; color: #000; border: none; padding: 14px; font-weight: bold; cursor: pointer; font-size: 14px; text-transform: uppercase; }
-        .btn-cancelar-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
+        .btn-cancel-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
         .player-selector-box-fixed { margin: 25px 0; border-top: 1px solid #333; padding-top: 15px; }
         .destinatarios-grid-fixed { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
         .chip-label-ff { background: rgba(0, 10, 30, 0.8); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 18px; border-radius: 4px; font-size: 12px; cursor: pointer; display: inline-block; }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
-// --- MODAL DE UPLOAD DE IMAGEM ---
+// --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
 const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
 
@@ -230,12 +230,31 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     return `${x},${y}`;
   }).join(" ");
 
+  // Helper para Safe Image
+  const getBgStyle = (url) => {
+      if (url && url.length > 5) return { backgroundImage: `url(${url})` };
+      return { backgroundColor: '#111', border: '1px solid #333' }; // Fallback escuro
+  };
+
   return (
     <div className="ficha-overlay-fixed">
-        <ImageUploadModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSave={uploadCallback} label={uploadLabel} />
+        {/* MODAL GLOBAL DE UPLOAD DE IMAGEM */}
+        <ImageUploadModal 
+            isOpen={uploadModalOpen} 
+            onClose={() => setUploadModalOpen(false)} 
+            onSave={uploadCallback} 
+            label={uploadLabel} 
+        />
 
+        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
         {isMaster && hasUnsavedChanges && (
-            <button className="save-fab glowing" onClick={saveSheetToDb} title="Salvar Alterações">💾</button>
+            <button 
+                className="save-fab glowing" 
+                onClick={saveSheetToDb}
+                title="Salvar Alterações"
+            >
+                💾
+            </button>
         )}
 
       <div className="ficha-container fade-in">
@@ -246,7 +265,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
-                <div className={`insignia-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
+                <div 
+                    className={`insignia-display ${isMaster ? 'clickable' : ''}`} 
+                    style={getBgStyle(sheet.basic_info.guild_insignia)}
+                    onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}
+                    title={isMaster ? "Clique para alterar imagem" : ""}
+                >
+                </div>
             </div>
             
             {/* Centro: Infos Básicas */}
@@ -272,7 +297,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                      <span className="header-label-top">GRUPO</span>
                      <div 
                         className={`special-display ${isMaster ? 'clickable' : ''}`} 
-                        style={{backgroundImage: `url(${sheet.basic_info.special_image || 'https://via.placeholder.com/60?text=?'})`}}
+                        style={getBgStyle(sheet.basic_info.special_image)}
                         onClick={() => openUploadModal('Especial', (url) => updateField('basic_info.special_image', url))}
                         title={isMaster ? "Clique para alterar imagem especial" : ""}
                      ></div>
@@ -280,7 +305,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
                 <div className="guild-item-box">
                     <span className="header-label-top">RANK</span>
-                    <div className={`rank-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
+                    <div 
+                        className={`rank-display ${isMaster ? 'clickable' : ''}`} 
+                        style={getBgStyle(sheet.basic_info.guild_rank_image)}
+                        onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}
+                        title={isMaster ? "Clique para alterar imagem" : ""}
+                    ></div>
                 </div>
             </div>
         </div>
@@ -319,8 +349,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     </div>
 
                     <div className="col-center-equip">
-                        <div className={`char-image-frame ${isMaster ? 'clickable' : ''}`} onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))} title={isMaster ? "Clique para alterar foto" : ""}>
-                            <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
+                        <div 
+                            className={`char-image-frame ${isMaster ? 'clickable' : ''}`}
+                            onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))}
+                            title={isMaster ? "Clique para alterar foto" : ""}
+                        >
+                            <div className="image-display" style={getBgStyle(sheet.imgUrl)}></div>
                         </div>
                         <div className="equip-slots-overlay">
                             {[
@@ -338,7 +372,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                         {!sheet.equipment?.slots?.[idx]?.item_img && isMaster && <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>}
                                         {sheet.equipment?.slots?.[idx]?.item_img ? (
                                             <>
-                                                <div className="item-bg" style={{backgroundImage: `url(${sheet.equipment.slots[idx].item_img})`}}></div>
+                                                <div className="item-bg" style={getBgStyle(sheet.equipment.slots[idx].item_img)}></div>
                                                 <button className="btn-eye-item" onClick={() => setViewItemDetails(sheet.equipment.slots[idx])}>👁️</button>
                                                 {isMaster && <button className="btn-return-forge" title="Devolver para Forja" onClick={() => handleUnequipItem(idx)}>↩️</button>}
                                             </>
@@ -443,10 +477,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 <div className="item-selector-box" onClick={e => e.stopPropagation()}>
                     <h3>EQUIPAR DO COFRE</h3>
                     <div className="forge-list-scroll">
-                        {forgeItems.length === 0 && <p className="empty-text">Nenhum item disponível.</p>}
+                        {forgeItems.length === 0 && <p className="empty-text">Nenhum item disponível na Forja.</p>}
                         {forgeItems.map(item => (
                             <div key={item.id} className="forge-item-row" onClick={() => handleEquipItem(item)}>
-                                <img src={item.imagem} alt={item.nome} />
+                                <div className="forge-thumb" style={getBgStyle(item.imagem)}></div>
                                 <div><strong>{item.nome}</strong>{item.ownerId && <small style={{color:'#0f0'}}> (Seu Item)</small>}<p>{item.descricao.substring(0, 40)}...</p></div>
                             </div>
                         ))}
@@ -459,7 +493,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         {viewItemDetails && (
             <div className="item-selector-overlay" onClick={() => setViewItemDetails(null)}>
                 <div className="item-details-box" onClick={e => e.stopPropagation()}>
-                    <img src={viewItemDetails.item_img} alt={viewItemDetails.item_name} />
+                    <div className="detail-img-large" style={getBgStyle(viewItemDetails.item_img)}></div>
                     <h3>{viewItemDetails.item_name}</h3>
                     <p className="details-desc">{viewItemDetails.description || "Sem descrição"}</p>
                     <p className="details-effect">Efeito: {viewItemDetails.effect || "Nenhum"}</p>
@@ -614,11 +648,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .forge-item-row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #333; cursor: pointer; }
         .forge-item-row:hover { background: rgba(255,255,255,0.1); }
         .forge-item-row img { width: 40px; height: 40px; border: 1px solid #555; margin-right: 10px; }
+        .forge-thumb { width: 40px; height: 40px; border: 1px solid #555; margin-right: 10px; background-size: cover; background-position: center; }
         .forge-item-row strong { color: #00f2ff; display: block; font-size: 12px; }
         .forge-item-row p { font-size: 10px; color: #aaa; margin: 0; }
         .btn-cancel-modal { width: 100%; padding: 10px; background: #333; color: #fff; border: none; cursor: pointer; }
         .item-details-box { width: 300px; background: #000; border: 1px solid #00f2ff; padding: 20px; text-align: center; border-radius: 8px; }
         .item-details-box img { width: 80px; height: 80px; border: 1px solid #fff; margin-bottom: 10px; }
+        .detail-img-large { width: 80px; height: 80px; border: 1px solid #fff; margin: 0 auto 10px auto; background-size: cover; background-position: center; }
         .item-details-box h3 { color: #00f2ff; margin: 0 0 10px 0; }
         .details-desc { font-size: 12px; color: #ccc; margin-bottom: 10px; font-style: italic; }
         .details-effect { font-size: 12px; color: #ffcc00; font-weight: bold; margin-bottom: 20px; }
