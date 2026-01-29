@@ -517,11 +517,11 @@ Bom jogo, ${i.name}!`)};return i?v.jsxs("div",{className:"jogador-container",chi
             font-family: 'Cinzel', serif; color: white; 
         }
 
-        /* --- ESTILOS DO FUNDO VTT --- */
+        /* --- ESTILOS DO FUNDO VTT CORRIGIDOS --- */
         .ether-container {
-            position: fixed;
+            position: absolute; /* Mudado de fixed para absolute para respeitar o container */
             top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: -10;
+            z-index: 0; /* Trazido para 0 para ficar ACIMA do body preto, mas abaixo da UI */
             background: radial-gradient(circle at center, #172554 0%, #020617 80%);
             overflow: hidden;
         }
@@ -531,9 +531,13 @@ Bom jogo, ${i.name}!`)};return i?v.jsxs("div",{className:"jogador-container",chi
             top: 0; left: 0; width: 100%; height: 100%;
             background-size: cover;
             background-position: center;
-            opacity: 0.5; /* Ajuste para ver o éter atrás */
-            z-index: -9;
+            opacity: 0.5;
+            z-index: 1; /* Garante que fique acima do gradiente base */
         }
+        
+        /* Ajuste fino nas camadas do éter para ficarem acima da imagem */
+        .ether-vortex { z-index: 2 !important; }
+        .ether-particles { z-index: 3 !important; }
 
         .loading-screen { 
             width: 100vw; height: 100vh; background: #000; color: #ffcc00; 
