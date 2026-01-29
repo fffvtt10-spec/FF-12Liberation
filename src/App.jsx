@@ -13,14 +13,22 @@ import AdminPage from './pages/AdminPage';
 import MestrePage from './pages/MestrePage';
 import CharacterCreation from './pages/CharacterCreation';
 import JogadorVttPage from './pages/JogadorVttPage';
-import MestreVTTPage from './pages/MestreVTTPage'; // <--- IMPORTAÇÃO NOVA
+import MestreVTTPage from './pages/MestreVTTPage';
 
-// Rota do Jogador (Placeholder antigo, mantido por enquanto)
+// Rota do Jogador
 const JogadorPage = () => <div style={{color: 'white', padding: '50px'}}>PÁGINA DO JOGADOR EM CONSTRUÇÃO</div>;
 
 // Componente de Rota Protegida para Admin
 const ProtectedAdminRoute = ({ user, children }) => {
-  if (user && user.email === 'fffvtt10@gmail.com') return children;
+  // Se ainda estiver carregando o estado do user, não redireciona
+  if (!user) {
+    return <Navigate to="/admin-login" />;
+  }
+  
+  if (user.email === 'fffvtt10@gmail.com') {
+    return children;
+  }
+  
   return <Navigate to="/admin-login" />;
 };
 
@@ -29,15 +37,13 @@ export default function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // 1. Escuta o estado do Firebase
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (initializing) setInitializing(false);
+      setInitializing(false);
     });
     return unsubscribe;
-  }, [initializing]);
+  }, []);
 
-  // Tela de Loading Inicial (Chocobo)
   if (initializing) {
     return (
       <div style={{
@@ -61,11 +67,8 @@ export default function App() {
             box-shadow: 0 0 10px #ffcc00;
             animation: fillProgress 1s ease-in-out forwards;
           }
-          
           p { color: #ffcc00; font-family: 'serif'; font-size: 10px; letter-spacing: 3px; animation: fadeText 1s infinite alternate; }
-          
           @keyframes fillProgress { from { width: 0%; } to { width: 100%; } }
-          @keyframes pulseBlur { from { opacity: 0.5; } to { opacity: 0.8; } }
           @keyframes fadeText { from { opacity: 0.4; } to { opacity: 1; } }
         `}</style>
       </div>
@@ -79,7 +82,7 @@ export default function App() {
       
       {/* Rotas do Mestre */}
       <Route path="/mestre" element={<MestrePage />} /> 
-      <Route path="/mestre-vtt" element={<MestreVTTPage />} /> {/* <--- ROTA NOVA ADICIONADA */}
+      <Route path="/mestre-vtt" element={<MestreVTTPage />} /> 
       
       {/* Rotas do Jogador */}
       <Route path="/jogador" element={<JogadorPage />} />
@@ -89,13 +92,16 @@ export default function App() {
       {/* Rotas de Admin */}
       <Route path="/admin-login" element={<AdminLoginPage />} />
       <Route 
-        path="/admin-dashboard" 
+        path="/admin" 
         element={
           <ProtectedAdminRoute user={user}>
             <AdminPage />
           </ProtectedAdminRoute>
         } 
       />
+
+      {/* Redirecionamento de segurança para rotas inexistentes */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
