@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"; // Add arrayRemove
-import { onAuthStateChanged } from "firebase/auth"; 
+import { doc, collection, query, where, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
 import levelUpMusic from '../assets/level-up.mp3'; 
 import Bazar from '../components/Bazar';
 import Ficha from '../components/Ficha';
+import chocoboGif from '../assets/chocobo-loading.gif'; // REUTILIZAR O GIF SE QUISER
 
 const CountdownTimer = ({ targetDate, onComplete }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -34,6 +35,7 @@ const CountdownTimer = ({ targetDate, onComplete }) => {
 
 export default function JogadorVttPage() {
   const [personagem, setPersonagem] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
   const [sessoesAtivas, setSessoesAtivas] = useState([]); 
   const [sessoesFuturas, setSessoesFuturas] = useState([]); 
@@ -71,6 +73,9 @@ export default function JogadorVttPage() {
                     }
                     prevLevelRef.current = currentLevel;
                     setPersonagem(data);
+                    setLoading(false); // Carregou personagem
+                } else {
+                    setLoading(false); // Não achou char, mas parou de carregar
                 }
             });
 
@@ -80,12 +85,14 @@ export default function JogadorVttPage() {
             });
 
             return () => { unsubChar(); unsubMissoes(); };
+        } else {
+            setLoading(false); // Não tem user
         }
     });
     return () => unsubscribeAuth();
   }, []);
 
-  // DADOS DEPENDENTES DO PERSONAGEM
+  // DADOS DEPENDENTES DO PERSONAGEM (SESSÕES E RESENHAS)
   useEffect(() => {
       if (!personagem) return;
       
@@ -125,7 +132,7 @@ export default function JogadorVttPage() {
       return () => { unsubSessoes(); unsubResenhas(); };
   }, [personagem, currentVttSession]);
 
-  // CLEANUP AO SAIR: REMOVE JOGADOR DA LISTA ONLINE
+  // CLEANUP AO SAIR
   useEffect(() => {
       return () => {
           if (currentVttSession && auth.currentUser) {
@@ -188,7 +195,8 @@ export default function JogadorVttPage() {
      }
   };
 
-  if (!personagem) return <div className="loading-screen">Carregando Grimório...</div>;
+  if (loading) return <div className="loading-screen">Carregando Grimório...</div>;
+  if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
   const charLevel = personagem.character_sheet?.basic_info?.level || 1;
 
@@ -357,24 +365,6 @@ export default function JogadorVttPage() {
                             <div className="info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div>
                             <div className="info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div>
                         </div>
-                        
-                        <div className="detail-section">
-                            <label className="section-label">STATUS DO GRUPO</label>
-                            <div style={{background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'4px'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', color:'#fff', fontSize:'12px', marginBottom:'5px'}}>
-                                    <span>JOGADORES INSCRITOS</span>
-                                    <span>{showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span>
-                                </div>
-                                <div style={{width:'100%', height:'6px', background:'#000', borderRadius:'3px'}}>
-                                    <div style={{
-                                        width: `${Math.min(((showMissionDetails.candidatos?.length||0) / (parseInt(showMissionDetails.grupo)||1))*100, 100)}%`, 
-                                        height:'100%', 
-                                        background: '#00f2ff'
-                                    }}></div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label><p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p></div>
                         <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label><p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p></div>
                         <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p></div>

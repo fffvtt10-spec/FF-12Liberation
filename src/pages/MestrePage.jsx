@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth"; // IMPORTANTE PARA PERSISTENCIA
+import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom'; 
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
@@ -76,49 +76,40 @@ export default function MestrePage() {
   const [tempType, setTempType] = useState("cenario");
 
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
-    return localStorage.getItem('mestreAssinatura') || "Narrador";
+    return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
   });
 
   useEffect(() => {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // --- SINCRONIZAÇÃO FIREBASE COM PERSISTÊNCIA (CORREÇÃO F5) ---
+  // --- SINCRONIZAÇÃO FIREBASE COM PERSISTÊNCIA ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
 
-    // Ouve a autenticação. Só carrega dados quando o usuário estiver confirmado.
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
-            // Se logado, inicia os listeners do Firestore
-            
-            // 1. Missões
             const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-            // 2. Resenhas
             const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-            // 3. Sessões
             const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
             const unsubS = onSnapshot(qS, (snap) => {
                 const loadedSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setSessoes(loadedSessoes);
             });
 
-            // 4. Personagens (Todos)
             const qC = query(collection(db, "characters"));
             const unsubC = onSnapshot(qC, (snap) => {
                 setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
 
-            // Retorna função de limpeza interna
             return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
         }
     });
 
-    // Retorna a limpeza do listener de Auth
     return () => unsubscribeAuth();
   }, []);
 
@@ -198,7 +189,7 @@ export default function MestrePage() {
             participantes: sessaoDestinatarios, 
             cenarios: sessionForm.cenarios,
             tokens: sessionForm.tokens,
-            connected_players: [], // Inicializa array vazio para rastreio
+            connected_players: [], // Inicializa array vazio
             dm_online: false,
             createdAt: serverTimestamp()
         });
@@ -370,7 +361,7 @@ export default function MestrePage() {
           />
       )}
 
-      {/* --- MODAIS DE CRIAÇÃO OMITIDOS PARA BREVIDADE (MANTENHA OS JÁ EXISTENTES) --- */}
+      {/* --- OUTROS MODAIS --- */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
@@ -504,22 +495,30 @@ export default function MestrePage() {
       </div>
 
       <style>{`
-        /* ESTILOS MANTIDOS */
+        /* ESTILOS MANTIDOS + NOVOS */
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
         .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
         .mestre-content { position: relative; z-index: 1; padding: 20px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
         .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .ff-title { color: #ffcc00; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; font-size: 2rem; margin: 0; }
         .mestre-identity-box { display: flex; align-items: center; gap: 10px; border: 1px solid #ffcc00; padding: 8px 15px; background: rgba(0, 10, 30, 0.9); }
         .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 5px 10px; font-weight: bold; font-family: 'serif'; outline: none; }
-        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex: 1; overflow: hidden; padding-bottom: 60px; }
+
+        /* GRID RESPONSIVO TELA ÚNICA */
+        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex: 1; overflow: hidden; padding-bottom: 60px; /* Espaço para botões flutuantes */ }
+        
+        /* CARDS TELA ÚNICA */
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; backdrop-filter: blur(10px); display: flex; flex-direction: column; max-height: 100%; }
         .board-column { flex: 1; overflow: hidden; min-height: 0; }
+        
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .card-header.no-border { border-bottom: none; }
+        
         .mission-scroll { flex: 1; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: #ffcc00 #000; }
         .mission-scroll::-webkit-scrollbar { width: 6px; }
         .mission-scroll::-webkit-scrollbar-thumb { background: #ffcc00; }
+
         .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
         .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
@@ -527,10 +526,13 @@ export default function MestrePage() {
         .cand-row-master { display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-bottom: 2px; }
         .btn-kick-x { background: transparent; border: none; color: #f44; cursor: pointer; font-weight: bold; font-size: 12px; }
         .btn-kick-x:hover { color: #fff; }
+
+        /* VAGAS VISUAL */
         .vagas-container { margin: 10px 0; }
         .vagas-labels { display: flex; justify-content: space-between; font-size: 10px; color: #ccc; margin-bottom: 2px; font-weight: bold; }
         .vagas-track { width: 100%; height: 6px; background: #111; border: 1px solid #444; border-radius: 3px; overflow: hidden; }
         .vagas-fill { height: 100%; transition: width 0.3s; }
+
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0; }
         .sanchez-header-top.no-border { border-bottom: none; }
@@ -595,7 +597,7 @@ export default function MestrePage() {
         .papiro-body-real::-webkit-scrollbar { display: none; }
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
-        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
         .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
         .ff-add-btn-gold-small:hover { background: #ffcc00; color: #000; box-shadow: 0 0 15px #ffcc00; }
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; margin-right: 10px; font-weight: bold; }
