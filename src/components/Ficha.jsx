@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
-// --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
+// --- MODAL DE UPLOAD DE IMAGEM ---
 const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
 
@@ -28,40 +28,45 @@ const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
 };
 
 export default function Ficha({ characterData, isMaster, onClose }) {
-  const [sheet, setSheet] = useState(characterData.character_sheet || {
-    basic_info: { 
-        character_name: characterData.name, 
-        level: 1, 
-        experience: { current: 0, max: 100 }, 
-        race: characterData.race, 
-        class: characterData.class,
-        guild_rank: "Iniciado",
-        guild_insignia: "", 
-        guild_rank_image: "" 
-    },
-    attributes: { 
-        FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
-        SOR: { value: 0 }, CAR: { value: 0 }, VEL: { value: 0 } 
-    },
-    status: { 
-        hp: { current: 10, max: 10 }, 
-        mp: { current: 5, max: 5 }, 
-        arm: { value: 0 }, 
-        res: { value: 0 },
-        mov: { value: 3 }
-    },
-    equipment: { 
-        slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
-    },
-    job_system: {
-        primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-        secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-        reaction_ability: { name: "", effect: "" },
-        passive_ability: { name: "", effect: "" },
-        class_bonus: { value: "" }
-    },
-    inventory: { gil: 0, items: [] },
-    imgUrl: "" 
+  // Estado inicial com fallback para dados existentes ou estrutura padrão
+  const [sheet, setSheet] = useState(() => {
+      const defaultSheet = {
+        basic_info: { 
+            character_name: characterData.name, 
+            level: 1, 
+            experience: { current: 0, max: 100 }, 
+            race: characterData.race, 
+            class: characterData.class,
+            guild_rank: "Iniciado",
+            guild_insignia: "", 
+            guild_rank_image: "" 
+        },
+        attributes: { 
+            FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
+            SOR: { value: 0 }, CAR: { value: 0 }, VEL: { value: 0 } 
+        },
+        status: { 
+            hp: { current: 10, max: 10 }, 
+            mp: { current: 5, max: 5 }, 
+            arm: { value: 0 }, 
+            res: { value: 0 },
+            mov: { value: 3 }
+        },
+        equipment: { 
+            slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
+        },
+        job_system: {
+            primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
+            secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
+            reaction_ability: { name: "", effect: "" },
+            passive_ability: { name: "", effect: "" },
+            class_bonus: { value: "" }
+        },
+        inventory: { gil: 0, items: [] },
+        imgUrl: "" 
+      };
+      // Mescla dados existentes com a estrutura padrão para garantir que campos novos não quebrem
+      return characterData.character_sheet ? { ...defaultSheet, ...characterData.character_sheet } : defaultSheet;
   });
 
   const [activeTab, setActiveTab] = useState('geral'); 
@@ -79,11 +84,28 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
+  // Ref para detectar level up anterior
+  const prevLevelRef = useRef(sheet.basic_info.level);
+
+  // Efeito: Atualiza dados em tempo real se mudarem no banco (ex: Mestre salvou, Jogador vê)
   useEffect(() => {
-    if (!isMaster && characterData.character_sheet) {
-        setSheet(characterData.character_sheet);
+    if (characterData.character_sheet) {
+        // Verifica se houve mudança real para evitar loop ou reset de edição local não salva
+        const serverSheet = JSON.stringify(characterData.character_sheet);
+        const localSheet = JSON.stringify(sheet);
+        
+        if (serverSheet !== localSheet && !hasUnsavedChanges) {
+            setSheet(characterData.character_sheet);
+        }
+
+        // Detecta Level Up vindo do servidor
+        if (characterData.character_sheet.basic_info?.level > prevLevelRef.current) {
+            setShowLevelUpAnim(true);
+            setTimeout(() => setShowLevelUpAnim(false), 4000);
+            prevLevelRef.current = characterData.character_sheet.basic_info.level;
+        }
     }
-  }, [characterData, isMaster]);
+  }, [characterData, hasUnsavedChanges]); // Dependência cuidadosa
 
   const updateField = (path, value) => {
     if (!isMaster) return;
@@ -104,7 +126,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
         await updateDoc(charRef, { character_sheet: sheet });
         setHasUnsavedChanges(false);
-        alert("Ficha salva com sucesso!");
+        // alert("Ficha salva com sucesso!"); // Removido alert intrusivo, visual feedback no botão basta
       } catch (error) {
           console.error("Erro ao salvar:", error);
           alert("Erro ao salvar ficha.");
@@ -112,6 +134,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   };
 
   const openUploadModal = (label, callback) => {
+      if(!isMaster) return;
       setUploadLabel(label);
       setUploadCallback(() => callback);
       setUploadModalOpen(true);
@@ -168,6 +191,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   const handleLevelUp = async () => {
     if(!isMaster) return;
+    // Animação Local + Salvar Imediato
     setShowLevelUpAnim(true);
     setTimeout(async () => {
         setShowLevelUpAnim(false);
@@ -185,10 +209,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     }, 4000);
   };
 
-  // --- RADAR CHART (Reduzido para caber melhor) ---
+  // --- RADAR CHART LOGIC ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
-  const radius = 90; // Reduzido de 110 para 90 para evitar cortes
+  const radius = 90;
   const center = 150;
 
   const getPoint = (value, index, total) => {
@@ -206,28 +230,31 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   return (
     <div className="ficha-overlay-fixed">
-        {isMaster && (
-            <button 
-                className={`save-btn-floating ${hasUnsavedChanges ? 'unsaved' : ''}`} 
-                onClick={saveSheetToDb}
-            >
-                {hasUnsavedChanges ? "💾 SALVAR ALTERAÇÕES" : "✅ FICHA SALVA"}
-            </button>
-        )}
-
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
         
+        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
+        {isMaster && hasUnsavedChanges && (
+            <button 
+                className="save-fab glowing" 
+                onClick={saveSheetToDb}
+                title="Salvar Alterações"
+            >
+                💾
+            </button>
+        )}
+
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
             {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
-                <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}}>
-                    {isMaster && (
-                        <button className="btn-plus-corner" onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}>+</button>
-                    )}
-                </div>
+                <div 
+                    className={`insignia-display ${isMaster ? 'clickable' : ''}`} 
+                    style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}}
+                    onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}
+                    title={isMaster ? "Clique para alterar imagem" : ""}
+                ></div>
             </div>
 
             {/* Centro: Infos Básicas */}
@@ -269,11 +296,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             {/* Direita: Rank Guilda */}
             <div className="guild-rank-box">
                 <span className="header-label-top">RANK</span>
-                <div className="rank-display" style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}}>
-                    {isMaster && (
-                        <button className="btn-plus-corner" onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}>+</button>
-                    )}
-                </div>
+                <div 
+                    className={`rank-display ${isMaster ? 'clickable' : ''}`} 
+                    style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}}
+                    onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}
+                    title={isMaster ? "Clique para alterar imagem" : ""}
+                ></div>
             </div>
         </div>
 
@@ -288,7 +316,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             
             {activeTab === 'geral' ? (
                 <>
-                    {/* COLUNA ESQUERDA: ATRIBUTOS (Reduzida) */}
+                    {/* COLUNA ESQUERDA: ATRIBUTOS */}
                     <div className="col-attributes">
                         <h3 className="section-title">ATRIBUTOS</h3>
                         <div className="radar-wrapper">
@@ -325,12 +353,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
                     {/* COLUNA CENTRAL: EQUIPAMENTOS */}
                     <div className="col-center-equip">
-                        <div className="char-image-frame">
-                            {isMaster && (
-                                <div className="char-img-upload-btn" onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))}>
-                                    +
-                                </div>
-                            )}
+                        <div 
+                            className={`char-image-frame ${isMaster ? 'clickable' : ''}`}
+                            onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))}
+                            title={isMaster ? "Clique para alterar foto" : ""}
+                        >
                             <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
                         </div>
                         
@@ -508,18 +535,18 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         
         .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 200; font-weight: bold; }
         
-        /* Botão Salvar (Fixo no topo da tela, fora da ficha) */
-        .save-btn-floating { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #222; border: 1px solid #444; color: #aaa; padding: 10px 20px; cursor: default; font-weight: bold; font-size: 14px; z-index: 200001; transition: 0.3s; box-shadow: 0 0 10px #000; border-radius: 4px; }
-        .save-btn-floating.unsaved { background: #00f2ff; color: #000; cursor: pointer; border-color: #fff; box-shadow: 0 0 25px #00f2ff; animation: pulseSave 1.5s infinite; }
-        @keyframes pulseSave { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } 100% { transform: translateX(-50%) scale(1); } }
+        /* Botão Salvar Flutuante (FAB) */
+        .save-fab { position: absolute; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: #222; border: 2px solid #444; color: #fff; font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 300; transition: 0.3s; box-shadow: 0 0 15px #000; }
+        .save-fab:hover { background: #00f2ff; border-color: #fff; color: #000; box-shadow: 0 0 30px #00f2ff; }
+        .save-fab.glowing { animation: pulseSave 1.5s infinite; border-color: #00f2ff; color: #00f2ff; }
+        @keyframes pulseSave { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         /* HEADER */
         .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
         .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
         .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; display: flex; align-items: center; justify-content: center; }
-        
-        .btn-plus-corner { background: transparent; color: #ffcc00; font-size: 20px; border: none; font-weight: bold; cursor: pointer; text-shadow: 0 0 5px #000; }
+        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; transition: 0.2s; }
+        .clickable:hover { cursor: pointer; border-color: #ffcc00; box-shadow: 0 0 10px #ffcc00; }
 
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
@@ -572,9 +599,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
         
-        .char-img-upload-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ffcc00; font-size: 40px; font-weight: bold; cursor: pointer; text-shadow: 0 0 10px #000; z-index: 100; transition: transform 0.2s; }
-        .char-img-upload-btn:hover { transform: translate(-50%, -50%) scale(1.2); }
-
         .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }
         .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
@@ -606,14 +630,17 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .i-qtd { color: #00f2ff; font-weight: bold; }
         .add-item-btn { width: 100%; background: #222; border: 1px dashed #555; color: #888; padding: 5px; cursor: pointer; margin-top: 10px; font-size: 10px; }
         
-        /* MODAL UPLOAD IMG (NOVO) */
+        /* MODAL UPLOAD IMG */
         .img-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 300000; display: flex; align-items: center; justify-content: center; }
-        .img-modal-content { background: #111; border: 1px solid #ffcc00; padding: 20px; width: 400px; border-radius: 8px; text-align: center; }
-        .img-modal-content h3 { color: #ffcc00; margin-top: 0; }
-        .img-modal-content input { width: 100%; padding: 10px; background: #000; border: 1px solid #444; color: #fff; margin: 15px 0; }
-        .img-modal-actions { display: flex; gap: 10px; justify-content: center; }
-        .btn-confirm { background: #00f2ff; color: #000; padding: 8px 20px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-cancel { background: #333; color: #fff; padding: 8px 20px; border: none; cursor: pointer; }
+        .img-modal-content { background: #111; border: 1px solid #ffcc00; padding: 25px; width: 400px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(255,204,0,0.2); }
+        .img-modal-content h3 { color: #ffcc00; margin-top: 0; font-family: 'Cinzel', serif; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 20px; }
+        .img-modal-content input { width: 100%; padding: 12px; background: #000; border: 1px solid #444; color: #fff; margin-bottom: 20px; outline: none; border-radius: 4px; }
+        .img-modal-content input:focus { border-color: #00f2ff; }
+        .img-modal-actions { display: flex; gap: 15px; justify-content: center; }
+        .btn-confirm { background: #00f2ff; color: #000; padding: 10px 25px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; transition: 0.2s; }
+        .btn-confirm:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
+        .btn-cancel { background: #333; color: #fff; padding: 10px 25px; border: none; cursor: pointer; border-radius: 4px; }
+        .btn-cancel:hover { background: #444; }
 
         /* MODAIS DE ITEM */
         .item-selector-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300000; display: flex; align-items: center; justify-content: center; }

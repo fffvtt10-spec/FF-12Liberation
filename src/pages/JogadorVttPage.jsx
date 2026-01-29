@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
+import levelUpMusic from '../assets/level-up.mp3'; // IMPORTAÇÃO DA MÚSICA
 import Bazar from '../components/Bazar';
-import Ficha from '../components/Ficha'; // IMPORT NOVO
+import Ficha from '../components/Ficha';
 
 const CountdownTimer = ({ targetDate, onComplete }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -43,24 +44,52 @@ export default function JogadorVttPage() {
   const [viewResenha, setViewResenha] = useState(null);
   const [vttStatus, setVttStatus] = useState(null); 
   const [currentVttSession, setCurrentVttSession] = useState(null);
-  
-  // NOVO: Estado para mostrar a ficha
   const [showFicha, setShowFicha] = useState(false);
 
+  // --- LÓGICA DE LEVEL UP ---
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const prevLevelRef = useRef(null); // Guarda o nível anterior para comparação
+  const audioRef = useRef(new Audio(levelUpMusic)); // Referência do áudio
+
+  // Configurar volume inicial
+  useEffect(() => {
+    audioRef.current.volume = 0.2;
+  }, []);
+
+  // --- CARREGAR DADOS DO PERSONAGEM EM REALTIME ---
   useEffect(() => {
     const fetchChar = async () => {
       if (!auth.currentUser) return;
-      // Listener em tempo real no personagem para atualizar Gil e Level na HUD
+      
       const docRef = doc(db, "characters", auth.currentUser.uid);
       const unsub = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
-              setPersonagem(docSnap.data());
+              const data = docSnap.data();
+              const currentLevel = data.character_sheet?.basic_info?.level || 1;
+
+              // Verifica se subiu de nível (e não é a primeira carga da página)
+              if (prevLevelRef.current !== null && currentLevel > prevLevelRef.current) {
+                  setShowLevelUpModal(true);
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play().catch(e => console.log("Autoplay bloqueado:", e));
+              }
+
+              // Atualiza a referência
+              prevLevelRef.current = currentLevel;
+              setPersonagem(data);
           }
       });
       return () => unsub();
     };
     fetchChar();
   }, []);
+
+  // --- FUNÇÃO PARA FECHAR O MODAL DE LEVEL UP ---
+  const handleConfirmLevelUp = () => {
+      setShowLevelUpModal(false);
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+  };
 
   useEffect(() => {
     if (!auth.currentUser || !personagem) return;
@@ -138,7 +167,6 @@ export default function JogadorVttPage() {
 
   if (!personagem) return <div className="loading-screen">Carregando Grimório...</div>;
 
-  // Lógica para pegar o nível do personagem (se existir na ficha, senão 1)
   const charLevel = personagem.character_sheet?.basic_info?.level || 1;
 
   return (
@@ -146,7 +174,7 @@ export default function JogadorVttPage() {
       <div className="background-layer" style={{ backgroundImage: `url(${fundoJogador})` }} />
       <div className="content-layer">
 
-        {/* HUD SUPERIOR: Agora clicável para abrir a Ficha */}
+        {/* HUD SUPERIOR */}
         <div className="char-hud clickable-hud" onClick={() => setShowFicha(true)} title="Abrir Ficha do Personagem">
           <div className="char-avatar">
              <div className="avatar-circle">
@@ -158,6 +186,17 @@ export default function JogadorVttPage() {
              <span className="char-meta">{personagem.race} // {personagem.class}</span>
           </div>
         </div>
+
+        {/* MODAL GLOBAL DE LEVEL UP */}
+        {showLevelUpModal && (
+            <div className="levelup-global-overlay">
+                <div className="levelup-content">
+                    <h1 className="levelup-title">LEVEL UP!</h1>
+                    <p className="levelup-subtitle">Seu poder cresce...</p>
+                    <button className="levelup-confirm-btn" onClick={handleConfirmLevelUp}>CONFIRMAR</button>
+                </div>
+            </div>
+        )}
 
         {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && !hasJoinedSession && (
            <div className="upcoming-sessions-banner">
@@ -202,7 +241,6 @@ export default function JogadorVttPage() {
            </button>
         )}
 
-        {/* BAZAR AGORA RECEBE OS DADOS DO JOGADOR PARA VALIDAR COMPRA */}
         <Bazar isMestre={false} playerData={personagem} /> 
 
         {showMissionModal && (
@@ -310,7 +348,6 @@ export default function JogadorVttPage() {
            </div>
         )}
 
-        {/* MODAL DA FICHA DO JOGADOR */}
         {showFicha && personagem && (
             <Ficha 
                 characterData={personagem} 
@@ -322,13 +359,13 @@ export default function JogadorVttPage() {
       </div>
 
       <style>{`
-        /* ESTILOS PRESERVADOS + NOVOS */
+        /* ESTILOS PRESERVADOS */
         .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; background-repeat: no-repeat; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         .loading-screen { width: 100vw; height: 100vh; background: #000; color: #ffcc00; display: flex; align-items: center; justify-content: center; font-size: 24px; font-family: 'Cinzel', serif; }
         
-        /* HUD ATUALIZADO */
+        /* HUD */
         .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; box-shadow: 0 0 15px rgba(255,204,0,0.3); backdrop-filter: blur(5px); z-index: 50; transition: transform 0.2s; }
         .char-hud.clickable-hud:hover { transform: scale(1.05); cursor: pointer; border-color: #fff; box-shadow: 0 0 25px #ffcc00; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
@@ -336,7 +373,15 @@ export default function JogadorVttPage() {
         .char-info h2 { margin: 0; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
         .char-meta { font-size: 12px; color: #00f2ff; font-weight: bold; }
 
-        /* OUTROS ESTILOS (Sessões, Botões, Modais) MANTIDOS IGUAIS AO ANTERIOR */
+        /* LEVEL UP GLOBAL OVERLAY */
+        .levelup-global-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 999999; display: flex; align-items: center; justify-content: center; animation: fadeOverlay 0.5s forwards; }
+        .levelup-content { text-align: center; }
+        .levelup-title { font-size: 80px; color: #ffcc00; text-shadow: 0 0 50px #ffcc00, 0 0 20px #fff; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); letter-spacing: 5px; margin-bottom: 10px; }
+        .levelup-subtitle { font-size: 24px; color: #fff; margin-bottom: 40px; font-family: 'Lato', sans-serif; opacity: 0.8; }
+        .levelup-confirm-btn { background: transparent; border: 2px solid #ffcc00; color: #ffcc00; padding: 15px 40px; font-size: 18px; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 2px; }
+        .levelup-confirm-btn:hover { background: #ffcc00; color: #000; box-shadow: 0 0 30px #ffcc00; transform: scale(1.1); }
+
+        /* SESSÕES, BOTÕES, ETC (Mantidos) */
         .upcoming-sessions-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(255,204,0,0.3); z-index: 5; width: 400px; }
         .upcoming-sessions-banner h3 { color: #ffcc00; margin-bottom: 10px; font-size: 18px; }
         .countdown-row { display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; }
@@ -422,6 +467,8 @@ export default function JogadorVttPage() {
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes fadeOverlay { 0% { opacity: 1; } 100% { opacity: 1; } }
       `}</style>
     </div>
   );
