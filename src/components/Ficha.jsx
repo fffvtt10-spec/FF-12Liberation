@@ -287,7 +287,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             <div className="header-right-group">
                 {/* GRUPO/ESPECIAL */}
                 <div className="guild-item-box">
-                     <span className="header-label-top">GRUPO</span>
+                     <span className="header-label-top">SÍMBOLO</span>
                      <div 
                         className={`special-display ${isMaster ? 'clickable' : ''}`} 
                         style={{backgroundImage: `url(${sheet.basic_info.special_image || 'https://via.placeholder.com/60?text=?'})`}}

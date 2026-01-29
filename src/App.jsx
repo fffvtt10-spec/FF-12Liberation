@@ -4,15 +4,18 @@ import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 import chocoboGif from './assets/chocobo-loading.gif';
+
+// --- IMPORTAÇÃO DAS PÁGINAS ---
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminPage from './pages/AdminPage';
 import MestrePage from './pages/MestrePage';
-import CharacterCreation from './pages/CharacterCreation'; // Importação mantida
+import CharacterCreation from './pages/CharacterCreation';
 import JogadorVttPage from './pages/JogadorVttPage';
+import MestreVTTPage from './pages/MestreVTTPage'; // <--- IMPORTAÇÃO NOVA
 
-// Rota do Jogador (Mantenha o recurso conforme solicitado)
+// Rota do Jogador (Placeholder antigo, mantido por enquanto)
 const JogadorPage = () => <div style={{color: 'white', padding: '50px'}}>PÁGINA DO JOGADOR EM CONSTRUÇÃO</div>;
 
 // Componente de Rota Protegida para Admin
@@ -29,51 +32,32 @@ export default function App() {
     // 1. Escuta o estado do Firebase
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      
-      // 2. Garante o tempo de 1 segundo para o carregamento do Chocobo e efeito de blur
-      const timer = setTimeout(() => {
-        setInitializing(false);
-      }, 1000);
-
-      return () => clearTimeout(timer);
+      if (initializing) setInitializing(false);
     });
+    return unsubscribe;
+  }, [initializing]);
 
-    return () => unsubscribe();
-  }, []);
-
-  // COMPONENTE DE LOADING (CHOCOBO + BLUR)
+  // Tela de Loading Inicial (Chocobo)
   if (initializing) {
     return (
-      <div className="ether-loading">
-        <div className="loading-blur-bg"></div>
-        <div className="loading-content">
-          <img src={chocoboGif} alt="Carregando..." className="chocobo-anim" />
-          <div className="loading-bar">
-            <div className="loading-fill"></div>
-          </div>
-          <p>SINTONIZANDO COM O ÉTER...</p>
+      <div style={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#000',
+        overflow: 'hidden'
+      }}>
+        <img src={chocoboGif} alt="Loading..." style={{width: '100px', marginBottom: '20px', filter: 'drop-shadow(0 0 10px #ffcc00)'}} />
+        <div style={{width: '200px', height: '4px', background: '#333', borderRadius: '2px', overflow: 'hidden'}}>
+          <div className="progress-bar"></div>
         </div>
+        <p style={{marginTop: '10px'}}>CARREGANDO...</p>
         <style>{`
-          .ether-loading {
-            height: 100vh; width: 100vw; background: #000;
-            display: flex; align-items: center; justify-content: center;
-            position: fixed; top: 0; left: 0; z-index: 9999;
-          }
-          .loading-blur-bg {
-            position: absolute; width: 100%; height: 100%;
-            background: radial-gradient(circle, #001a33 0%, #000 100%);
-            filter: blur(40px);
-            animation: pulseBlur 2s infinite alternate;
-          }
-          .loading-content { position: relative; z-index: 10; text-align: center; }
-          .chocobo-anim { width: 120px; filter: drop-shadow(0 0 10px #ffcc00); margin-bottom: 20px; }
-          
-          .loading-bar {
-            width: 200px; height: 2px; background: rgba(255, 255, 255, 0.1);
-            margin: 0 auto 15px auto; border-radius: 10px; overflow: hidden;
-          }
-          .loading-fill {
-            height: 100%; width: 0%; background: #ffcc00;
+          .progress-bar {
+            height: 100%; background: #ffcc00; width: 0%;
             box-shadow: 0 0 10px #ffcc00;
             animation: fillProgress 1s ease-in-out forwards;
           }
@@ -93,30 +77,25 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       
-      {/* Rota do Mestre */}
+      {/* Rotas do Mestre */}
       <Route path="/mestre" element={<MestrePage />} /> 
+      <Route path="/mestre-vtt" element={<MestreVTTPage />} /> {/* <--- ROTA NOVA ADICIONADA */}
       
-      {/* Rota do Jogador */}
+      {/* Rotas do Jogador */}
       <Route path="/jogador" element={<JogadorPage />} />
-
-      {/* NOVA ROTA ADICIONADA: CRIAÇÃO DE PERSONAGEM */}
       <Route path="/create-character" element={<CharacterCreation />} />
-
-      <Route path="/admin-login" element={<AdminLoginPage />} />
-
       <Route path="/jogador-vtt" element={<JogadorVttPage />} />
 
-      {/* PROTEGENDO A PÁGINA ADMIN (Passando o usuário atualizado) */}
+      {/* Rotas de Admin */}
+      <Route path="/admin-login" element={<AdminLoginPage />} />
       <Route 
-        path="/admin" 
+        path="/admin-dashboard" 
         element={
           <ProtectedAdminRoute user={user}>
             <AdminPage />
           </ProtectedAdminRoute>
         } 
       />
-      
-      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
