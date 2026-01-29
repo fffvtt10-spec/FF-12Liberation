@@ -5,16 +5,14 @@ import fundoJogador from '../assets/fundo-jogador.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
 import Bazar from '../components/Bazar';
+import Ficha from '../components/Ficha'; // IMPORT NOVO
 
-// Componente de Contagem Regressiva para Sessões Futuras
 const CountdownTimer = ({ targetDate, onComplete }) => {
   const [timeLeft, setTimeLeft] = useState("");
-
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date().getTime();
       const distance = new Date(targetDate).getTime() - now;
-
       if (distance < 0) {
         clearInterval(interval);
         if (onComplete) onComplete();
@@ -27,93 +25,73 @@ const CountdownTimer = ({ targetDate, onComplete }) => {
         setTimeLeft(`${days}d ${hours}h ${mins}m ${secs}s`);
       }
     }, 1000);
-
     return () => clearInterval(interval);
   }, [targetDate, onComplete]);
-
   return <span className="countdown-text">{timeLeft}</span>;
 };
 
 export default function JogadorVttPage() {
   const [personagem, setPersonagem] = useState(null);
   const [missoes, setMissoes] = useState([]);
-  
-  // Estados de Sessão
-  const [sessoesAtivas, setSessoesAtivas] = useState([]); // Já começou
-  const [sessoesFuturas, setSessoesFuturas] = useState([]); // Vai começar
-  
-  // Controle de Entrada na Sessão (NOVO)
+  const [sessoesAtivas, setSessoesAtivas] = useState([]); 
+  const [sessoesFuturas, setSessoesFuturas] = useState([]); 
   const [hasJoinedSession, setHasJoinedSession] = useState(false);
-
-  // Modais e Visualizações
   const [showMissionModal, setShowMissionModal] = useState(false);
-  const [showMissionDetails, setShowMissionDetails] = useState(null); // Detalhes da missão
-  
-  // Estados de Resenhas
+  const [showMissionDetails, setShowMissionDetails] = useState(null); 
   const [resenhas, setResenhas] = useState([]);
   const [showResenhasList, setShowResenhasList] = useState(false);
   const [viewResenha, setViewResenha] = useState(null);
-
-  // Estado do VTT (Status no canto superior)
-  const [vttStatus, setVttStatus] = useState(null); // null, 'waiting', 'connected'
+  const [vttStatus, setVttStatus] = useState(null); 
   const [currentVttSession, setCurrentVttSession] = useState(null);
+  
+  // NOVO: Estado para mostrar a ficha
+  const [showFicha, setShowFicha] = useState(false);
 
-  // --- CARREGAR DADOS DO PERSONAGEM ---
   useEffect(() => {
     const fetchChar = async () => {
       if (!auth.currentUser) return;
+      // Listener em tempo real no personagem para atualizar Gil e Level na HUD
       const docRef = doc(db, "characters", auth.currentUser.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setPersonagem(docSnap.data());
-      }
+      const unsub = onSnapshot(docRef, (docSnap) => {
+          if (docSnap.exists()) {
+              setPersonagem(docSnap.data());
+          }
+      });
+      return () => unsub();
     };
     fetchChar();
   }, []);
 
-  // --- CARREGAR MISSÕES, SESSÕES E RESENHAS ---
   useEffect(() => {
     if (!auth.currentUser || !personagem) return;
-
-    // 1. Ouvir Missões Disponíveis
     const qMissoes = query(collection(db, "missoes"));
     const unsubMissoes = onSnapshot(qMissoes, (snap) => {
       setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-
-    // 2. Ouvir Sessões onde o jogador foi incluído
     const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
     const unsubSessoes = onSnapshot(qSessoes, (snap) => {
       const agora = new Date();
       const todasSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
       const ativas = [];
       const futuras = [];
-
       todasSessoes.forEach(s => {
         const inicio = new Date(s.dataInicio);
         const fim = new Date(s.expiraEm);
-
         if (agora >= inicio && agora <= fim) {
            ativas.push(s);
         } else if (agora < inicio) {
            futuras.push(s);
         }
       });
-
       setSessoesAtivas(ativas);
       setSessoesFuturas(futuras);
-      
-      // Lógica automática para atualizar o status do VTT se estiver conectado
       if (currentVttSession) {
          const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
          if (sessionUpdated) {
-            setVttStatus('connected'); // Se está na lista de ativas, o mestre "abriu" (pelo horário)
+            setVttStatus('connected'); 
          }
       }
     });
-
-    // 3. Ouvir Resenhas
     const qResenhas = query(collection(db, "resenhas"), where("destinatarios", "array-contains", personagem.name));
     const unsubResenhas = onSnapshot(qResenhas, (snap) => {
        const loadedResenhas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -121,16 +99,13 @@ export default function JogadorVttPage() {
        const validas = loadedResenhas.filter(r => new Date(r.expiraEm) > agora);
        setResenhas(validas);
     });
-
     return () => { unsubMissoes(); unsubSessoes(); unsubResenhas(); };
   }, [personagem, currentVttSession]);
 
-  // --- CANDIDATURA À MISSÃO ---
   const handleCandidatar = async (missao) => {
     if (!personagem) return;
     const jaCandidato = missao.candidatos?.some(c => c.uid === auth.currentUser.uid);
     if (jaCandidato) return alert("Você já se candidatou para esta missão!");
-
     const isLeader = !missao.candidatos || missao.candidatos.length === 0;
     const candidatoObj = {
       uid: auth.currentUser.uid,
@@ -139,7 +114,6 @@ export default function JogadorVttPage() {
       isLeader: isLeader,
       dataCandidatura: new Date().toISOString()
     };
-
     try {
       const missaoRef = doc(db, "missoes", missao.id);
       await updateDoc(missaoRef, { candidatos: arrayUnion(candidatoObj) });
@@ -150,15 +124,11 @@ export default function JogadorVttPage() {
     }
   };
 
-  // --- ENTRAR NO VTT (ACIONA O STATUS E SOME O BANNER) ---
   const enterVTT = (sessao) => {
      setCurrentVttSession(sessao);
-     setHasJoinedSession(true); // ESCONDE O BANNER CENTRAL
-
-     // Verifica se a sessão já está ativa (horário)
+     setHasJoinedSession(true); 
      const agora = new Date();
      const inicio = new Date(sessao.dataInicio);
-     
      if (agora >= inicio) {
         setVttStatus('connected');
      } else {
@@ -168,22 +138,20 @@ export default function JogadorVttPage() {
 
   if (!personagem) return <div className="loading-screen">Carregando Grimório...</div>;
 
+  // Lógica para pegar o nível do personagem (se existir na ficha, senão 1)
+  const charLevel = personagem.character_sheet?.basic_info?.level || 1;
+
   return (
     <div className="jogador-container">
-      
-      {/* 1. CAMADA DE FUNDO */}
-      <div 
-        className="background-layer"
-        style={{ backgroundImage: `url(${fundoJogador})` }}
-      />
-      
-      {/* 2. CAMADA DE CONTEÚDO */}
+      <div className="background-layer" style={{ backgroundImage: `url(${fundoJogador})` }} />
       <div className="content-layer">
 
-        {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
-        <div className="char-hud">
+        {/* HUD SUPERIOR: Agora clicável para abrir a Ficha */}
+        <div className="char-hud clickable-hud" onClick={() => setShowFicha(true)} title="Abrir Ficha do Personagem">
           <div className="char-avatar">
-             <div className="avatar-circle"></div>
+             <div className="avatar-circle">
+                 <span className="hud-level">{charLevel}</span>
+             </div>
           </div>
           <div className="char-info">
              <h2 className="char-name">{personagem.name}</h2>
@@ -191,9 +159,6 @@ export default function JogadorVttPage() {
           </div>
         </div>
 
-        {/* ÁREA CENTRAL: SESSÕES (FUTURAS E ATIVAS) */}
-        
-        {/* 1. Sessões Futuras (Countdown) - Só aparece se não entrou e não tem ativa rolando */}
         {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && !hasJoinedSession && (
            <div className="upcoming-sessions-banner">
               <h3>A SESSÃO VAI COMEÇAR EM BREVE</h3>
@@ -206,7 +171,6 @@ export default function JogadorVttPage() {
            </div>
         )}
 
-        {/* 2. Sessões Ativas (Banner Vermelho) - SÓ APARECE SE AINDA NÃO CLICOU EM ENTRAR */}
         {sessoesAtivas.length > 0 && !hasJoinedSession && (
           <div className="active-sessions-banner fade-in">
              <h3>SESSÃO EM ANDAMENTO!</h3>
@@ -219,31 +183,17 @@ export default function JogadorVttPage() {
           </div>
         )}
 
-        {/* STATUS DO VTT (CANTO SUPERIOR DIREITO) - SÓ APARECE DEPOIS DE ENTRAR */}
         {vttStatus && currentVttSession && (
            <div className={`vtt-status-widget ${vttStatus}`}>
               <div className="status-indicator"></div>
               <div className="status-text">
-                 {vttStatus === 'waiting' && (
-                    <>
-                      <h4>AGUARDANDO MESTRE</h4>
-                      <small>Sessão Conectada! Aguardando...</small>
-                    </>
-                 )}
-                 {vttStatus === 'connected' && (
-                    <>
-                      <h4>BEM-VINDO, AVENTUREIRO</h4>
-                      <small>Sessão Conectada!</small>
-                    </>
-                 )}
+                 {vttStatus === 'waiting' && (<><h4>AGUARDANDO MESTRE</h4><small>Sessão Conectada! Aguardando...</small></>)}
+                 {vttStatus === 'connected' && (<><h4>BEM-VINDO, AVENTUREIRO</h4><small>Sessão Conectada!</small></>)}
               </div>
            </div>
         )}
 
-        {/* BOTÕES FLUTUANTES */}
-        <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Quadro de Missões">
-            📜
-        </button>
+        <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Quadro de Missões">📜</button>
 
         {resenhas.length > 0 && (
            <button className="floating-sanchez-btn" onClick={() => setShowResenhasList(true)} title="Resenhas do Sanchez">
@@ -252,18 +202,16 @@ export default function JogadorVttPage() {
            </button>
         )}
 
-        <Bazar isMestre={false} /> 
+        {/* BAZAR AGORA RECEBE OS DADOS DO JOGADOR PARA VALIDAR COMPRA */}
+        <Bazar isMestre={false} playerData={personagem} /> 
 
-        {/* MODAL DO QUADRO DE MISSÕES */}
         {showMissionModal && (
           <div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}>
              <div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}>
-                
                 <div className="modal-header-row">
                   <h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3>
                   <button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button>
                 </div>
-
                 <div className="missions-list-player">
                    {missoes.map(m => (
                      <div key={m.id} className={`mission-poster-player rank-${m.rank}`}>
@@ -276,7 +224,6 @@ export default function JogadorVttPage() {
                           <p><strong>Recompensa:</strong> {m.gilRecompensa} Gil</p>
                           <p className="mp-desc">{m.descricaoMissao}</p>
                         </div>
-                        
                         {m.candidatos && m.candidatos.length > 0 && (
                           <div className="candidates-box">
                              <small>Grupo em formação:</small>
@@ -289,14 +236,9 @@ export default function JogadorVttPage() {
                              </div>
                           </div>
                         )}
-                        
                         <div className="mp-actions-row">
                              <button className="btn-details-outline" onClick={() => setShowMissionDetails(m)}>DETALHES</button>
-                             <button 
-                              className="btn-candidatar" 
-                              disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)}
-                              onClick={() => handleCandidatar(m)}
-                             >
+                             <button className="btn-candidatar" disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)} onClick={() => handleCandidatar(m)}>
                               {m.candidatos?.some(c => c.uid === auth.currentUser.uid) ? "ENVIADO" : "ACEITAR"}
                              </button>
                         </div>
@@ -308,7 +250,6 @@ export default function JogadorVttPage() {
           </div>
         )}
 
-        {/* MODAL DE DETALHES DA MISSÃO */}
         {showMissionDetails && (
             <div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}>
                 <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
@@ -321,41 +262,17 @@ export default function JogadorVttPage() {
                     </div>
                     <div className="detail-body-grid">
                         <div className="detail-info-row">
-                            <div className="info-item">
-                                <label>🌍 LOCAL</label>
-                                <span>{showMissionDetails.local || "Desconhecido"}</span>
-                            </div>
-                            <div className="info-item">
-                                <label>👤 CONTRATANTE</label>
-                                <span>{showMissionDetails.contratante || "Anônimo"}</span>
-                            </div>
+                            <div className="info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div>
+                            <div className="info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div>
                         </div>
-                        <div className="detail-section">
-                            <label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label>
-                            <p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p>
-                        </div>
-                        <div className="detail-section">
-                            <label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label>
-                            <p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p>
-                        </div>
-                        <div className="detail-section">
-                            <label className="section-label">⚡ REQUISITOS</label>
-                            <p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p>
-                        </div>
+                        <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label><p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p></div>
+                        <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label><p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p></div>
+                        <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p></div>
                         <div className="detail-section reward-section">
                             <label className="section-label">💎 RECOMPENSAS</label>
                             <div className="reward-content-box">
-                                <div className="gil-display-row">
-                                    <span className="gil-icon">💰</span> 
-                                    <span className="gil-value">{showMissionDetails.gilRecompensa || 0} GIL</span>
-                                </div>
-                                {showMissionDetails.recompensa && (
-                                    <div className="extra-rewards-list">
-                                        {showMissionDetails.recompensa.split('\n').map((r,i) => (
-                                            <div key={i} className="reward-item">• {r}</div>
-                                        ))}
-                                    </div>
-                                )}
+                                <div className="gil-display-row"><span className="gil-icon">💰</span> <span className="gil-value">{showMissionDetails.gilRecompensa || 0} GIL</span></div>
+                                {showMissionDetails.recompensa && (<div className="extra-rewards-list">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}
                             </div>
                         </div>
                     </div>
@@ -364,22 +281,15 @@ export default function JogadorVttPage() {
             </div>
         )}
 
-        {/* MODAL DE LISTA DE RESENHAS */}
         {showResenhasList && (
            <div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}>
               <div className="ff-modal-content ff-card" style={{height: 'auto', maxHeight: '600px'}} onClick={e => e.stopPropagation()}>
-                 <div className="modal-header-row">
-                    <h3 className="modal-title-ff">RESENHAS RECEBIDAS</h3>
-                    <button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button>
-                 </div>
+                 <div className="modal-header-row"><h3 className="modal-title-ff">RESENHAS RECEBIDAS</h3><button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button></div>
                  <div className="resenhas-list-container">
                     {resenhas.map(r => (
                        <div key={r.id} className="resenha-row-player" onClick={() => { setViewResenha(r); setShowResenhasList(false); }}>
                           <span className="r-icon">📩</span>
-                          <div className="r-info">
-                             <h4>{r.titulo}</h4>
-                             <small>De: {r.mestre}</small>
-                          </div>
+                          <div className="r-info"><h4>{r.titulo}</h4><small>De: {r.mestre}</small></div>
                           <button className="btn-read-arrow">LER ➔</button>
                        </div>
                     ))}
@@ -388,7 +298,6 @@ export default function JogadorVttPage() {
            </div>
         )}
 
-        {/* MODAL DE LEITURA (PAPIRO) */}
         {viewResenha && (
            <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
               <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -401,35 +310,42 @@ export default function JogadorVttPage() {
            </div>
         )}
 
+        {/* MODAL DA FICHA DO JOGADOR */}
+        {showFicha && personagem && (
+            <Ficha 
+                characterData={personagem} 
+                isMaster={false} 
+                onClose={() => setShowFicha(false)} 
+            />
+        )}
+
       </div>
 
       <style>{`
-        /* ESTRUTURA DE CAMADAS */
+        /* ESTILOS PRESERVADOS + NOVOS */
         .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; background-repeat: no-repeat; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
-
-        /* INTERFACE GERAL */
         .loading-screen { width: 100vw; height: 100vh; background: #000; color: #ffcc00; display: flex; align-items: center; justify-content: center; font-size: 24px; font-family: 'Cinzel', serif; }
-        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; box-shadow: 0 0 15px rgba(255,204,0,0.3); backdrop-filter: blur(5px); z-index: 50; }
-        .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; }
+        
+        /* HUD ATUALIZADO */
+        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; box-shadow: 0 0 15px rgba(255,204,0,0.3); backdrop-filter: blur(5px); z-index: 50; transition: transform 0.2s; }
+        .char-hud.clickable-hud:hover { transform: scale(1.05); cursor: pointer; border-color: #fff; box-shadow: 0 0 25px #ffcc00; }
+        .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
+        .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 5px #000; }
         .char-info h2 { margin: 0; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
         .char-meta { font-size: 12px; color: #00f2ff; font-weight: bold; }
 
-        /* SESSÕES FUTURAS (COUNTDOWN) */
+        /* OUTROS ESTILOS (Sessões, Botões, Modais) MANTIDOS IGUAIS AO ANTERIOR */
         .upcoming-sessions-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(255,204,0,0.3); z-index: 5; width: 400px; }
         .upcoming-sessions-banner h3 { color: #ffcc00; margin-bottom: 10px; font-size: 18px; }
         .countdown-row { display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; }
         .countdown-text { font-size: 24px; color: #fff; font-weight: bold; font-family: 'Lato', sans-serif; }
-
-        /* SESSÕES ATIVAS */
         .active-sessions-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(20, 0, 0, 0.9); border: 2px solid #f00; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px #f00; animation: pulseRed 2s infinite; z-index: 5; }
         .session-entry-row { display: flex; gap: 20px; align-items: center; margin-top: 10px; justify-content: center; }
         .btn-enter-session { background: #f00; color: #fff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; font-size: 16px; }
         .btn-enter-session:hover { background: #fff; color: #f00; }
         @keyframes pulseRed { 0% { box-shadow: 0 0 10px #f00; } 50% { box-shadow: 0 0 30px #f00; } 100% { box-shadow: 0 0 10px #f00; } }
-
-        /* WIDGET STATUS VTT */
         .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 9999; width: 280px; transition: 0.5s; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
         .vtt-status-widget.waiting { border-color: #ffcc00; }
         .vtt-status-widget.connected { border-color: #0f0; box-shadow: 0 0 20px rgba(0,255,0,0.3); }
@@ -441,24 +357,18 @@ export default function JogadorVttPage() {
         .waiting .status-text h4 { color: #ffcc00; }
         .connected .status-text h4 { color: #0f0; }
         @keyframes blink { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-
-        /* BOTÕES FLUTUANTES */
         .floating-mission-btn { position: fixed; bottom: 30px; left: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 30px; cursor: pointer; z-index: 999; box-shadow: 0 0 15px rgba(0,0,0,0.8); transition: transform 0.2s, box-shadow 0.2s; display: flex; align-items: center; justify-content: center; }
         .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #ffcc00; }
         .floating-sanchez-btn { position: fixed; bottom: 110px; left: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 999; box-shadow: 0 0 15px rgba(0,242,255,0.5); transition: transform 0.2s; display: flex; align-items: center; justify-content: center; overflow: visible; }
         .floating-sanchez-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #00f2ff; }
         .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; }
         .notification-badge { position: absolute; top: -5px; right: -5px; background: #f00; color: #fff; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
-
-        /* MODAIS GERAIS */
         .ff-modal-overlay-flex { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
         .ff-modal-content { width: 600px; max-width: 95vw; max-height: 85vh; background: #0d0d15; border: 2px solid #ffcc00; padding: 25px; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.9); overflow-y: auto; display: flex; flex-direction: column; }
         .modal-header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; }
         .modal-title-ff { color: #ffcc00; margin: 0; font-size: 22px; letter-spacing: 2px; }
         .btn-close-x { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; }
         .btn-close-x:hover { color: #f00; }
-
-        /* LISTA DE MISSÕES */
         .missions-list-player { display: grid; grid-template-columns: 1fr; gap: 15px; }
         .mission-poster-player { background: rgba(255,255,255,0.05); border: 1px solid #444; padding: 15px; border-radius: 4px; position: relative; }
         .mp-header { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 8px; }
@@ -475,8 +385,6 @@ export default function JogadorVttPage() {
         .cand-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
         .cand-tag { font-size: 11px; padding: 2px 6px; background: #222; border: 1px solid #444; border-radius: 3px; color: #ddd; }
         .cand-tag.leader { border-color: #ffcc00; color: #ffcc00; }
-
-        /* LISTA DE RESENHAS */
         .resenhas-list-container { display: flex; flex-direction: column; gap: 10px; }
         .resenha-row-player { display: flex; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
         .resenha-row-player:hover { background: rgba(255,255,255,0.1); border-color: #ffcc00; }
@@ -485,8 +393,6 @@ export default function JogadorVttPage() {
         .r-info h4 { margin: 0; color: #ffcc00; font-size: 16px; }
         .r-info small { color: #aaa; }
         .btn-read-arrow { background: none; border: none; color: #00f2ff; font-weight: bold; cursor: pointer; }
-
-        /* VISUALIZAÇÃO DE DETALHES (Estilo do Mestre) */
         .detail-view-main { width: 600px; background: #000814; border: 1px solid #ffcc00; padding: 0; box-shadow: 0 0 40px rgba(255, 204, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; }
         .detail-header-modern { background: linear-gradient(90deg, #1a1a1a 0%, #000 100%); padding: 25px 30px; display: flex; align-items: center; border-bottom: 1px solid #333; gap: 20px; }
         .detail-rank-badge { font-size: 32px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); border: 2px solid #ffcc00; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.5); }
@@ -506,8 +412,6 @@ export default function JogadorVttPage() {
         .reward-item { color: #aaa; font-size: 14px; margin-bottom: 4px; font-style: italic; }
         .ff-final-close-btn { width: 100%; background: #111; color: #fff; border: none; border-top: 1px solid #333; padding: 20px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; transition: 0.2s; }
         .ff-final-close-btn:hover { background: #222; color: #ffcc00; }
-
-        /* PAPIRO VIEW */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
         .papiro-real-container { width: 1000px; height: 800px; max-width: 95vw; max-height: 95vh; background-size: 100% 100%; background-repeat: no-repeat; padding: 110px 160px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
         .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); opacity: 0.9; }
@@ -516,7 +420,6 @@ export default function JogadorVttPage() {
         .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; scrollbar-width: none; -ms-overflow-style: none; }
         .papiro-body-real::-webkit-scrollbar { display: none; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
-
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>

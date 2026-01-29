@@ -7,6 +7,7 @@ import sanchezImg from '../assets/sanchez.jpeg';
 import papiroImg from '../assets/papiro.png'; 
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
+import Ficha from '../components/Ficha'; // NOVO IMPORT
 
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -39,6 +40,8 @@ export default function MestrePage() {
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
+  const [showFichasList, setShowFichasList] = useState(false); // NOVO
+  const [selectedFicha, setSelectedFicha] = useState(null); // NOVO
   
   // Visualizações
   const [showDetails, setShowDetails] = useState(null); 
@@ -102,6 +105,8 @@ export default function MestrePage() {
     return () => { unsubM(); unsubR(); unsubS(); };
   }, []);
 
+  // ... (Funções handleCreateMission, publicarResenha, handleAddAsset, handleRemoveAsset, criarSessao, enterVTT mantidas iguais) -> Ocultando para brevidade pois não mudaram
+  // Vou reimplementar o handleCreateMission para garantir a consistencia
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
@@ -148,12 +153,10 @@ export default function MestrePage() {
   const criarSessao = async (e) => {
       e.preventDefault();
       if (!sessionForm.missaoId || !sessionForm.dataInicio) return alert("Selecione a missão e o horário!");
-      
       try {
         const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
         const inicio = new Date(sessionForm.dataInicio);
         const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); 
-
         await addDoc(collection(db, "sessoes"), {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
@@ -165,14 +168,12 @@ export default function MestrePage() {
             tokens: sessionForm.tokens,
             createdAt: serverTimestamp()
         });
-        
         setShowSessionModal(false);
         setSessionForm({ missaoId: '', dataInicio: '', cenarios: [], tokens: [] });
         setSessaoDestinatarios([]);
         alert("Sessão criada com sucesso!");
       } catch (err) {
           alert("Erro ao criar sessão: " + err.message);
-          console.error(err);
       }
   };
 
@@ -192,6 +193,11 @@ export default function MestrePage() {
           <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
         </div>
         
+        {/* BOTÃO DE GERENCIAR FICHAS NOVO */}
+        <div style={{textAlign: 'center', marginBottom: '20px'}}>
+            <button className="btn-cyan big-btn" onClick={() => setShowFichasList(true)}>📜 GERENCIAR FICHAS DE PERSONAGEM</button>
+        </div>
+
         <div className="mestre-grid">
           {/* COLUNA 1: MISSÕES */}
           <div className="ff-card board-column">
@@ -283,256 +289,130 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* MODAL DE CRIAÇÃO DE MISSÃO */}
+      {/* MODAL DE LISTA DE FICHAS (NOVO) */}
+      {showFichasList && (
+          <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
+              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()}>
+                  <h3 className="modal-title-ff">PERSONAGENS REGISTRADOS</h3>
+                  <div className="destinatarios-grid-fixed">
+                      {personagensDb.map(p => (
+                          <div key={p.id} className="ficha-list-item" onClick={() => { setSelectedFicha(p); setShowFichasList(false); }}>
+                              <div className="ficha-row-name">
+                                  <strong>{p.name}</strong> 
+                                  <small>{p.race} // {p.class}</small>
+                              </div>
+                              <button className="btn-cyan">ABRIR FICHA ➔</button>
+                          </div>
+                      ))}
+                  </div>
+                  <button className="btn-cancelar-main" style={{marginTop:'20px'}} onClick={() => setShowFichasList(false)}>FECHAR</button>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL DA FICHA EM MODO MESTRE (EDIÇÃO) */}
+      {selectedFicha && (
+          <Ficha 
+            characterData={selectedFicha} 
+            isMaster={true} 
+            onClose={() => setSelectedFicha(null)} 
+          />
+      )}
+
+      {/* --- OUTROS MODAIS MANTIDOS (Resenha, Sessão, Detalhes, etc) --- */}
       {showModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
             <h3 className="modal-title-ff">NOVA MISSÃO</h3>
             <form onSubmit={handleCreateMission}>
-              {/* CAMPOS MANTIDOS... */}
-              <div className="modal-input-group">
-                <label>NOME DA MISSÃO</label>
-                <input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required />
-              </div>
-              <div className="modal-input-group">
-                <label>LOCAL</label>
-                <input placeholder="Onde ocorre..." value={form.local} onChange={e=>setForm({...form, local: e.target.value})} />
-              </div>
-              <div className="modal-input-group">
-                <label>CONTRATANTE</label>
-                <input placeholder="Quem paga..." value={form.contratante} onChange={e=>setForm({...form, contratante: e.target.value})} />
-              </div>
-              <div className="modal-input-group">
-                <label>DESCRIÇÃO DA MISSÃO</label>
-                <textarea className="tall-area-dark" placeholder="Detalhes da história e contexto..." value={form.descricaoMissao} onChange={e=>setForm({...form, descricaoMissao: e.target.value})} />
-              </div>
-              <div className="modal-input-group">
-                <label>OBJETIVOS DA MISSÃO</label>
-                <textarea className="tall-area-dark" placeholder="O que deve ser feito passo a passo..." value={form.objetivosMissao} onChange={e=>setForm({...form, objetivosMissao: e.target.value})} />
-              </div>
-              <div className="modal-input-group">
-                <label>REQUISITOS DA MISSÃO</label>
-                <textarea className="tall-area-dark" placeholder="O que é necessário para aceitar..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} />
-              </div>
+              <div className="modal-input-group"><label>NOME DA MISSÃO</label><input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required /></div>
+              <div className="modal-input-group"><label>LOCAL</label><input placeholder="Onde ocorre..." value={form.local} onChange={e=>setForm({...form, local: e.target.value})} /></div>
+              <div className="modal-input-group"><label>CONTRATANTE</label><input placeholder="Quem paga..." value={form.contratante} onChange={e=>setForm({...form, contratante: e.target.value})} /></div>
+              <div className="modal-input-group"><label>DESCRIÇÃO DA MISSÃO</label><textarea className="tall-area-dark" placeholder="Detalhes da história e contexto..." value={form.descricaoMissao} onChange={e=>setForm({...form, descricaoMissao: e.target.value})} /></div>
+              <div className="modal-input-group"><label>OBJETIVOS DA MISSÃO</label><textarea className="tall-area-dark" placeholder="O que deve ser feito passo a passo..." value={form.objetivosMissao} onChange={e=>setForm({...form, objetivosMissao: e.target.value})} /></div>
+              <div className="modal-input-group"><label>REQUISITOS DA MISSÃO</label><textarea className="tall-area-dark" placeholder="O que é necessário para aceitar..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} /></div>
               <div className="row-double-ff">
-                <div className="field-group">
-                  <label>GRUPO MÁXIMO</label>
-                  <input placeholder="Ex: 6 jogadores" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} />
-                </div>
-                <div className="field-group">
-                  <label>RANK</label>
-                  <select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>
-                    {['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}
-                  </select>
-                </div>
+                <div className="field-group"><label>GRUPO MÁXIMO</label><input placeholder="Ex: 6 jogadores" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} /></div>
+                <div className="field-group"><label>RANK</label><select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>{['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}</select></div>
               </div>
-              <div className="modal-input-group">
-                <label>RECOMPENSAS EXTRAS (TEXTO)</label>
-                <textarea className="tall-area-dark" placeholder="Itens, especiarias, equipamentos..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} />
-              </div>
+              <div className="modal-input-group"><label>RECOMPENSAS EXTRAS</label><textarea className="tall-area-dark" placeholder="Itens, especiarias..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} /></div>
               <div className="row-double-ff">
-                <div className="field-group">
-                  <label>GIL</label>
-                  <input type="text" className="gil-input" placeholder="Ex: 5000" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} />
-                </div>
-                <div className="field-group">
-                  <label>DURAÇÃO DA MISSÃO</label>
-                  <input placeholder="Ex: 1d 10h" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required />
-                </div>
+                <div className="field-group"><label>GIL</label><input type="text" className="gil-input" placeholder="Ex: 5000" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} /></div>
+                <div className="field-group"><label>DURAÇÃO</label><input placeholder="Ex: 1d 10h" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required /></div>
               </div>
-              <div className="modal-input-group">
-                <label>URL DA IMAGEM DO CARTAZ</label>
-                <input placeholder="Link Imgur..." value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} />
-              </div>
-              <div className="btn-group-ff">
-                <button type="submit" className="btn-forjar-main">FORJAR MISSÃO</button>
-                <button type="button" className="btn-cancelar-main" onClick={() => setShowModal(false)}>FECHAR</button>
-              </div>
+              <div className="modal-input-group"><label>IMAGEM</label><input placeholder="Link Imgur..." value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} /></div>
+              <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">FORJAR MISSÃO</button><button type="button" className="btn-cancelar-main" onClick={() => setShowModal(false)}>FECHAR</button></div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO DE RESENHA */}
       {showResenhaModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
             <h3 className="modal-title-ff">ESCREVER CRÔNICA</h3>
-            <div className="modal-input-group">
-               <label>TÍTULO DA CRÔNICA</label>
-               <input className="ff-modal-input-dark" placeholder="Título..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
-            </div>
-            <div className="modal-input-group">
-               <label>CORPO DO TEXTO</label>
-               <textarea className="tall-area-ff-dark" placeholder="Use **texto** para negrito." value={resenha} onChange={(e) => setResenha(e.target.value)} />
-            </div>
-            <div className="player-selector-box-fixed">
-              <label>DESTINATÁRIOS:</label>
-              <div className="destinatarios-grid-fixed">
-                {personagensDb.length > 0 ? personagensDb.map(p => (
-                  <label key={p.id} className="chip-label-ff">
-                    <input type="checkbox" checked={destinatarios.includes(p.name)} onChange={() => destinatarios.includes(p.name) ? setDestinatarios(destinatarios.filter(x=>x!==p.name)) : setDestinatarios([...destinatarios, p.name])} /> {p.name}
-                  </label>
-                )) : <p>Nenhum personagem disponível.</p>}
-              </div>
-            </div>
-            <div className="btn-group-ff">
-              <button className="btn-forjar-main" onClick={publicarResenha}>PUBLICAR</button>
-              <button className="btn-cancelar-main" onClick={() => setShowResenhaModal(false)}>FECHAR</button>
-            </div>
+            <div className="modal-input-group"><label>TÍTULO</label><input className="ff-modal-input-dark" value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} /></div>
+            <div className="modal-input-group"><label>CORPO</label><textarea className="tall-area-ff-dark" value={resenha} onChange={(e) => setResenha(e.target.value)} /></div>
+            <div className="player-selector-box-fixed"><label>DESTINATÁRIOS:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={destinatarios.includes(p.name)} onChange={() => destinatarios.includes(p.name) ? setDestinatarios(destinatarios.filter(x=>x!==p.name)) : setDestinatarios([...destinatarios, p.name])} /> {p.name}</label>))}</div></div>
+            <div className="btn-group-ff"><button className="btn-forjar-main" onClick={publicarResenha}>PUBLICAR</button><button className="btn-cancelar-main" onClick={() => setShowResenhaModal(false)}>FECHAR</button></div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO DE SESSÃO */}
       {showSessionModal && (
           <div className="ff-modal-overlay-fixed">
               <div className="ff-modal-scrollable ff-card">
                   <h3 className="modal-title-ff">CRIAR NOVA SESSÃO</h3>
                   <form onSubmit={criarSessao}>
-                      <div className="modal-input-group">
-                          <label>SELECIONAR MISSÃO (OBJETIVO)</label>
-                          <select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required>
-                              <option value="">-- Escolha uma missão --</option>
-                              {missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}
-                          </select>
-                      </div>
-
-                      <div className="modal-input-group">
-                          <label>DATA E HORÁRIO DE INÍCIO</label>
-                          <input type="datetime-local" className="ff-input-dark" value={sessionForm.dataInicio} onChange={e => setSessionForm({...sessionForm, dataInicio: e.target.value})} required />
-                      </div>
-
-                      <div className="player-selector-box-fixed">
-                          <label>SELECIONAR JOGADORES (PERSONAGENS):</label>
-                          <div className="destinatarios-grid-fixed">
-                              {personagensDb.length > 0 ? personagensDb.map(p => (
-                                  <label key={p.id} className="chip-label-ff">
-                                      <input 
-                                        type="checkbox" 
-                                        checked={sessaoDestinatarios.includes(p.name)} 
-                                        onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} 
-                                      /> 
-                                      {p.name} ({p.class})
-                                  </label>
-                              )) : <p style={{color: '#666'}}>Nenhum personagem encontrado no banco.</p>}
-                          </div>
-                      </div>
-
+                      <div className="modal-input-group"><label>SELECIONAR MISSÃO</label><select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required><option value="">-- Escolha --</option>{missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}</select></div>
+                      <div className="modal-input-group"><label>DATA E HORÁRIO</label><input type="datetime-local" className="ff-input-dark" value={sessionForm.dataInicio} onChange={e => setSessionForm({...sessionForm, dataInicio: e.target.value})} required /></div>
+                      <div className="player-selector-box-fixed"><label>JOGADORES:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={sessaoDestinatarios.includes(p.name)} onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} /> {p.name} ({p.class})</label>))}</div></div>
                       <div className="upload-section-box">
-                          <h4 className="upload-section-title">IMPORTAR IMAGENS (IMGUR)</h4>
-                          <div className="link-import-row">
-                              <input className="ff-input-dark" placeholder="Cole o link da imagem aqui..." value={tempLink} onChange={e => setTempLink(e.target.value)} />
-                              <select className="ff-select-dark small-select" value={tempType} onChange={e => setTempType(e.target.value)}>
-                                  <option value="cenario">Cenário</option>
-                                  <option value="token">Token</option>
-                              </select>
-                              <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
-                          </div>
+                          <h4 className="upload-section-title">IMPORTAR IMAGENS</h4>
+                          <div className="link-import-row"><input className="ff-input-dark" value={tempLink} onChange={e => setTempLink(e.target.value)} /><select className="ff-select-dark small-select" value={tempType} onChange={e => setTempType(e.target.value)}><option value="cenario">Cenário</option><option value="token">Token</option></select><button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button></div>
                           <div className="assets-lists">
-                              {sessionForm.cenarios.length > 0 && (
-                                <div className="asset-group"><label>CENÁRIOS:</label>{sessionForm.cenarios.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenario', i)}>×</button></div>))}</div>
-                              )}
-                              {sessionForm.tokens.length > 0 && (
-                                <div className="asset-group"><label>TOKENS:</label>{sessionForm.tokens.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('token', i)}>×</button></div>))}</div>
-                              )}
+                              {sessionForm.cenarios.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenario', i)}>×</button></div>))}
+                              {sessionForm.tokens.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('token', i)}>×</button></div>))}
                           </div>
                       </div>
-
-                      <div className="btn-group-ff">
-                          <button type="submit" className="btn-forjar-main">AGENDAR SESSÃO</button>
-                          <button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button>
-                      </div>
+                      <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">AGENDAR</button><button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button></div>
                   </form>
               </div>
           </div>
       )}
 
-      {/* MODAL DE MEMBROS DA SESSÃO */}
       {viewMembers && (
         <div className="ff-modal-overlay-fixed" onClick={() => setViewMembers(null)}>
            <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{height: 'auto', maxHeight: '500px'}}>
               <h3 className="modal-title-ff">MEMBROS ALOCADOS</h3>
-              <p style={{color: '#aaa', marginBottom: '20px'}}>Personagens selecionados para esta sessão:</p>
-              <div className="destinatarios-grid-fixed">
-                 {viewMembers.participantes?.length > 0 ? viewMembers.participantes.map((nome, idx) => (
-                    <div key={idx} className="chip-label-ff" style={{cursor: 'default', color: '#fff', borderColor: '#00f2ff'}}>
-                       👤 {nome}
-                    </div>
-                 )) : <p>Nenhum membro alocado ainda.</p>}
-              </div>
+              <div className="destinatarios-grid-fixed">{viewMembers.participantes?.map((nome, idx) => (<div key={idx} className="chip-label-ff" style={{cursor: 'default', color: '#fff', borderColor: '#00f2ff'}}>👤 {nome}</div>))}</div>
               <button className="btn-cancelar-main" style={{marginTop: '20px', width: '100%'}} onClick={() => setViewMembers(null)}>FECHAR</button>
            </div>
         </div>
       )}
 
-      {/* MODAL DE DETALHES DA MISSÃO */}
       {showDetails && (
         <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
-            <div className="detail-header-modern">
-                <div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div>
-                <div className="detail-title-col">
-                    <h2>{showDetails.nome}</h2>
-                    <span className="detail-narrator">Narrador: {showDetails.mestreNome}</span>
-                </div>
-            </div>
+            <div className="detail-header-modern"><div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div><div className="detail-title-col"><h2>{showDetails.nome}</h2><span className="detail-narrator">Narrador: {showDetails.mestreNome}</span></div></div>
             <div className="detail-body-grid">
-               <div className="detail-info-row">
-                   <div className="info-item">
-                       <label>🌍 LOCAL</label>
-                       <span>{showDetails.local || "Desconhecido"}</span>
-                   </div>
-                   <div className="info-item">
-                       <label>👤 CONTRATANTE</label>
-                       <span>{showDetails.contratante || "Anônimo"}</span>
-                   </div>
-               </div>
-               <div className="detail-section">
-                   <label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label>
-                   <p className="section-text">{showDetails.descricaoMissao || "Sem descrição."}</p>
-               </div>
-               <div className="detail-section">
-                   <label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label>
-                   <p className="section-text">{showDetails.objetivosMissao || "Sem objetivos definidos."}</p>
-               </div>
-               <div className="detail-section">
-                   <label className="section-label">⚡ REQUISITOS</label>
-                   <p className="section-text">{showDetails.requisitos || "Sem requisitos especiais."}</p>
-               </div>
-               <div className="detail-section reward-section">
-                    <label className="section-label">💎 RECOMPENSAS</label>
-                    <div className="reward-content-box">
-                        <div className="gil-display-row">
-                             <span className="gil-icon">💰</span> 
-                             <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span>
-                        </div>
-                        {showDetails.recompensa && (
-                            <div className="extra-rewards-list">
-                                {showDetails.recompensa.split('\n').map((r,i) => (
-                                    <div key={i} className="reward-item">• {r}</div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-               </div>
+               <div className="detail-info-row"><div className="info-item"><label>🌍 LOCAL</label><span>{showDetails.local || "Desconhecido"}</span></div><div className="info-item"><label>👤 CONTRATANTE</label><span>{showDetails.contratante || "Anônimo"}</span></div></div>
+               <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO</label><p className="section-text">{showDetails.descricaoMissao}</p></div>
+               <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS</label><p className="section-text">{showDetails.objetivosMissao}</p></div>
+               <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showDetails.requisitos}</p></div>
+               <div className="detail-section reward-section"><label className="section-label">💎 RECOMPENSAS</label><div className="reward-content-box"><div className="gil-display-row"><span className="gil-icon">💰</span> <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span></div>{showDetails.recompensa && (<div className="extra-rewards-list">{showDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div></div>
             </div>
             <button className="ff-final-close-btn" onClick={() => setShowDetails(null)}>FECHAR RELATÓRIO</button>
           </div>
         </div>
       )}
 
-      {/* VISUALIZAR CARTAZ */}
       {viewImage && (
         <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
-          <div className="lightbox-wrap">
-            <button className="close-lightbox" onClick={() => setViewImage(null)}>×</button>
-            <img src={viewImage} alt="Cartaz" className="cartaz-full-view" />
-          </div>
+          <div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div>
         </div>
       )}
 
-      {/* VISUALIZAR RESENHA */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -551,7 +431,7 @@ export default function MestrePage() {
       <Bazar isMestre={true} />
 
       <style>{`
-        /* ESTILOS MANTIDOS E UNIFICADOS DO ARQUIVO ANTERIOR */
+        /* ESTILOS MANTIDOS + NOVOS */
         .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
         .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
         .mestre-content { position: relative; z-index: 1; padding: 30px; }
@@ -648,6 +528,12 @@ export default function MestrePage() {
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
+        .big-btn { width: 80%; max-width: 400px; padding: 15px; font-size: 14px; letter-spacing: 1px; }
+        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; }
+        .ficha-list-item:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
+        .ficha-row-name { display: flex; flex-direction: column; }
+        .ficha-row-name strong { color: #fff; font-size: 16px; }
+        .ficha-row-name small { color: #aaa; font-size: 12px; }
       `}</style>
     </div>
   );
