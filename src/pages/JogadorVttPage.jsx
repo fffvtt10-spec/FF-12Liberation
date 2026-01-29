@@ -88,17 +88,21 @@ export default function JogadorVttPage() {
   return (
     <div className="jogador-container">
       
-      {/* --- CAMADAS DE FUNDO (EFEITO ÉTER + IMAGEM) --- */}
-      <div className="ether-container">
-        {/* Imagem de Fundo Dinâmica */}
-        <div 
-          className="vtt-background-image" 
-          style={{ backgroundImage: `url(${fundoJogador})` }}
-        ></div>
-        {/* Efeitos de Partículas e Vórtice do index.css */}
-        <div className="ether-vortex"></div>
-        <div className="ether-particles"></div>
-      </div>
+      {/* --- FUNDO DA PÁGINA (Apenas a Imagem, sem animações de éter por cima) --- */}
+      <div 
+        style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundImage: `url(${fundoJogador})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            zIndex: -1 /* Garante que fique atrás de tudo */
+        }}
+      />
       
       {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
       <div className="char-hud">
@@ -189,27 +193,9 @@ export default function JogadorVttPage() {
             font-family: 'Cinzel', serif; color: white; 
         }
 
-        /* --- ESTILOS DO FUNDO VTT CORRIGIDOS --- */
-        .ether-container {
-            position: absolute; /* Mudado de fixed para absolute para respeitar o container */
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: 0; /* Trazido para 0 para ficar ACIMA do body preto, mas abaixo da UI */
-            background: radial-gradient(circle at center, #172554 0%, #020617 80%);
-            overflow: hidden;
-        }
-
-        .vtt-background-image {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-size: cover;
-            background-position: center;
-            opacity: 0.5;
-            z-index: 1; /* Garante que fique acima do gradiente base */
-        }
-        
-        /* Ajuste fino nas camadas do éter para ficarem acima da imagem */
-        .ether-vortex { z-index: 2 !important; }
-        .ether-particles { z-index: 3 !important; }
+        /* Removido styles de .ether-container aqui para não conflitar.
+           A imagem é controlada direto na div inline acima.
+        */
 
         .loading-screen { 
             width: 100vw; height: 100vh; background: #000; color: #ffcc00; 
