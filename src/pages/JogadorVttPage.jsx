@@ -87,8 +87,22 @@ export default function JogadorVttPage() {
 
   return (
     <div className="jogador-container">
-      {/* Imagem de Fundo Fixa */}
-      <div className="jogador-bg" style={{backgroundImage: `url(${fundoJogador})`}}></div>
+      {/* Imagem de Fundo Fixa - CSS Reforçado Inline para Garantir */}
+      <div 
+        className="jogador-bg" 
+        style={{
+            backgroundImage: `url(${fundoJogador})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: -1
+        }}
+      ></div>
       
       {/* HUD SUPERIOR: STATUS DO PERSONAGEM */}
       <div className="char-hud">
@@ -184,11 +198,7 @@ export default function JogadorVttPage() {
             position: relative; overflow: hidden; 
             font-family: 'Cinzel', serif; color: white; 
         }
-        .jogador-bg { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background-size: cover; background-position: center; 
-            z-index: -1; 
-        }
+        /* O estilo .jogador-bg agora também está inline no JSX para garantir */
         
         .loading-screen { 
             width: 100vw; height: 100vh; background: #000; color: #ffcc00; 
@@ -203,6 +213,7 @@ export default function JogadorVttPage() {
             background: rgba(0,0,0,0.7); padding: 15px 25px; 
             border-radius: 50px; border: 1px solid #ffcc00; 
             box-shadow: 0 0 15px rgba(255,204,0,0.3); 
+            z-index: 10;
         }
         .avatar-circle { 
             width: 60px; height: 60px; 
@@ -220,7 +231,7 @@ export default function JogadorVttPage() {
             position: absolute; top: 120px; left: 50%; transform: translateX(-50%); 
             background: rgba(20, 0, 0, 0.9); border: 2px solid #f00; padding: 20px; 
             border-radius: 8px; text-align: center; box-shadow: 0 0 30px #f00; 
-            animation: pulseRed 2s infinite; 
+            animation: pulseRed 2s infinite; z-index: 5;
         }
         .session-entry-row { display: flex; gap: 20px; align-items: center; margin-top: 10px; justify-content: center; }
         .btn-enter-session { 
