@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
-// --- MODAL DE UPLOAD DE IMAGEM ---
+// --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
 const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
 
@@ -28,45 +28,41 @@ const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
 };
 
 export default function Ficha({ characterData, isMaster, onClose }) {
-  // Estado inicial com fallback para dados existentes ou estrutura padrão
-  const [sheet, setSheet] = useState(() => {
-      const defaultSheet = {
-        basic_info: { 
-            character_name: characterData.name, 
-            level: 1, 
-            experience: { current: 0, max: 100 }, 
-            race: characterData.race, 
-            class: characterData.class,
-            guild_rank: "Iniciado",
-            guild_insignia: "", 
-            guild_rank_image: "" 
-        },
-        attributes: { 
-            FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
-            SOR: { value: 0 }, CAR: { value: 0 }, VEL: { value: 0 } 
-        },
-        status: { 
-            hp: { current: 10, max: 10 }, 
-            mp: { current: 5, max: 5 }, 
-            arm: { value: 0 }, 
-            res: { value: 0 },
-            mov: { value: 3 }
-        },
-        equipment: { 
-            slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
-        },
-        job_system: {
-            primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-            secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-            reaction_ability: { name: "", effect: "" },
-            passive_ability: { name: "", effect: "" },
-            class_bonus: { value: "" }
-        },
-        inventory: { gil: 0, items: [] },
-        imgUrl: "" 
-      };
-      // Mescla dados existentes com a estrutura padrão para garantir que campos novos não quebrem
-      return characterData.character_sheet ? { ...defaultSheet, ...characterData.character_sheet } : defaultSheet;
+  // Estado local da ficha
+  const [sheet, setSheet] = useState(characterData.character_sheet || {
+    basic_info: { 
+        character_name: characterData.name, 
+        level: 1, 
+        experience: { current: 0, max: 100 }, 
+        race: characterData.race, 
+        class: characterData.class,
+        guild_rank: "Iniciado",
+        guild_insignia: "", 
+        guild_rank_image: "" 
+    },
+    attributes: { 
+        FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
+        SOR: { value: 0 }, CAR: { value: 0 }, VEL: { value: 0 } 
+    },
+    status: { 
+        hp: { current: 10, max: 10 }, 
+        mp: { current: 5, max: 5 }, 
+        arm: { value: 0 }, 
+        res: { value: 0 },
+        mov: { value: 3 }
+    },
+    equipment: { 
+        slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
+    },
+    job_system: {
+        primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
+        secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
+        reaction_ability: { name: "", effect: "" },
+        passive_ability: { name: "", effect: "" },
+        class_bonus: { value: "" }
+    },
+    inventory: { gil: 0, items: [] },
+    imgUrl: "" 
   });
 
   const [activeTab, setActiveTab] = useState('geral'); 
@@ -84,28 +80,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
-  // Ref para detectar level up anterior
-  const prevLevelRef = useRef(sheet.basic_info.level);
-
-  // Efeito: Atualiza dados em tempo real se mudarem no banco (ex: Mestre salvou, Jogador vê)
+  // --- CORREÇÃO DE PERSISTÊNCIA ---
+  // Esse Effect garante que se os dados vierem do banco (MestrePage), o estado local atualiza.
+  // Isso resolve o problema de abrir a ficha e ela estar "limpa" ou desatualizada.
   useEffect(() => {
-    if (characterData.character_sheet) {
-        // Verifica se houve mudança real para evitar loop ou reset de edição local não salva
-        const serverSheet = JSON.stringify(characterData.character_sheet);
-        const localSheet = JSON.stringify(sheet);
-        
-        if (serverSheet !== localSheet && !hasUnsavedChanges) {
-            setSheet(characterData.character_sheet);
-        }
-
-        // Detecta Level Up vindo do servidor
-        if (characterData.character_sheet.basic_info?.level > prevLevelRef.current) {
-            setShowLevelUpAnim(true);
-            setTimeout(() => setShowLevelUpAnim(false), 4000);
-            prevLevelRef.current = characterData.character_sheet.basic_info.level;
-        }
+    if (characterData && characterData.character_sheet) {
+        // Atualiza o sheet local com os dados vindos da prop (que vem do Firestore via MestrePage)
+        setSheet(characterData.character_sheet);
     }
-  }, [characterData, hasUnsavedChanges]); // Dependência cuidadosa
+  }, [characterData]); 
 
   const updateField = (path, value) => {
     if (!isMaster) return;
@@ -126,7 +109,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
         await updateDoc(charRef, { character_sheet: sheet });
         setHasUnsavedChanges(false);
-        // alert("Ficha salva com sucesso!"); // Removido alert intrusivo, visual feedback no botão basta
       } catch (error) {
           console.error("Erro ao salvar:", error);
           alert("Erro ao salvar ficha.");
@@ -191,7 +173,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   const handleLevelUp = async () => {
     if(!isMaster) return;
-    // Animação Local + Salvar Imediato
     setShowLevelUpAnim(true);
     setTimeout(async () => {
         setShowLevelUpAnim(false);
@@ -209,11 +190,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
     }, 4000);
   };
 
-  // --- RADAR CHART LOGIC ---
+  // --- RADAR CHART LOGIC (REDUZIDO PARA 85) ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
-  const radius = 90;
-  const center = 150;
+  const radius = 85; 
+  const center = 125; 
 
   const getPoint = (value, index, total) => {
     const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
@@ -230,20 +211,17 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   return (
     <div className="ficha-overlay-fixed">
+        {/* MODAL GLOBAL DE UPLOAD DE IMAGEM */}
+        <ImageUploadModal 
+            isOpen={uploadModalOpen} 
+            onClose={() => setUploadModalOpen(false)} 
+            onSave={uploadCallback} 
+            label={uploadLabel} 
+        />
+
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
         
-        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
-        {isMaster && hasUnsavedChanges && (
-            <button 
-                className="save-fab glowing" 
-                onClick={saveSheetToDb}
-                title="Salvar Alterações"
-            >
-                💾
-            </button>
-        )}
-
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
             {/* Esquerda: Signo */}
@@ -254,7 +232,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}}
                     onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}
                     title={isMaster ? "Clique para alterar imagem" : ""}
-                ></div>
+                >
+                </div>
             </div>
 
             {/* Centro: Infos Básicas */}
@@ -301,7 +280,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}}
                     onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}
                     title={isMaster ? "Clique para alterar imagem" : ""}
-                ></div>
+                >
+                </div>
             </div>
         </div>
 
@@ -320,13 +300,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     <div className="col-attributes">
                         <h3 className="section-title">ATRIBUTOS</h3>
                         <div className="radar-wrapper">
-                            <svg width="260" height="260" viewBox="0 0 300 300">
+                            <svg width="250" height="250" viewBox="0 0 250 250">
                                 {[20, 40, 60, 80, 100].map(r => (
                                     <polygon key={r} points={stats.map((_, i) => { const {x,y} = getPoint(r, i, 6); return `${x},${y}`; }).join(" ")} fill="none" stroke="#333" strokeWidth="1" />
                                 ))}
                                 <polygon points={polyPoints} fill="rgba(0, 242, 255, 0.2)" stroke="#00f2ff" strokeWidth="2" />
                                 {stats.map((stat, i) => {
-                                    const {x, y} = getPoint(125, i, 6);
+                                    const {x, y} = getPoint(120, i, 6);
                                     const val = sheet.attributes?.[stat]?.value || 0;
                                     return (
                                         <foreignObject x={x - 20} y={y - 15} width="40" height="30" key={stat}>
@@ -479,13 +459,16 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             )}
         </div>
 
-        {/* MODAL GLOBAL DE UPLOAD DE IMAGEM */}
-        <ImageUploadModal 
-            isOpen={uploadModalOpen} 
-            onClose={() => setUploadModalOpen(false)} 
-            onSave={uploadCallback} 
-            label={uploadLabel} 
-        />
+        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
+        {isMaster && hasUnsavedChanges && (
+            <button 
+                className="save-fab glowing" 
+                onClick={saveSheetToDb}
+                title="Salvar Alterações"
+            >
+                💾
+            </button>
+        )}
 
         {/* MODAL SELETOR DE ITENS DA FORJA */}
         {showForgeSelector && (
@@ -596,7 +579,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
         /* COLUNA EQUIPAMENTOS */
         .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
-        .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; }
+        .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; transition: 0.2s; }
+        .char-image-frame.clickable:hover { border-color: #ffcc00; cursor: pointer; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
         
         .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }

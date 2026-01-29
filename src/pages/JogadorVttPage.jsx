@@ -4,7 +4,7 @@ import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, arrayUnio
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
-import levelUpMusic from '../assets/level-up.mp3'; // IMPORTAÇÃO DA MÚSICA
+import levelUpMusic from '../assets/level-up.mp3'; 
 import Bazar from '../components/Bazar';
 import Ficha from '../components/Ficha';
 
@@ -46,35 +46,27 @@ export default function JogadorVttPage() {
   const [currentVttSession, setCurrentVttSession] = useState(null);
   const [showFicha, setShowFicha] = useState(false);
 
-  // --- LÓGICA DE LEVEL UP ---
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
-  const prevLevelRef = useRef(null); // Guarda o nível anterior para comparação
-  const audioRef = useRef(new Audio(levelUpMusic)); // Referência do áudio
+  const prevLevelRef = useRef(null); 
+  const audioRef = useRef(new Audio(levelUpMusic)); 
 
-  // Configurar volume inicial
   useEffect(() => {
     audioRef.current.volume = 0.2;
   }, []);
 
-  // --- CARREGAR DADOS DO PERSONAGEM EM REALTIME ---
   useEffect(() => {
     const fetchChar = async () => {
       if (!auth.currentUser) return;
-      
       const docRef = doc(db, "characters", auth.currentUser.uid);
       const unsub = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
               const data = docSnap.data();
               const currentLevel = data.character_sheet?.basic_info?.level || 1;
-
-              // Verifica se subiu de nível (e não é a primeira carga da página)
               if (prevLevelRef.current !== null && currentLevel > prevLevelRef.current) {
                   setShowLevelUpModal(true);
                   audioRef.current.currentTime = 0;
                   audioRef.current.play().catch(e => console.log("Autoplay bloqueado:", e));
               }
-
-              // Atualiza a referência
               prevLevelRef.current = currentLevel;
               setPersonagem(data);
           }
@@ -84,7 +76,6 @@ export default function JogadorVttPage() {
     fetchChar();
   }, []);
 
-  // --- FUNÇÃO PARA FECHAR O MODAL DE LEVEL UP ---
   const handleConfirmLevelUp = () => {
       setShowLevelUpModal(false);
       audioRef.current.pause();
@@ -251,37 +242,69 @@ export default function JogadorVttPage() {
                   <button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button>
                 </div>
                 <div className="missions-list-player">
-                   {missoes.map(m => (
-                     <div key={m.id} className={`mission-poster-player rank-${m.rank}`}>
-                        <div className="mp-header">
-                          <span className="mp-rank">{m.rank}</span>
-                          <h4>{m.nome}</h4>
+                   {missoes.map(m => {
+                     const maxGroup = parseInt(m.grupo) || 0;
+                     const currentGroup = m.candidatos ? m.candidatos.length : 0;
+                     const isFull = currentGroup >= maxGroup && maxGroup > 0;
+                     const alreadyCandidate = m.candidatos?.some(c => c.uid === auth.currentUser.uid);
+
+                     return (
+                        <div key={m.id} className={`mission-poster-player rank-${m.rank}`}>
+                            <div className="mp-header">
+                            <span className="mp-rank">{m.rank}</span>
+                            <h4>{m.nome}</h4>
+                            </div>
+                            <div className="mp-details">
+                            <p><strong>Local:</strong> {m.local}</p>
+                            <p><strong>Recompensa:</strong> {m.gilRecompensa} Gil</p>
+                            <p className="mp-desc">{m.descricaoMissao}</p>
+                            </div>
+                            
+                            {/* Visualização de Vagas */}
+                            <div className="vagas-container-player" style={{marginTop:'10px', background:'rgba(0,0,0,0.3)', padding:'5px', borderRadius:'4px'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#ccc'}}>
+                                    <span>VAGAS PREENCHIDAS</span>
+                                    <span>{currentGroup} / {maxGroup > 0 ? maxGroup : '∞'}</span>
+                                </div>
+                                <div style={{width:'100%', height:'4px', background:'#222', marginTop:'2px'}}>
+                                    <div style={{
+                                        width: `${Math.min((currentGroup/(maxGroup||1))*100, 100)}%`, 
+                                        height:'100%', 
+                                        background: isFull ? '#f44' : '#00f2ff'
+                                    }}></div>
+                                </div>
+                            </div>
+
+                            {m.candidatos && m.candidatos.length > 0 && (
+                            <div className="candidates-box">
+                                <small>Grupo em formação:</small>
+                                <div className="cand-tags">
+                                {m.candidatos.map((c, idx) => (
+                                    <span key={idx} className={`cand-tag ${c.isLeader ? 'leader' : ''}`}>
+                                    {c.isLeader && '👑'} {c.nome}
+                                    </span>
+                                ))}
+                                </div>
+                            </div>
+                            )}
+                            <div className="mp-actions-row">
+                                <button className="btn-details-outline" onClick={() => setShowMissionDetails(m)}>DETALHES</button>
+                                <button 
+                                    className="btn-candidatar" 
+                                    disabled={alreadyCandidate || (isFull && !alreadyCandidate)}
+                                    onClick={() => handleCandidatar(m)}
+                                    style={{
+                                        background: isFull && !alreadyCandidate ? '#333' : '#00f2ff',
+                                        color: isFull && !alreadyCandidate ? '#666' : '#000',
+                                        cursor: isFull && !alreadyCandidate ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                {alreadyCandidate ? "ENVIADO" : (isFull ? "LOTADO" : "ACEITAR")}
+                                </button>
+                            </div>
                         </div>
-                        <div className="mp-details">
-                          <p><strong>Local:</strong> {m.local}</p>
-                          <p><strong>Recompensa:</strong> {m.gilRecompensa} Gil</p>
-                          <p className="mp-desc">{m.descricaoMissao}</p>
-                        </div>
-                        {m.candidatos && m.candidatos.length > 0 && (
-                          <div className="candidates-box">
-                             <small>Grupo em formação:</small>
-                             <div className="cand-tags">
-                               {m.candidatos.map((c, idx) => (
-                                 <span key={idx} className={`cand-tag ${c.isLeader ? 'leader' : ''}`}>
-                                   {c.isLeader && '👑'} {c.nome}
-                                 </span>
-                               ))}
-                             </div>
-                          </div>
-                        )}
-                        <div className="mp-actions-row">
-                             <button className="btn-details-outline" onClick={() => setShowMissionDetails(m)}>DETALHES</button>
-                             <button className="btn-candidatar" disabled={m.candidatos?.some(c => c.uid === auth.currentUser.uid)} onClick={() => handleCandidatar(m)}>
-                              {m.candidatos?.some(c => c.uid === auth.currentUser.uid) ? "ENVIADO" : "ACEITAR"}
-                             </button>
-                        </div>
-                     </div>
-                   ))}
+                     );
+                   })}
                    {missoes.length === 0 && <p style={{textAlign: 'center', padding: '20px'}}>Nenhum contrato disponível no momento.</p>}
                 </div>
              </div>
@@ -303,6 +326,25 @@ export default function JogadorVttPage() {
                             <div className="info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div>
                             <div className="info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div>
                         </div>
+                        
+                        {/* Vagas no Detalhe */}
+                        <div className="detail-section">
+                            <label className="section-label">STATUS DO GRUPO</label>
+                            <div style={{background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'4px'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', color:'#fff', fontSize:'12px', marginBottom:'5px'}}>
+                                    <span>JOGADORES INSCRITOS</span>
+                                    <span>{showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span>
+                                </div>
+                                <div style={{width:'100%', height:'6px', background:'#000', borderRadius:'3px'}}>
+                                    <div style={{
+                                        width: `${Math.min(((showMissionDetails.candidatos?.length||0) / (parseInt(showMissionDetails.grupo)||1))*100, 100)}%`, 
+                                        height:'100%', 
+                                        background: '#00f2ff'
+                                    }}></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label><p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p></div>
                         <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label><p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p></div>
                         <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p></div>
@@ -467,8 +509,6 @@ export default function JogadorVttPage() {
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
         .fade-in { animation: fadeIn 1s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes fadeOverlay { 0% { opacity: 1; } 100% { opacity: 1; } }
       `}</style>
     </div>
   );

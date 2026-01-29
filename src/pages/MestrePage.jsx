@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, getDocs } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove } from "firebase/firestore";
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
@@ -97,14 +97,22 @@ export default function MestrePage() {
         setSessoes(loadedSessoes);
     });
 
-    const fetchChars = async () => {
-        const snap = await getDocs(collection(db, "characters"));
+    // CORREÇÃO: Usando onSnapshot para personagens também para garantir dados frescos
+    const qC = query(collection(db, "characters"));
+    const unsubC = onSnapshot(qC, (snap) => {
         setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    };
-    fetchChars();
+    });
 
-    return () => { unsubM(); unsubR(); unsubS(); };
+    return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
   }, []);
+
+  // Atualiza a ficha selecionada se os dados do banco mudarem enquanto ela está aberta
+  useEffect(() => {
+      if (selectedFicha) {
+          const updated = personagensDb.find(p => p.id === selectedFicha.id);
+          if (updated) setSelectedFicha(updated);
+      }
+  }, [personagensDb]);
 
   const handleCreateMission = async (e) => {
     e.preventDefault();
@@ -129,6 +137,16 @@ export default function MestrePage() {
       });
       setShowResenhaModal(false); setResenha(""); setTituloResenha(""); setDestinatarios([]);
     } catch (e) { alert("Erro ao publicar."); }
+  };
+
+  // REMOVER CANDIDATO DA MISSÃO
+  const handleRemoveCandidate = async (missaoId, candidate) => {
+      if(window.confirm(`Remover ${candidate.nome} da missão?`)) {
+          const missaoRef = doc(db, "missoes", missaoId);
+          await updateDoc(missaoRef, {
+              candidatos: arrayRemove(candidate)
+          });
+      }
   };
 
   const handleAddAsset = () => {
@@ -202,32 +220,53 @@ export default function MestrePage() {
               <button className="ff-add-btn" onClick={() => setShowModal(true)}><span>+</span> ADICIONAR CARTAZ</button>
             </div>
             <div className="mission-scroll">
-              {missoes.map(m => (
-                <div key={m.id} className={`mission-poster rank-${m.rank}`}>
-                  <div className="poster-rank-label-fixed">{m.rank}</div>
-                  <span className="mestre-tag">Narrador: {m.mestreNome}</span>
-                  <h4>{m.nome}</h4>
-                  <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
-                  
-                  {m.candidatos && m.candidatos.length > 0 && (
-                    <div className="candidates-mini-box">
-                       <strong>Candidatos:</strong>
-                       {m.candidatos.map(c => (
-                         <div key={c.uid} style={{fontSize: '10px', color: c.isLeader ? '#ffcc00' : '#ccc'}}>
-                           {c.isLeader && '👑'} {c.nome} ({c.classe})
-                         </div>
-                       ))}
-                    </div>
-                  )}
+              {missoes.map(m => {
+                const maxGroup = parseInt(m.grupo) || 0;
+                const currentGroup = m.candidatos ? m.candidatos.length : 0;
+                const fillPercent = maxGroup > 0 ? (currentGroup / maxGroup) * 100 : 0;
+                const isFull = currentGroup >= maxGroup && maxGroup > 0;
 
-                  <Timer expiry={m.expiraEm} />
-                  <div className="poster-actions">
-                    <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
-                    <button className="btn-cyan" onClick={() => setShowDetails(m)}>DETALHES</button>
-                    <button className="btn-red" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
-                  </div>
-                </div>
-              ))}
+                return (
+                    <div key={m.id} className={`mission-poster rank-${m.rank}`}>
+                    <div className="poster-rank-label-fixed">{m.rank}</div>
+                    <span className="mestre-tag">Narrador: {m.mestreNome}</span>
+                    <h4>{m.nome}</h4>
+                    <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
+                    
+                    {/* Barra de Vagas */}
+                    <div className="vagas-container">
+                        <div className="vagas-labels">
+                            <span>JOGADORES:</span>
+                            <span style={{color: isFull ? '#f44' : '#0f0'}}>{currentGroup} / {maxGroup}</span>
+                        </div>
+                        <div className="vagas-track">
+                            <div className="vagas-fill" style={{width: `${fillPercent}%`, background: isFull ? '#f44' : '#00f2ff'}}></div>
+                        </div>
+                    </div>
+
+                    {m.candidatos && m.candidatos.length > 0 && (
+                        <div className="candidates-mini-box">
+                        <strong>Candidatos:</strong>
+                        {m.candidatos.map(c => (
+                            <div key={c.uid} className="cand-row-master">
+                                <span style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>
+                                    {c.isLeader && '👑'} {c.nome} ({c.classe})
+                                </span>
+                                <button className="btn-kick-x" title="Remover Jogador" onClick={() => handleRemoveCandidate(m.id, c)}>×</button>
+                            </div>
+                        ))}
+                        </div>
+                    )}
+
+                    <Timer expiry={m.expiraEm} />
+                    <div className="poster-actions">
+                        <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
+                        <button className="btn-cyan" onClick={() => setShowDetails(m)}>DETALHES</button>
+                        <button className="btn-red" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
+                    </div>
+                    </div>
+                );
+              })}
             </div>
           </div>
 
@@ -328,7 +367,7 @@ export default function MestrePage() {
               <div className="modal-input-group"><label>OBJETIVOS DA MISSÃO</label><textarea className="tall-area-dark" placeholder="O que deve ser feito passo a passo..." value={form.objetivosMissao} onChange={e=>setForm({...form, objetivosMissao: e.target.value})} /></div>
               <div className="modal-input-group"><label>REQUISITOS DA MISSÃO</label><textarea className="tall-area-dark" placeholder="O que é necessário para aceitar..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} /></div>
               <div className="row-double-ff">
-                <div className="field-group"><label>GRUPO MÁXIMO</label><input placeholder="Ex: 6 jogadores" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} /></div>
+                <div className="field-group"><label>GRUPO MÁXIMO</label><input placeholder="Ex: 4" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} /></div>
                 <div className="field-group"><label>RANK</label><select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>{['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}</select></div>
               </div>
               <div className="modal-input-group"><label>RECOMPENSAS EXTRAS</label><textarea className="tall-area-dark" placeholder="Itens, especiarias..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} /></div>
@@ -393,6 +432,25 @@ export default function MestrePage() {
             <div className="detail-header-modern"><div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div><div className="detail-title-col"><h2>{showDetails.nome}</h2><span className="detail-narrator">Narrador: {showDetails.mestreNome}</span></div></div>
             <div className="detail-body-grid">
                <div className="detail-info-row"><div className="info-item"><label>🌍 LOCAL</label><span>{showDetails.local || "Desconhecido"}</span></div><div className="info-item"><label>👤 CONTRATANTE</label><span>{showDetails.contratante || "Anônimo"}</span></div></div>
+               
+               {/* VAGAS VISUAL NO DETALHE */}
+               <div className="detail-section">
+                   <label className="section-label">VAGAS</label>
+                   <div style={{background: '#111', padding: '10px', borderRadius: '4px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#aaa', marginBottom:'5px'}}>
+                            <span>STATUS DO GRUPO</span>
+                            <span>{showDetails.candidatos ? showDetails.candidatos.length : 0} / {showDetails.grupo || '?'}</span>
+                        </div>
+                        <div style={{width: '100%', height: '6px', background: '#333', borderRadius:'3px'}}>
+                            <div style={{
+                                width: `${Math.min(((showDetails.candidatos?.length || 0) / (parseInt(showDetails.grupo) || 1)) * 100, 100)}%`, 
+                                height:'100%', 
+                                background: (showDetails.candidatos?.length >= parseInt(showDetails.grupo)) ? '#f44' : '#00f2ff'
+                            }}></div>
+                        </div>
+                   </div>
+               </div>
+
                <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO</label><p className="section-text">{showDetails.descricaoMissao}</p></div>
                <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS</label><p className="section-text">{showDetails.objetivosMissao}</p></div>
                <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showDetails.requisitos}</p></div>
@@ -446,7 +504,7 @@ export default function MestrePage() {
         /* GRID RESPONSIVO TELA ÚNICA */
         .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex: 1; overflow: hidden; padding-bottom: 60px; /* Espaço para botões flutuantes */ }
         
-        /* CARDS TELA ÚNICA - REDUZIDO ALTURA */
+        /* CARDS TELA ÚNICA */
         .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; backdrop-filter: blur(10px); display: flex; flex-direction: column; max-height: 100%; }
         .board-column { flex: 1; overflow: hidden; min-height: 0; }
         
@@ -461,6 +519,16 @@ export default function MestrePage() {
         .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
         .candidates-mini-box { margin-top: 8px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; }
+        .cand-row-master { display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-bottom: 2px; }
+        .btn-kick-x { background: transparent; border: none; color: #f44; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .btn-kick-x:hover { color: #fff; }
+
+        /* VAGAS VISUAL */
+        .vagas-container { margin: 10px 0; }
+        .vagas-labels { display: flex; justify-content: space-between; font-size: 10px; color: #ccc; margin-bottom: 2px; font-weight: bold; }
+        .vagas-track { width: 100%; height: 6px; background: #111; border: 1px solid #444; border-radius: 3px; overflow: hidden; }
+        .vagas-fill { height: 100%; transition: width 0.3s; }
+
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0; }
         .sanchez-header-top.no-border { border-bottom: none; }
@@ -525,14 +593,14 @@ export default function MestrePage() {
         .papiro-body-real::-webkit-scrollbar { display: none; }
         .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
         .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
-        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; }
+        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
         .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
         .ff-add-btn-gold-small:hover { background: #ffcc00; color: #000; box-shadow: 0 0 15px #ffcc00; }
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; margin-right: 10px; font-weight: bold; }
         .btn-red { border: 1px solid #f44; color: #f44; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; font-weight: bold; }
         .btn-group-ff { display: flex; gap: 20px; margin-top: 25px; }
         .btn-forjar-main { flex: 1; background: #ffcc00; color: #000; border: none; padding: 14px; font-weight: bold; cursor: pointer; font-size: 14px; text-transform: uppercase; }
-        .btn-cancelar-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
+        .btn-cancel-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
         .player-selector-box-fixed { margin: 25px 0; border-top: 1px solid #333; padding-top: 15px; }
         .destinatarios-grid-fixed { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
         .chip-label-ff { background: rgba(0, 10, 30, 0.8); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 18px; border-radius: 4px; font-size: 12px; cursor: pointer; display: inline-block; }
