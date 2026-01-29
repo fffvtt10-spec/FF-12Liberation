@@ -1,6 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
+
+// COMPONENTE AUXILIAR: Botão Pequeno de Upload de Imagem (+)
+const ImageUploader = ({ currentValue, onSave, label }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [tempUrl, setTempUrl] = useState("");
+
+    const handleSave = () => {
+        onSave(tempUrl);
+        setIsOpen(false);
+    };
+
+    return (
+        <div className="img-uploader-wrapper">
+            <button className="btn-plus-gold" onClick={() => setIsOpen(true)} title={`Adicionar Imagem de ${label}`}>+</button>
+            {isOpen && (
+                <div className="mini-popover">
+                    <input 
+                        placeholder="Cole o link (Imgur)..." 
+                        value={tempUrl} 
+                        onChange={e => setTempUrl(e.target.value)} 
+                        autoFocus
+                    />
+                    <div className="pop-actions">
+                        <button onClick={handleSave} className="pop-confirm">OK</button>
+                        <button onClick={() => setIsOpen(false)} className="pop-cancel">X</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default function Ficha({ characterData, isMaster, onClose }) {
   // Estado local da ficha
@@ -27,17 +58,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         mov: { value: 3 }
     },
     equipment: { 
-        slots: Array(7).fill({ item_name: "", item_img: "", effect: "-" }) 
+        slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
     },
     job_system: {
-        primary_class: { 
-            name: characterData.class || "Classe Primária", 
-            skills: Array(4).fill({ name: "", cost: "", effect: "" }) 
-        },
-        secondary_class: { 
-            name: "Classe Secundária", 
-            skills: Array(4).fill({ name: "", cost: "", effect: "" }) 
-        },
+        primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
+        secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
         reaction_ability: { name: "", effect: "" },
         passive_ability: { name: "", effect: "" },
         class_bonus: { value: "" }
@@ -49,31 +74,36 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [activeTab, setActiveTab] = useState('geral'); 
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
+  
+  // Estados para Gestão de Itens (Forja)
+  const [showForgeSelector, setShowForgeSelector] = useState(false); // Modal de seleção
+  const [forgeItems, setForgeItems] = useState([]); // Itens vindos da Forja
+  const [activeSlotIndex, setActiveSlotIndex] = useState(null); // Qual slot está sendo editado
+  const [viewItemDetails, setViewItemDetails] = useState(null); // Detalhes do item (olho)
 
-  // Efeito para atualizar a ficha do JOGADOR em tempo real quando o mestre salvar
+  // Sincronização em tempo real (para o jogador)
   useEffect(() => {
     if (!isMaster && characterData.character_sheet) {
         setSheet(characterData.character_sheet);
     }
   }, [characterData, isMaster]);
 
+  // Função genérica de atualização local
   const updateField = (path, value) => {
     if (!isMaster) return;
-    
     const newSheet = JSON.parse(JSON.stringify(sheet));
     const keys = path.split('.');
     let ref = newSheet;
-    
     for (let i = 0; i < keys.length - 1; i++) {
         if (!ref[keys[i]]) ref[keys[i]] = {}; 
         ref = ref[keys[i]];
     }
-    
     ref[keys[keys.length - 1]] = value;
     setSheet(newSheet);
     setHasUnsavedChanges(true);
   };
 
+  // Salvar no Firebase
   const saveSheetToDb = async () => {
       try {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
@@ -84,6 +114,63 @@ export default function Ficha({ characterData, isMaster, onClose }) {
           console.error("Erro ao salvar:", error);
           alert("Erro ao salvar ficha.");
       }
+  };
+
+  // --- LÓGICA DE ITENS (FORJA INTEGRATION) ---
+  
+  // 1. Abrir Modal de Seleção (Busca itens no cofre)
+  const handleOpenForgeSelector = async (slotIndex) => {
+      if(!isMaster) return;
+      setActiveSlotIndex(slotIndex);
+      const q = query(collection(db, "game_items"), where("status", "==", "vault"));
+      const snap = await getDocs(q);
+      setForgeItems(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      setShowForgeSelector(true);
+  };
+
+  // 2. Equipar Item (Tira da forja, põe no slot, atualiza banco do item)
+  const handleEquipItem = async (item) => {
+      // Atualiza Slot Localmente
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      newSheet.equipment.slots[activeSlotIndex] = {
+          item_id: item.id,
+          item_name: item.nome,
+          item_img: item.imagem,
+          description: item.descricao,
+          effect: "" // Pode ser editado depois
+      };
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
+
+      // Atualiza Item na Coleção Global (Rastreio)
+      const itemRef = doc(db, "game_items", item.id);
+      await updateDoc(itemRef, { 
+          status: 'equipped', 
+          ownerId: characterData.uid || characterData.id,
+          slotIndex: activeSlotIndex,
+          updatedAt: serverTimestamp()
+      });
+
+      setShowForgeSelector(false);
+  };
+
+  // 3. Devolver para Forja (Desequipar)
+  const handleUnequipItem = async (slotIndex) => {
+      if(!isMaster) return;
+      const slot = sheet.equipment.slots[slotIndex];
+      if(slot.item_id) {
+          if(window.confirm("Isso devolverá o item para a Forja (Cofre). Confirmar?")) {
+              // Devolve pro Cofre Global
+              const itemRef = doc(db, "game_items", slot.item_id);
+              await updateDoc(itemRef, { status: 'vault', ownerId: null, slotIndex: null, updatedAt: serverTimestamp() });
+          }
+      }
+      
+      // Limpa Slot Local
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      newSheet.equipment.slots[slotIndex] = { item_name: "", item_img: "", effect: "" };
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
   };
 
   const handleLevelUp = async () => {
@@ -100,15 +187,16 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         newSheet.basic_info.experience.max = newXpMax;
         
         setSheet(newSheet);
-        
+        // Salva direto pois level up é crítico
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
         await updateDoc(charRef, { character_sheet: newSheet });
     }, 4000);
   };
 
+  // --- RADAR CHART LOGIC (AJUSTADO RAIO 110) ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
-  const radius = 90;
+  const radius = 110; // Aumentado a sensibilidade visual
   const center = 150;
 
   const getPoint = (value, index, total) => {
@@ -129,12 +217,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
         
+        {/* BOTÃO DE SALVAR (Reposicionado para Esquerda) */}
         {isMaster && (
             <button 
                 className={`save-btn-master ${hasUnsavedChanges ? 'unsaved' : ''}`} 
                 onClick={saveSheetToDb}
             >
-                {hasUnsavedChanges ? "💾 SALVAR ALTERAÇÕES" : "FICHA SALVA"}
+                {hasUnsavedChanges ? "💾 SALVAR" : "SALVO"}
             </button>
         )}
 
@@ -143,14 +232,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
-                {isMaster ? (
-                    <input 
-                        className="guild-img-input" 
-                        placeholder="URL Img"
-                        value={sheet.basic_info.guild_insignia || ""}
-                        onChange={e => updateField('basic_info.guild_insignia', e.target.value)}
+                {isMaster && (
+                    <ImageUploader 
+                        label="Signo" 
+                        onSave={(url) => updateField('basic_info.guild_insignia', url)} 
                     />
-                ) : null}
+                )}
                 <div className="insignia-display" style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=Signo'})`}}></div>
             </div>
 
@@ -159,33 +246,49 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 <h1>{sheet.basic_info.character_name}</h1>
                 <span className="sub-header">{sheet.basic_info.race} // {characterData.class}</span>
                 
-                {/* XP BAR - Subido para não sobrepor abas */}
+                {/* XP BAR & LEVEL */}
                 <div className="xp-container">
                     <div className="lvl-box">
                         <small>LVL</small>
-                        <span>{sheet.basic_info.level}</span>
+                        {isMaster ? (
+                            <input className="lvl-input" type="number" value={sheet.basic_info.level} onChange={e => updateField('basic_info.level', Number(e.target.value))} />
+                        ) : (
+                            <span>{sheet.basic_info.level}</span>
+                        )}
                     </div>
                     <div className="xp-bar-box">
-                        <div className="xp-text">XP {sheet.basic_info.experience.current} / {sheet.basic_info.experience.max}</div>
+                        <div className="xp-text">
+                            XP 
+                            {isMaster ? (
+                                <input className="xp-mini-input" value={sheet.basic_info.experience.current} onChange={e => updateField('basic_info.experience.current', Number(e.target.value))} />
+                            ) : sheet.basic_info.experience.current} 
+                            / 
+                            {isMaster ? (
+                                <input className="xp-mini-input" value={sheet.basic_info.experience.max} onChange={e => updateField('basic_info.experience.max', Number(e.target.value))} />
+                            ) : sheet.basic_info.experience.max}
+                        </div>
                         <div className="xp-track">
                             <div className="xp-fill" style={{width: `${Math.min((sheet.basic_info.experience.current / sheet.basic_info.experience.max) * 100, 100)}%`}}></div>
                         </div>
                     </div>
                     {isMaster && sheet.basic_info.experience.current >= sheet.basic_info.experience.max && (
-                        <button className="btn-levelup glowing" onClick={handleLevelUp}>⚡ LEVEL UP ⚡</button>
+                        <button className="btn-levelup glowing" onClick={handleLevelUp}>⚡ UP</button>
                     )}
                 </div>
             </div>
 
-            {/* Direita: Rank Guilda (Sem texto "Iniciado") */}
+            {/* Direita: Rank Guilda */}
             <div className="guild-rank-box">
                 <span className="header-label-top">RANK</span>
-                {isMaster ? (
+                {isMaster && (
                     <>
                         <input className="rank-name-input" placeholder="Nome Rank" value={sheet.basic_info.guild_rank} onChange={e => updateField('basic_info.guild_rank', e.target.value)} />
-                        <input className="guild-img-input rank" placeholder="URL Rank" value={sheet.basic_info.guild_rank_image || ""} onChange={e => updateField('basic_info.guild_rank_image', e.target.value)} />
+                        <ImageUploader 
+                            label="Rank" 
+                            onSave={(url) => updateField('basic_info.guild_rank_image', url)} 
+                        />
                     </>
-                ) : null /* Texto removido para o jogador */}
+                )}
                 <div className="rank-display" style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=Rank'})`}}></div>
             </div>
         </div>
@@ -211,7 +314,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 ))}
                                 <polygon points={polyPoints} fill="rgba(0, 242, 255, 0.2)" stroke="#00f2ff" strokeWidth="2" />
                                 {stats.map((stat, i) => {
-                                    const {x, y} = getPoint(115, i, 6);
+                                    const {x, y} = getPoint(125, i, 6); // Ajustado label position
                                     const val = sheet.attributes?.[stat]?.value || 0;
                                     return (
                                         <foreignObject x={x - 20} y={y - 15} width="40" height="30" key={stat}>
@@ -236,37 +339,45 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         </div>
                     </div>
 
-                    {/* COLUNA CENTRAL: EQUIPAMENTOS (Ajustado para Bordas) */}
+                    {/* COLUNA CENTRAL: EQUIPAMENTOS */}
                     <div className="col-center-equip">
                         <div className="char-image-frame">
-                            {isMaster ? <input className="img-url-input" placeholder="Link da Imagem" value={sheet.imgUrl} onChange={e => updateField('imgUrl', e.target.value)} /> : null}
-                            <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Sem+Imagem'})`}}></div>
+                            {isMaster && (
+                                <div style={{position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', zIndex: 100}}>
+                                    <ImageUploader label="Personagem" onSave={(url) => updateField('imgUrl', url)} />
+                                </div>
+                            )}
+                            <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
                         </div>
                         
-                        {/* Overlay com tamanho exato da moldura para posicionamento preciso nas bordas */}
                         <div className="equip-slots-overlay">
                             {[
                                 {id: 0, label: "CABEÇA", style: { top: '-40px', left: '50%', transform: 'translateX(-50%)' }}, 
-                                {id: 1, label: "CORPO", style: { top: '80px', right: '-40px' }}, 
-                                {id: 2, label: "MÃO DIR.", style: { bottom: '120px', right: '-40px' }}, 
-                                {id: 3, label: "MÃO ESQ.", style: { bottom: '120px', left: '-40px' }}, 
-                                {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-40px' }}, 
+                                {id: 1, label: "CORPO", style: { top: '80px', right: '-35px' }}, 
+                                {id: 2, label: "MÃO DIR.", style: { bottom: '120px', right: '-35px' }}, 
+                                {id: 3, label: "MÃO ESQ.", style: { bottom: '120px', left: '-35px' }}, 
+                                {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-35px' }}, 
                                 {id: 5, label: "ACESS. 2", style: { bottom: '-30px', left: '40px' }}, 
                                 {id: 6, label: "PÉS", style: { bottom: '-30px', right: '40px' }} 
                             ].map((slot, idx) => (
                                 <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
                                     <div className="slot-square">
-                                        {sheet.equipment?.slots?.[idx]?.item_img ? (
-                                            <div className="item-bg" style={{backgroundImage: `url(${sheet.equipment.slots[idx].item_img})`}}></div>
-                                        ) : (
-                                            <span className="empty-text">{sheet.equipment?.slots?.[idx]?.item_name || "Vazio"}</span>
+                                        {/* Estado Vazio + Mestre */}
+                                        {!sheet.equipment?.slots?.[idx]?.item_img && isMaster && (
+                                            <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>
                                         )}
-                                        {isMaster && (
-                                            <div className="master-slot-edit">
-                                                <input className="slot-mini-in" placeholder="Nome" value={sheet.equipment?.slots?.[idx]?.item_name || ""} onChange={e => updateField(`equipment.slots.${idx}.item_name`, e.target.value)} />
-                                                <input className="slot-mini-in" placeholder="Img URL" value={sheet.equipment?.slots?.[idx]?.item_img || ""} onChange={e => updateField(`equipment.slots.${idx}.item_img`, e.target.value)} />
-                                            </div>
+                                        
+                                        {/* Estado Cheio */}
+                                        {sheet.equipment?.slots?.[idx]?.item_img ? (
+                                            <>
+                                                <div className="item-bg" style={{backgroundImage: `url(${sheet.equipment.slots[idx].item_img})`}}></div>
+                                                <button className="btn-eye-item" onClick={() => setViewItemDetails(sheet.equipment.slots[idx])}>👁️</button>
+                                                {isMaster && <button className="btn-return-forge" title="Devolver para Forja" onClick={() => handleUnequipItem(idx)}>↩️</button>}
+                                            </>
+                                        ) : (
+                                            /* Estado Vazio + Jogador */
+                                            !isMaster && <span className="empty-text">Vazio</span>
                                         )}
                                     </div>
                                 </div>
@@ -279,7 +390,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         <h3 className="section-title">BOLSA & GIL</h3>
                         <div className="gil-display">
                             <span className="coin-icon">💰</span>
-                            {isMaster ? <input type="number" value={sheet.inventory.gil} onChange={e => updateField('inventory.gil', Number(e.target.value))} /> : <span className="gil-amount">{sheet.inventory.gil}</span>}
+                            {isMaster ? <input type="number" className="gil-input-master" value={sheet.inventory.gil} onChange={e => updateField('inventory.gil', Number(e.target.value))} /> : <span className="gil-amount">{sheet.inventory.gil}</span>}
                             <span className="currency">GIL</span>
                         </div>
                         <div className="items-list">
@@ -291,6 +402,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                             <>
                                                 <input className="inv-name" value={item.name} onChange={e => updateField(`inventory.items.${idx}.name`, e.target.value)} />
                                                 <input className="inv-qtd" type="number" value={item.quantity} onChange={e => updateField(`inventory.items.${idx}.quantity`, Number(e.target.value))} />
+                                                <button className="btn-x-red" onClick={() => {
+                                                    const newItems = sheet.inventory.items.filter((_, i) => i !== idx);
+                                                    updateField('inventory.items', newItems);
+                                                }}>×</button>
                                             </>
                                         ) : (
                                             <><span className="i-name">{item.name || "Slot Vazio"}</span><span className="i-qtd">x{item.quantity || 0}</span></>
@@ -357,6 +472,41 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             )}
         </div>
 
+        {/* MODAL SELETOR DE ITENS DA FORJA */}
+        {showForgeSelector && (
+            <div className="item-selector-overlay" onClick={() => setShowForgeSelector(false)}>
+                <div className="item-selector-box" onClick={e => e.stopPropagation()}>
+                    <h3>EQUIPAR DO COFRE</h3>
+                    <div className="forge-list-scroll">
+                        {forgeItems.length === 0 && <p className="empty-text">Nenhum item disponível na Forja.</p>}
+                        {forgeItems.map(item => (
+                            <div key={item.id} className="forge-item-row" onClick={() => handleEquipItem(item)}>
+                                <img src={item.imagem} alt={item.nome} />
+                                <div>
+                                    <strong>{item.nome}</strong>
+                                    <p>{item.descricao.substring(0, 40)}...</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <button className="btn-cancel-modal" onClick={() => setShowForgeSelector(false)}>CANCELAR</button>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL DETALHES DO ITEM */}
+        {viewItemDetails && (
+            <div className="item-selector-overlay" onClick={() => setViewItemDetails(null)}>
+                <div className="item-details-box" onClick={e => e.stopPropagation()}>
+                    <img src={viewItemDetails.item_img} alt={viewItemDetails.item_name} />
+                    <h3>{viewItemDetails.item_name}</h3>
+                    <p className="details-desc">{viewItemDetails.description || "Sem descrição"}</p>
+                    <p className="details-effect">Efeito: {viewItemDetails.effect || "Nenhum"}</p>
+                    <button className="btn-cancel-modal" onClick={() => setViewItemDetails(null)}>FECHAR</button>
+                </div>
+            </div>
+        )}
+
         {/* LEVEL UP ANIMATION */}
         {showLevelUpAnim && (
             <div className="level-up-overlay"><h1 className="levelup-text">LEVEL UP!</h1></div>
@@ -365,34 +515,45 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       </div>
 
       <style>{`
+        /* GERAL */
         .ficha-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
         .ficha-container { width: 1100px; height: 850px; max-width: 98vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
         .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 10; font-weight: bold; }
         
-        .save-btn-master { position: absolute; top: 10px; right: 60px; background: #222; border: 1px solid #444; color: #aaa; padding: 5px 15px; cursor: default; font-weight: bold; font-size: 11px; z-index: 10; transition: 0.3s; }
+        .save-btn-master { position: absolute; top: 10px; left: 10px; background: #222; border: 1px solid #444; color: #aaa; padding: 5px 15px; cursor: default; font-weight: bold; font-size: 11px; z-index: 200; transition: 0.3s; }
         .save-btn-master.unsaved { background: #00f2ff; color: #000; cursor: pointer; border-color: #fff; box-shadow: 0 0 15px #00f2ff; animation: pulseSave 1.5s infinite; }
         @keyframes pulseSave { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* UPLOADER E INPUTS */
+        .img-uploader-wrapper { position: absolute; top: 0; right: 0; z-index: 10; }
+        .btn-plus-gold { background: #ffcc00; color: #000; border: 1px solid #fff; width: 16px; height: 16px; border-radius: 50%; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 5px #ffcc00; }
+        .mini-popover { position: absolute; top: 20px; left: -100px; background: #000; border: 1px solid #ffcc00; padding: 5px; width: 200px; z-index: 50; display: flex; gap: 5px; flex-direction: column; }
+        .mini-popover input { background: #111; color: #fff; border: 1px solid #444; font-size: 10px; padding: 3px; width: 100%; }
+        .pop-actions { display: flex; gap: 5px; }
+        .pop-confirm { background: #00f2ff; border: none; color: #000; font-size: 9px; flex: 1; cursor: pointer; font-weight: bold; }
+        .pop-cancel { background: #f44; border: none; color: #fff; font-size: 9px; width: 20px; cursor: pointer; }
 
         /* HEADER */
         .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
         .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
         .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
         .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; }
-        .guild-img-input { position: absolute; top: 20px; width: 100%; font-size: 9px; background: rgba(0,0,0,0.8); border: none; color: #fff; z-index: 2; opacity: 0; transition: opacity 0.2s; }
-        .guild-insignia-box:hover .guild-img-input, .guild-rank-box:hover .guild-img-input { opacity: 1; }
-        /* Nome do Rank removido visualmente para o jogador, mantido apenas o input para mestre se necessário */
+        .rank-name { font-size: 10px; color: #ffcc00; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-top: 5px; }
         .rank-name-input { width: 100%; background: transparent; border: none; color: #ffcc00; font-size: 10px; text-align: center; border-bottom: 1px solid #444; margin-top: 5px; }
 
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
-        .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+        .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
         
-        .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: -5px; } /* Ajuste de margem para subir */
+        /* XP Container */
+        .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: -5px; }
         .lvl-box { display: flex; flex-direction: column; align-items: center; background: #222; border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .lvl-box small { font-size: 8px; color: #ffcc00; }
         .lvl-box span { font-size: 24px; font-weight: bold; line-height: 1; }
+        .lvl-input { width: 40px; background: transparent; border: none; color: #fff; font-size: 24px; font-weight: bold; text-align: center; }
         .xp-bar-box { flex: 1; display: flex; flex-direction: column; }
         .xp-text { text-align: right; font-size: 10px; color: #aaa; margin-bottom: 2px; }
+        .xp-mini-input { background: #111; border: none; color: #fff; width: 30px; text-align: center; font-size: 10px; }
         .xp-track { width: 100%; height: 8px; background: #111; border: 1px solid #444; border-radius: 4px; overflow: hidden; }
         .xp-fill { height: 100%; background: linear-gradient(90deg, #00f2ff, #0088ff); transition: width 0.5s; }
         .btn-levelup { background: linear-gradient(to bottom, #ffcc00, #ff8800); border: 2px solid #fff; color: #000; font-weight: bold; padding: 5px 15px; cursor: pointer; border-radius: 20px; animation: glow 1s infinite alternate; font-family: 'Cinzel', serif; font-size: 10px; }
@@ -427,41 +588,61 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
 
-        /* COLUNA EQUIPAMENTOS (Centralizada e Aproximada) */
+        /* COLUNA EQUIPAMENTOS */
         .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
         .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; }
-        .img-url-input { position: absolute; top: 10px; left: 20px; right: 20px; z-index: 5; background: rgba(0,0,0,0.7); border: 1px solid #555; color: #fff; font-size: 10px; padding: 2px; text-align: center; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
         
         .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }
         .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; }
-        .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; }
+        .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; position: absolute; top: 0; left: 0; }
         .empty-text { font-size: 9px; color: #666; text-align: center; line-height: 1; padding: 2px; }
-        .master-slot-edit { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); opacity: 0; transition: opacity 0.2s; display: flex; flex-direction: column; }
-        .slot-square:hover .master-slot-edit { opacity: 1; }
-        .slot-mini-in { width: 100%; height: 50%; border: none; border-bottom: 1px solid #333; background: transparent; color: #fff; font-size: 8px; padding: 2px; text-align: center; }
+        
+        .btn-plus-item { background: transparent; color: #ffcc00; font-size: 24px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-eye-item { position: absolute; bottom: 2px; right: 2px; font-size: 10px; background: rgba(0,0,0,0.8); color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 4px; z-index: 5; }
+        .btn-return-forge { position: absolute; top: 2px; left: 2px; font-size: 10px; background: rgba(200, 0, 0, 0.8); color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 4px; z-index: 5; }
 
         /* COLUNA INVENTÁRIO */
         .col-inventory { width: 280px; border-left: 1px solid #333; padding-left: 20px; display: flex; flex-direction: column; }
         .gil-display { background: linear-gradient(90deg, rgba(255,204,0,0.1), transparent); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .coin-icon { font-size: 20px; }
         .gil-amount { font-size: 24px; font-weight: bold; color: #fff; flex: 1; text-align: right; }
-        .gil-display input { background: transparent; border: none; color: #fff; font-size: 24px; font-weight: bold; width: 100%; text-align: right; outline: none; }
+        .gil-input-master { background: transparent; border: none; color: #fff; font-size: 24px; font-weight: bold; width: 100%; text-align: right; outline: none; }
+        /* NO SPIN BUTTONS */
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .currency { font-size: 10px; color: #ffcc00; font-weight: bold; }
         .items-list { flex: 1; display: flex; flex-direction: column; }
         .items-list h4 { color: #888; font-size: 12px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; }
         .items-scroll { flex: 1; overflow-y: auto; padding-right: 5px; }
-        .inv-row { display: flex; justify-content: space-between; border-bottom: 1px solid #222; padding: 8px 0; font-size: 12px; }
+        .inv-row { display: flex; justify-content: space-between; border-bottom: 1px solid #222; padding: 8px 0; font-size: 12px; align-items: center; }
         .inv-name { background: transparent; border: none; color: #ddd; flex: 1; font-family: 'serif'; }
         .inv-qtd { background: transparent; border: none; color: #00f2ff; width: 40px; text-align: right; font-weight: bold; }
+        .btn-x-red { color: #f44; background: none; border: none; cursor: pointer; font-weight: bold; margin-left: 5px; }
         .i-name { color: #ddd; }
         .i-qtd { color: #00f2ff; font-weight: bold; }
         .add-item-btn { width: 100%; background: #222; border: 1px dashed #555; color: #888; padding: 5px; cursor: pointer; margin-top: 10px; font-size: 10px; }
-        .add-item-btn:hover { border-color: #fff; color: #fff; }
+        
+        /* MODAIS DE ITEM */
+        .item-selector-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300000; display: flex; align-items: center; justify-content: center; }
+        .item-selector-box { width: 400px; height: 500px; background: #111; border: 1px solid #ffcc00; padding: 20px; display: flex; flex-direction: column; border-radius: 8px; }
+        .item-selector-box h3 { color: #ffcc00; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
+        .forge-list-scroll { flex: 1; overflow-y: auto; margin-bottom: 15px; }
+        .forge-item-row { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #333; cursor: pointer; }
+        .forge-item-row:hover { background: rgba(255,255,255,0.1); }
+        .forge-item-row img { width: 40px; height: 40px; border: 1px solid #555; margin-right: 10px; }
+        .forge-item-row strong { color: #00f2ff; display: block; font-size: 12px; }
+        .forge-item-row p { font-size: 10px; color: #aaa; margin: 0; }
+        .btn-cancel-modal { width: 100%; padding: 10px; background: #333; color: #fff; border: none; cursor: pointer; }
+        
+        .item-details-box { width: 300px; background: #000; border: 1px solid #00f2ff; padding: 20px; text-align: center; border-radius: 8px; }
+        .item-details-box img { width: 80px; height: 80px; border: 1px solid #fff; margin-bottom: 10px; }
+        .item-details-box h3 { color: #00f2ff; margin: 0 0 10px 0; }
+        .details-desc { font-size: 12px; color: #ccc; margin-bottom: 10px; font-style: italic; }
+        .details-effect { font-size: 12px; color: #ffcc00; font-weight: bold; margin-bottom: 20px; }
 
-        /* ABA HABILIDADES */
+        /* ABA HABILIDADES (Estilos mantidos) */
         .skills-tab-content { display: flex; width: 100%; height: 100%; gap: 30px; }
         .skills-col { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); border: 1px solid #333; padding: 15px; border-radius: 4px; }
         .class-header { color: #00f2ff; font-size: 18px; border-bottom: 2px solid #00f2ff; padding-bottom: 10px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px; }
