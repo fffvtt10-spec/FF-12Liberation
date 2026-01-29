@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, setDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore"; // ADICIONADO setDoc
 import bazarIcon from '../assets/bazar.png'; 
 
 // AGORA ACEITA playerData PARA VERIFICAR SALDO
@@ -32,7 +32,6 @@ export default function Bazar({ isMestre, playerData }) {
 
   useEffect(() => {
     if (!isOpen || !isMestre) return;
-    // Pega itens do cofre para o mestre colocar a venda (apenas os sem dono)
     const q = query(collection(db, "game_items"), where("status", "==", "vault"), orderBy("nome", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       // Filtra apenas os que não tem dono para venda geral
@@ -91,7 +90,7 @@ export default function Bazar({ isMestre, playerData }) {
   const handleBuyItem = async (item) => {
     if (!auth.currentUser) return alert("Você precisa estar logado.");
     
-    // VERIFICAÇÃO DE SALDO (NOVO)
+    // VERIFICAÇÃO DE SALDO
     const currentGil = playerData?.character_sheet?.inventory?.gil || 0;
     const price = Number(item.valorGil);
 
@@ -104,26 +103,29 @@ export default function Bazar({ isMestre, playerData }) {
         try {
             // 1. Debita o valor do jogador
             const newGil = currentGil - price;
-            // Atualiza o objeto complexo do jogador no Firestore
+            
+            // CORREÇÃO AQUI: Usar setDoc com merge em vez de updateDoc para evitar erro de "No document"
             const charRef = doc(db, "characters", auth.currentUser.uid);
-            // Precisamos clonar para não mutar estado diretamente se viesse de prop readonly, mas aqui é novo objeto
+            
             const updatedSheet = JSON.parse(JSON.stringify(playerData.character_sheet));
             updatedSheet.inventory.gil = newGil;
             
-            await updateDoc(charRef, { character_sheet: updatedSheet });
+            // setDoc com merge = true garante que se o documento não existir (por algum erro), ele cria, 
+            // e se existir, ele apenas atualiza o campo character_sheet
+            await setDoc(charRef, { character_sheet: updatedSheet }, { merge: true });
 
             // 2. Atualiza o item para "solicitado"
             await updateDoc(doc(db, "game_items", item.id), { 
                 status: 'requested', 
                 ownerId: auth.currentUser.uid, 
-                buyerName: playerData.name, // Para o mestre saber quem comprou
+                buyerName: playerData.name, 
                 updatedAt: serverTimestamp() 
             });
 
             alert(`Solicitação enviada! O Mestre aprovará a entrega em breve. Saldo restante: ${newGil} Gil.`);
         } catch (err) {
-            console.error(err);
-            alert("Erro na transação.");
+            console.error("Erro na compra:", err);
+            alert("Erro na transação. Verifique o console.");
         }
     }
   };
@@ -141,14 +143,11 @@ export default function Bazar({ isMestre, playerData }) {
   }, [isMestre, isOpen]);
 
   const handleApprovePurchase = async (item) => {
-      // ALTERAÇÃO: Item volta para 'vault' mas mantém o ownerId
-      // Isso permite que ele apareça na Forja (marcado) e na Ficha do Jogador (filtrado)
-      
       try {
           await updateDoc(doc(db, "game_items", item.id), { 
-              status: 'vault', // Volta para o banco de dados da forja
-              ownerId: item.ownerId, // Mantém o dono definido na compra
-              buyerName: item.buyerName, // Mantém nome para exibição na forja
+              status: 'vault', 
+              ownerId: item.ownerId, 
+              buyerName: item.buyerName, 
               updatedAt: serverTimestamp() 
           });
           
@@ -172,6 +171,11 @@ export default function Bazar({ isMestre, playerData }) {
 
   const filteredItems = items.filter(item => item.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  // Função auxiliar para validar imagem e evitar erro de rede
+  const getSafeImage = (url) => {
+      return (url && url.startsWith('http')) ? `url(${url})` : `url('https://via.placeholder.com/150?text=Item')`;
+  };
+
   return (
     <>
       <button className="bazar-trigger-btn" onClick={() => setIsOpen(true)} title="Abrir Bazar">
@@ -183,7 +187,7 @@ export default function Bazar({ isMestre, playerData }) {
           <div className="bazar-modal-centered" onClick={e => e.stopPropagation()}>
             
             <div className="bazar-header">
-              <h2>BAZAR</h2>
+              <h2>MERCADO NEGRO</h2>
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
             </div>
 
@@ -235,7 +239,7 @@ export default function Bazar({ isMestre, playerData }) {
             <div className="bazar-grid">
               {filteredItems.map(item => (
                 <div key={item.id} className="bazar-item-card">
-                  <div className="item-img" style={{backgroundImage: `url(${item.imagem || 'https://via.placeholder.com/150?text=Item'})`}}></div>
+                  <div className="item-img" style={{backgroundImage: getSafeImage(item.imagem)}}></div>
                   <div className="item-info">
                     <h4>{item.nome}</h4>
                     <p className="desc">{item.descricao}</p>
