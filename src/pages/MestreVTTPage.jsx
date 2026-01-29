@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { doc, updateDoc, onSnapshot, collection, query, where, serverTimestamp } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth"; // IMPORTANTE
+import { onAuthStateChanged } from "firebase/auth";
 import fundoMestre from '../assets/fundo-mestre.jpg';
 import chocoboGif from '../assets/chocobo-loading.gif';
 import Ficha from '../components/Ficha';
 import Bazar from '../components/Bazar';
 import Forja from '../components/Forja';
 
-// Ícones placeholder
 const IconTabletop = () => <span>🗺️</span>;
 const IconDice = () => <span>🎲</span>;
 const IconNPC = () => <span>👹</span>;
@@ -21,14 +20,11 @@ export default function MestreVTTPage() {
   const [connectedPlayers, setConnectedPlayers] = useState([]);
   const [selectedFicha, setSelectedFicha] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [currentUser, setCurrentUser] = useState(null);
 
   // --- 1. DETECÇÃO DE AUTH E SESSÃO (PERSISTENTE NO F5) ---
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
-            setCurrentUser(user);
-            // Busca a sessão ativa criada pelo mestre
             const q = query(
               collection(db, "sessoes"), 
               where("mestreId", "==", user.uid)
@@ -36,7 +32,6 @@ export default function MestreVTTPage() {
 
             const unsubSession = onSnapshot(q, (snap) => {
               const sessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-              // Pega a sessão válida mais recente
               const ativa = sessoes.find(s => {
                   const agora = new Date();
                   const fim = new Date(s.expiraEm);
@@ -47,12 +42,12 @@ export default function MestreVTTPage() {
                 setSessaoAtiva(ativa);
                 setConnectedPlayers(ativa.connected_players || []); 
                 
-                // Garante status online no banco
+                // Mestre Online
                 if (!ativa.dm_online) {
                     updateDoc(doc(db, "sessoes", ativa.id), { dm_online: true }).catch(console.error);
                 }
               }
-              setLoading(false); // Libera o loading mesmo se não achar sessão (para mostrar msg de erro)
+              setLoading(false); 
             });
 
             return () => unsubSession();
@@ -64,7 +59,7 @@ export default function MestreVTTPage() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Cleanup: Marca mestre como offline ao sair
+  // Cleanup Mestre Offline
   useEffect(() => {
     return () => {
         if (sessaoAtiva && auth.currentUser) {
@@ -87,13 +82,11 @@ export default function MestreVTTPage() {
     return () => unsub();
   }, [sessaoAtiva]);
 
-  // Relógio
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // --- TELA DE CARREGAMENTO (CHOCOBO) ---
   if (loading) {
       return (
         <div className="ether-loading">
@@ -125,11 +118,11 @@ export default function MestreVTTPage() {
     <div className="mestre-vtt-container">
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${fundoMestre})` }} />
       
-      {/* --- HUD LATERAL ESQUERDA: LISTA DE JOGADORES --- */}
       <div className="dm-players-sidebar">
           <h3 className="sidebar-title">AVENTUREIROS</h3>
           <div className="players-list-scroll">
               {personagensData.map(char => {
+                  // VERIFICAÇÃO DE ONLINE: UID do jogador está no array da sessão?
                   const isOnline = connectedPlayers.includes(char.uid); 
                   return (
                       <div 
@@ -158,7 +151,6 @@ export default function MestreVTTPage() {
           </div>
       </div>
 
-      {/* --- STATUS DA SESSÃO --- */}
       <div className="session-status-top">
           <div className="status-indicator active"></div>
           <div className="status-info">
@@ -167,14 +159,12 @@ export default function MestreVTTPage() {
           </div>
       </div>
 
-      {/* --- ÁREA CENTRAL --- */}
       <div className="vtt-workspace">
           <div className="empty-tabletop-msg">
               SELECIONE UMA FERRAMENTA PARA INICIAR
           </div>
       </div>
 
-      {/* --- FERRAMENTAS DO MESTRE --- */}
       <div className="dm-tools-dock">
           <div className="tool-group">
             <Bazar isMestre={true} />
@@ -192,7 +182,6 @@ export default function MestreVTTPage() {
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => alert("Em breve")}><IconEnemies /></button><div className="tool-label">COMBATE</div></div>
       </div>
 
-      {/* --- MODAL DA FICHA --- */}
       {selectedFicha && (
           <Ficha 
             characterData={selectedFicha} 

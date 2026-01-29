@@ -8,7 +8,6 @@ import papiroImg from '../assets/papiro.png';
 import levelUpMusic from '../assets/level-up.mp3'; 
 import Bazar from '../components/Bazar';
 import Ficha from '../components/Ficha';
-import chocoboGif from '../assets/chocobo-loading.gif'; // REUTILIZAR O GIF SE QUISER
 
 const CountdownTimer = ({ targetDate, onComplete }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -73,12 +72,13 @@ export default function JogadorVttPage() {
                     }
                     prevLevelRef.current = currentLevel;
                     setPersonagem(data);
-                    setLoading(false); // Carregou personagem
+                    setLoading(false); 
                 } else {
-                    setLoading(false); // Não achou char, mas parou de carregar
+                    setLoading(false); 
                 }
             });
 
+            // Missões não dependem do personagem, pode carregar direto
             const qMissoes = query(collection(db, "missoes"));
             const unsubMissoes = onSnapshot(qMissoes, (snap) => {
                 setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -86,7 +86,7 @@ export default function JogadorVttPage() {
 
             return () => { unsubChar(); unsubMissoes(); };
         } else {
-            setLoading(false); // Não tem user
+            setLoading(false); 
         }
     });
     return () => unsubscribeAuth();
@@ -94,7 +94,8 @@ export default function JogadorVttPage() {
 
   // DADOS DEPENDENTES DO PERSONAGEM (SESSÕES E RESENHAS)
   useEffect(() => {
-      if (!personagem) return;
+      // CORREÇÃO CRÍTICA: Verifica se personagem E personagem.name existem antes de consultar
+      if (!personagem || !personagem.name) return;
       
       const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
       const unsubSessoes = onSnapshot(qSessoes, (snap) => {
@@ -176,7 +177,6 @@ export default function JogadorVttPage() {
      setCurrentVttSession(sessao);
      setHasJoinedSession(true); 
      
-     // MARCA ONLINE NO BANCO
      try {
          const sessionRef = doc(db, "sessoes", sessao.id);
          await updateDoc(sessionRef, {
@@ -365,6 +365,24 @@ export default function JogadorVttPage() {
                             <div className="info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div>
                             <div className="info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div>
                         </div>
+                        
+                        <div className="detail-section">
+                            <label className="section-label">STATUS DO GRUPO</label>
+                            <div style={{background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'4px'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', color:'#fff', fontSize:'12px', marginBottom:'5px'}}>
+                                    <span>JOGADORES INSCRITOS</span>
+                                    <span>{showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span>
+                                </div>
+                                <div style={{width:'100%', height:'6px', background:'#000', borderRadius:'3px'}}>
+                                    <div style={{
+                                        width: `${Math.min(((showMissionDetails.candidatos?.length||0) / (parseInt(showMissionDetails.grupo)||1))*100, 100)}%`, 
+                                        height:'100%', 
+                                        background: '#00f2ff'
+                                    }}></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label><p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p></div>
                         <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label><p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p></div>
                         <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p></div>
