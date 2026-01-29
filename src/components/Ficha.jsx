@@ -41,7 +41,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         class: characterData.class,
         guild_rank: "Iniciado",
         guild_insignia: "", 
-        guild_rank_image: "" 
+        guild_rank_image: "",
+        special_image: "" // Novo campo para o container quadrado
     },
     attributes: { 
         FOR: { value: 0 }, CONS: { value: 0 }, INT: { value: 0 }, 
@@ -89,15 +90,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   // Estado para Drag and Drop de Skills
   const [draggedSkill, setDraggedSkill] = useState(null);
-  const [dragSource, setDragSource] = useState(null); // 'primary' ou 'secondary'
+  const [dragSource, setDragSource] = useState(null); 
 
   // Sincronização
   useEffect(() => {
     if (characterData && characterData.character_sheet) {
-        // Mesclagem defensiva para garantir que skills novas tenham a estrutura correta se o banco estiver antigo
         const incomingSheet = characterData.character_sheet;
         
-        // Garante estrutura de XP nas skills se não existir
         ['primary_class', 'secondary_class'].forEach(clsType => {
             if (incomingSheet.job_system && incomingSheet.job_system[clsType] && incomingSheet.job_system[clsType].skills) {
                 incomingSheet.job_system[clsType].skills = incomingSheet.job_system[clsType].skills.map(s => ({
@@ -108,6 +107,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 }));
             }
         });
+
+        // Garante que o campo novo exista na estrutura ao carregar
+        if (!incomingSheet.basic_info.special_image) incomingSheet.basic_info.special_image = "";
 
         setSheet(incomingSheet);
     }
@@ -146,9 +148,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   };
 
   // --- LÓGICA DE SKILLS (DRAG AND DROP & XP) ---
-
   const handleDragStart = (e, skill, source, index) => {
-      if (!isMaster) return; // Só mestre arrasta
+      if (!isMaster) return; 
       setDraggedSkill({ skill, index });
       setDragSource(source);
       e.dataTransfer.effectAllowed = "move";
@@ -166,14 +167,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       const sourceList = newSheet.job_system[dragSource === 'primary' ? 'primary_class' : 'secondary_class'].skills;
       const targetList = newSheet.job_system[targetSource === 'primary' ? 'primary_class' : 'secondary_class'].skills;
 
-      // Remove do original
       const [movedItem] = sourceList.splice(draggedSkill.index, 1);
 
-      // Se for a mesma lista, ajusta indices
       if (dragSource === targetSource) {
           sourceList.splice(targetIndex, 0, movedItem);
       } else {
-          // Listas diferentes
           targetList.splice(targetIndex, 0, movedItem);
       }
 
@@ -202,7 +200,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       const newSheet = JSON.parse(JSON.stringify(sheet));
       const skill = newSheet.job_system[classType].skills[index];
       skill.master = true;
-      skill.xp.current = skill.xp.max; // Garante visual cheio
+      skill.xp.current = skill.xp.max; 
       setSheet(newSheet);
       setHasUnsavedChanges(true);
   };
@@ -297,10 +295,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
+            {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
                 <div className={`insignia-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
             </div>
+            
+            {/* Centro: Infos Básicas */}
             <div className="header-info">
                 <h1>{sheet.basic_info.character_name}</h1>
                 <span className="sub-header">{sheet.basic_info.race} // {characterData.class}</span>
@@ -316,9 +317,24 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     {isMaster && sheet.basic_info.experience.current >= sheet.basic_info.experience.max && <button className="btn-levelup glowing" onClick={handleLevelUp}>⚡ UP</button>}
                 </div>
             </div>
-            <div className="guild-rank-box">
-                <span className="header-label-top">RANK</span>
-                <div className={`rank-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
+            
+            {/* Direita: Grupo (Novo Quadrado) e Rank */}
+            <div className="header-right-group">
+                {/* NOVO CONTAINER QUADRADO SEM TITULO */}
+                <div className="special-img-box">
+                     <div 
+                        className={`special-display ${isMaster ? 'clickable' : ''}`} 
+                        style={{backgroundImage: `url(${sheet.basic_info.special_image || 'https://via.placeholder.com/60?text=?'})`}}
+                        onClick={() => openUploadModal('Especial', (url) => updateField('basic_info.special_image', url))}
+                        title={isMaster ? "Clique para alterar imagem especial" : ""}
+                     ></div>
+                </div>
+
+                {/* RANK */}
+                <div className="guild-rank-box">
+                    <span className="header-label-top">RANK</span>
+                    <div className={`rank-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
+                </div>
             </div>
         </div>
 
@@ -467,7 +483,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
                     <div className="skills-col extra-col">
                         <div className="extra-abilities-box">
-                            {/* Reação, Passiva e Bonus - Igual */}
                             <div className="ability-row"><label>REAÇÃO</label>{isMaster ? <input value={sheet.job_system?.reaction_ability?.name} onChange={e => updateField('job_system.reaction_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.reaction_ability?.name || "-"}</span>}</div>
                             <div className="ability-row"><label>PASSIVA</label>{isMaster ? <input value={sheet.job_system?.passive_ability?.name} onChange={e => updateField('job_system.passive_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.passive_ability?.name || "-"}</span>}</div>
                             <div className="bonus-row"><label>BÔNUS DE CLASSE</label>{isMaster ? <textarea value={sheet.job_system?.class_bonus?.value} onChange={e => updateField('job_system.class_bonus.value', e.target.value)} className="bonus-area" /> : <p>{sheet.job_system?.class_bonus?.value || "Nenhum"}</p>}</div>
@@ -519,11 +534,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .save-fab:hover { background: #00f2ff; border-color: #fff; color: #000; box-shadow: 0 0 30px #00f2ff; }
         .save-fab.glowing { animation: pulseSave 1.5s infinite; border-color: #00f2ff; color: #00f2ff; }
         @keyframes pulseSave { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        /* HEADER E OUTROS MANTIDOS IGUAIS ... */
+        /* HEADER */
         .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
         .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
         .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-        .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; transition: 0.2s; }
+        .insignia-display, .rank-display, .special-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; transition: 0.2s; }
+        .special-display { border-radius: 12px; /* QUADRADO ARREDONDADO */ }
         .clickable:hover { cursor: pointer; border-color: #ffcc00; box-shadow: 0 0 10px #ffcc00; }
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
@@ -540,13 +556,17 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .xp-fill { height: 100%; background: linear-gradient(90deg, #00f2ff, #0088ff); transition: width 0.5s; }
         .btn-levelup { background: linear-gradient(to bottom, #ffcc00, #ff8800); border: 2px solid #fff; color: #000; font-weight: bold; padding: 5px 15px; cursor: pointer; border-radius: 20px; animation: glow 1s infinite alternate; font-family: 'Cinzel', serif; font-size: 10px; }
         @keyframes glow { from { box-shadow: 0 0 10px #ffcc00; } to { box-shadow: 0 0 30px #ffcc00; transform: scale(1.05); } }
+        
+        .header-right-group { display: flex; gap: 15px; align-items: flex-end; }
+        .special-img-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 10px; }
+
         .ficha-tabs { display: flex; background: #111; border-bottom: 1px solid #333; margin-top: 0; }
         .tab-btn { flex: 1; background: transparent; border: none; padding: 15px; color: #666; font-family: 'Cinzel', serif; font-size: 16px; cursor: pointer; transition: 0.3s; border-bottom: 3px solid transparent; }
         .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
         .tab-btn.active { color: #ffcc00; border-bottom: 3px solid #ffcc00; background: rgba(255, 204, 0, 0.05); }
         .ficha-body { flex: 1; display: flex; padding: 30px 20px; gap: 20px; overflow: hidden; position: relative; }
         
-        /* ESTILOS DE HABILIDADES NOVOS */
+        /* ESTILOS DE HABILIDADES */
         .skills-tab-content { display: flex; width: 100%; height: 100%; gap: 20px; }
         .skills-col { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); border: 1px solid #333; padding: 10px; border-radius: 4px; overflow: hidden; }
         .skills-col.extra-col { flex: 0.5; }
@@ -554,7 +574,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .class-header.secondary { color: #aaa; border-color: #666; }
         .class-name-input { background: transparent; border: none; color: inherit; font-size: inherit; font-weight: bold; width: 80%; }
         .btn-add-skill-slot { background: transparent; border: 1px solid #555; color: #fff; width: 20px; height: 20px; cursor: pointer; font-size: 14px; line-height: 1; }
-        .skills-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        
+        .skills-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; 
+            scrollbar-width: none; /* Firefox */
+        }
+        .skills-list::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
+        
         .skill-card { background: rgba(0, 30, 60, 0.4); border: 1px solid #005577; padding: 8px; border-radius: 4px; cursor: grab; transition: 0.2s; }
         .skill-card.secondary { background: rgba(30, 30, 30, 0.4); border-color: #444; }
         .skill-card:active { cursor: grabbing; border-color: #ffcc00; }
