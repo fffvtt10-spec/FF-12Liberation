@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { doc, collection, query, where, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from 'react-router-dom';
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
 import levelUpMusic from '../assets/level-up.mp3'; 
 import Bazar from '../components/Bazar';
 import Ficha from '../components/Ficha';
+import chocoboGif from '../assets/chocobo-loading.gif';
 
 const CountdownTimer = ({ targetDate, onComplete }) => {
   const [timeLeft, setTimeLeft] = useState("");
@@ -33,6 +35,7 @@ const CountdownTimer = ({ targetDate, onComplete }) => {
 };
 
 export default function JogadorVttPage() {
+  const navigate = useNavigate();
   const [personagem, setPersonagem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
@@ -78,7 +81,6 @@ export default function JogadorVttPage() {
                 }
             });
 
-            // Missões não dependem do personagem, pode carregar direto
             const qMissoes = query(collection(db, "missoes"));
             const unsubMissoes = onSnapshot(qMissoes, (snap) => {
                 setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -87,15 +89,15 @@ export default function JogadorVttPage() {
             return () => { unsubChar(); unsubMissoes(); };
         } else {
             setLoading(false); 
+            navigate('/login');
         }
     });
     return () => unsubscribeAuth();
-  }, []);
+  }, [navigate]);
 
   // DADOS DEPENDENTES DO PERSONAGEM (SESSÕES E RESENHAS)
   useEffect(() => {
-      // CORREÇÃO CRÍTICA: Verifica se personagem E personagem.name existem antes de consultar
-      if (!personagem || !personagem.name) return;
+      if (!personagem) return;
       
       const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
       const unsubSessoes = onSnapshot(qSessoes, (snap) => {
@@ -118,6 +120,11 @@ export default function JogadorVttPage() {
             const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
             if (sessionUpdated) {
                 setVttStatus('connected'); 
+                // Se o componente montou e já estava numa sessão, garante que está marcado como online
+                if(auth.currentUser) {
+                    const sessionRef = doc(db, "sessoes", sessionUpdated.id);
+                    updateDoc(sessionRef, { connected_players: arrayUnion(auth.currentUser.uid) }).catch(()=>{});
+                }
             }
         }
       });
@@ -138,6 +145,7 @@ export default function JogadorVttPage() {
       return () => {
           if (currentVttSession && auth.currentUser) {
              const sessionRef = doc(db, "sessoes", currentVttSession.id);
+             // Pequeno delay para evitar remover se for só um refresh rápido, mas idealmente remove
              updateDoc(sessionRef, {
                  connected_players: arrayRemove(auth.currentUser.uid)
              }).catch(console.error);
@@ -195,7 +203,31 @@ export default function JogadorVttPage() {
      }
   };
 
-  if (loading) return <div className="loading-screen">Carregando Grimório...</div>;
+  if (loading) {
+    return (
+      <div className="ether-loading">
+          <div className="loading-blur-bg"></div>
+          <div className="loading-content">
+          <img src={chocoboGif} alt="Carregando..." className="chocobo-anim" />
+          <div className="loading-bar"><div className="loading-fill"></div></div>
+          <p>CARREGANDO GRIMÓRIO...</p>
+          </div>
+          <style>{`
+          .ether-loading { height: 100vh; width: 100vw; background: #000; display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; z-index: 9999; }
+          .loading-blur-bg { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #001a33 0%, #000 100%); filter: blur(40px); animation: pulseBlur 2s infinite alternate; }
+          .loading-content { position: relative; z-index: 10; text-align: center; }
+          .chocobo-anim { width: 120px; filter: drop-shadow(0 0 10px #ffcc00); margin-bottom: 20px; }
+          .loading-bar { width: 200px; height: 2px; background: rgba(255, 255, 255, 0.1); margin: 0 auto 15px auto; border-radius: 10px; overflow: hidden; }
+          .loading-fill { height: 100%; width: 0%; background: #ffcc00; box-shadow: 0 0 10px #ffcc00; animation: fillProgress 1s ease-in-out forwards; }
+          p { color: #ffcc00; font-family: 'serif'; font-size: 10px; letter-spacing: 3px; animation: fadeText 1s infinite alternate; }
+          @keyframes fillProgress { from { width: 0%; } to { width: 100%; } }
+          @keyframes pulseBlur { from { opacity: 0.5; } to { opacity: 0.8; } }
+          @keyframes fadeText { from { opacity: 0.4; } to { opacity: 1; } }
+          `}</style>
+      </div>
+    );
+  }
+  
   if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
   const charLevel = personagem.character_sheet?.basic_info?.level || 1;
@@ -365,24 +397,6 @@ export default function JogadorVttPage() {
                             <div className="info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div>
                             <div className="info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div>
                         </div>
-                        
-                        <div className="detail-section">
-                            <label className="section-label">STATUS DO GRUPO</label>
-                            <div style={{background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'4px'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', color:'#fff', fontSize:'12px', marginBottom:'5px'}}>
-                                    <span>JOGADORES INSCRITOS</span>
-                                    <span>{showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span>
-                                </div>
-                                <div style={{width:'100%', height:'6px', background:'#000', borderRadius:'3px'}}>
-                                    <div style={{
-                                        width: `${Math.min(((showMissionDetails.candidatos?.length||0) / (parseInt(showMissionDetails.grupo)||1))*100, 100)}%`, 
-                                        height:'100%', 
-                                        background: '#00f2ff'
-                                    }}></div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO DA MISSÃO</label><p className="section-text">{showMissionDetails.descricaoMissao || "Sem descrição."}</p></div>
                         <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS DA MISSÃO</label><p className="section-text">{showMissionDetails.objetivosMissao || "Sem objetivos definidos."}</p></div>
                         <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showMissionDetails.requisitos || "Sem requisitos especiais."}</p></div>
