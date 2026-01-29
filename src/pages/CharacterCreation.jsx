@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
-// Importe sua imagem de fundo
 import bgCharacter from '../assets/fundo-character.jpg';
+// IMPORTS DO FIREBASE ADICIONADOS
+import { db, auth } from '../firebase';
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
@@ -16,7 +18,7 @@ const CharacterCreation = () => {
   const [selectedGender, setSelectedGender] = useState('female');
   const [selectedClass, setSelectedClass] = useState(null);
 
-  // --- NOVOS ESTADOS PARA O MODAL DE NOME ---
+  // --- ESTADOS DO MODAL DE NOME ---
   const [showNameModal, setShowNameModal] = useState(false);
   const [charName, setCharName] = useState('');
 
@@ -51,7 +53,7 @@ const CharacterCreation = () => {
     }
   }, [activeIndex, viewState]);
 
-  // 3. Scroll RÁPIDO com Mouse Wheel
+  // 3. Scroll RÁPIDO
   const handleWheelScroll = (e) => {
     if (carouselRef.current) {
       carouselRef.current.scrollLeft += e.deltaY * 4; 
@@ -106,9 +108,31 @@ const CharacterCreation = () => {
     setSelectedClass(null);
   };
 
-  const handleFinalizeCreation = () => {
-    console.log(`Personagem Criado: ${charName} - ${selectedRace.name} - ${selectedClass}`);
-    navigate('/vtt');
+  // --- CRIAÇÃO REAL DO PERSONAGEM ---
+  const handleFinalizeCreation = async () => {
+    if (!charName.trim() || !auth.currentUser) return;
+
+    try {
+      // Salva na coleção 'characters' usando o UID do usuário como ID do documento
+      // Isso facilita buscar "o personagem deste usuário"
+      await setDoc(doc(db, "characters", auth.currentUser.uid), {
+        uid: auth.currentUser.uid,
+        email: auth.currentUser.email,
+        name: charName,
+        race: selectedRace.name,
+        class: selectedClass,
+        gender: selectedGender,
+        createdAt: serverTimestamp()
+      });
+
+      console.log(`Personagem Criado e Salvo: ${charName}`);
+      // Redireciona para a nova página do jogador
+      navigate('/jogador-vtt'); 
+
+    } catch (error) {
+      console.error("Erro ao salvar personagem:", error);
+      alert("Falha ao invocar personagem no banco de dados.");
+    }
   };
 
   const activeRace = races[activeIndex];
@@ -116,74 +140,20 @@ const CharacterCreation = () => {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       
-      {/* CSS DO MODAL DE NOME (Estilo Dourado/Pergaminho) */}
       <style>{`
-        @keyframes scaleIn {
-          0% { transform: scale(0.8); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-
-        .rpg-modal-overlay {
-          position: fixed;
-          top: 0; left: 0; width: 100vw; height: 100vh;
-          background-color: rgba(0, 0, 0, 0.85);
-          backdrop-filter: blur(8px);
-          z-index: 9999;
-          display: flex; align-items: center; justify-content: center;
-        }
-
-        .rpg-modal-box {
-          position: relative;
-          width: 500px; max-width: 90%;
-          background: #1a120b;
-          border: 2px solid #b45309;
-          box-shadow: 0 0 50px rgba(234, 179, 8, 0.4);
-          padding: 6px;
-          border-radius: 8px;
-          animation: scaleIn 0.3s ease-out forwards;
-        }
-
-        .rpg-modal-inner {
-          background: linear-gradient(to bottom, #f3e6d5, #e7cba8);
-          border: 1px solid #78350f;
-          padding: 40px 20px;
-          border-radius: 4px;
-          text-align: center;
-          display: flex; flex-direction: column; align-items: center; gap: 20px;
-        }
-
-        .rpg-modal-title {
-          font-family: 'Cinzel', serif; font-size: 32px; color: #78350f; font-weight: bold;
-          text-transform: uppercase; text-shadow: 0px 1px 0px rgba(255,255,255,0.6); margin-bottom: 5px;
-        }
-        .rpg-modal-subtitle {
-          font-family: 'Cinzel', serif; font-size: 14px; color: #92400e; font-style: italic;
-          border-top: 1px solid rgba(146, 64, 14, 0.3); padding-top: 10px; width: 100%;
-        }
-
-        .rpg-input {
-          width: 100%; padding: 12px; background: #fff8ed; border: 2px solid #854d0e;
-          font-family: 'Cinzel', serif; font-size: 18px; color: #451a03; outline: none;
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px;
-        }
+        @keyframes scaleIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .rpg-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .rpg-modal-box { position: relative; width: 500px; max-width: 90%; background: #1a120b; border: 2px solid #b45309; box-shadow: 0 0 50px rgba(234, 179, 8, 0.4); padding: 6px; border-radius: 8px; animation: scaleIn 0.3s ease-out forwards; }
+        .rpg-modal-inner { background: linear-gradient(to bottom, #f3e6d5, #e7cba8); border: 1px solid #78350f; padding: 40px 20px; border-radius: 4px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .rpg-modal-title { font-family: 'Cinzel', serif; font-size: 32px; color: #78350f; font-weight: bold; text-transform: uppercase; text-shadow: 0px 1px 0px rgba(255,255,255,0.6); margin-bottom: 5px; }
+        .rpg-modal-subtitle { font-family: 'Cinzel', serif; font-size: 14px; color: #92400e; font-style: italic; border-top: 1px solid rgba(146, 64, 14, 0.3); padding-top: 10px; width: 100%; }
+        .rpg-input { width: 100%; padding: 12px; background: #fff8ed; border: 2px solid #854d0e; font-family: 'Cinzel', serif; font-size: 18px; color: #451a03; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px; }
         .rpg-input:focus { border-color: #d97706; background: #ffffff; }
-
-        .rpg-btn-go {
-          background: linear-gradient(to bottom, #fcd34d, #d97706);
-          border: 1px solid #92400e; padding: 10px 30px;
-          font-family: 'Cinzel', serif; font-weight: bold; font-size: 18px; color: #451a03;
-          text-transform: uppercase; cursor: pointer; border-radius: 4px;
-          box-shadow: 0 4px 0 #92400e; transition: transform 0.1s;
-        }
+        .rpg-btn-go { background: linear-gradient(to bottom, #fcd34d, #d97706); border: 1px solid #92400e; padding: 10px 30px; font-family: 'Cinzel', serif; font-weight: bold; font-size: 18px; color: #451a03; text-transform: uppercase; cursor: pointer; border-radius: 4px; box-shadow: 0 4px 0 #92400e; transition: transform 0.1s; }
         .rpg-btn-go:active { transform: translateY(4px); box-shadow: 0 0 0 #92400e; }
         .rpg-btn-go:disabled { filter: grayscale(1); opacity: 0.6; cursor: not-allowed; }
-
-        .rpg-close-btn {
-          position: absolute; top: 10px; right: 15px; background: none; border: none;
-          font-size: 20px; color: #92400e; cursor: pointer; font-weight: bold;
-        }
+        .rpg-close-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 20px; color: #92400e; cursor: pointer; font-weight: bold; }
         .rpg-close-btn:hover { color: #ff0000; }
-
         .corner { position: absolute; width: 20px; height: 20px; border-color: #fcd34d; border-style: solid; }
         .tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
         .tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
@@ -191,13 +161,11 @@ const CharacterCreation = () => {
         .br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
       `}</style>
 
-      {/* --- BACKGROUND ANIMADO (ÉTER) --- */}
       <div className="ether-container">
         <div className="ether-vortex"></div>
         <div className="ether-particles"></div>
       </div>
 
-      {/* --- CABEÇALHO --- */}
       <header className="absolute top-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
         <div>
           <h1 className="rpg-title text-3xl">Gênese da Alma</h1>
@@ -307,7 +275,7 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME (POR CIMA DE TUDO) --- */}
+      {/* --- MODAL DE NOME --- */}
       {showNameModal && (
         <div className="rpg-modal-overlay">
            <div className="rpg-modal-box">

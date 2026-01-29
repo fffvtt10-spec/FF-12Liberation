@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, getDocs } from "firebase/firestore";
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
@@ -8,7 +8,6 @@ import papiroImg from '../assets/papiro.png';
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
 
-// --- COMPONENTE DE CRONÔMETRO ---
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
@@ -31,10 +30,12 @@ const Timer = ({ expiry }) => {
 };
 
 export default function MestrePage() {
-  // --- ESTADOS GERAIS ---
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
+  // Estado para armazenar os personagens reais do banco
+  const [personagensDb, setPersonagensDb] = useState([]);
+
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
@@ -42,31 +43,25 @@ export default function MestrePage() {
   const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
 
-  // --- ESTADOS DE CRIAÇÃO ---
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
   const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
-  const personagensDisponiveis = ["Cloud Strife", "Tifa Lockhart", "Barret Wallace", "Aerith Gainsborough"];
 
-  // FORM MISSÃO
   const [form, setForm] = useState({
     nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
 
-  // FORM SESSÃO (LINKS IMGUR)
   const [sessionForm, setSessionForm] = useState({
     missaoId: '',
     dataInicio: '',
-    cenarios: [], // Array de strings (URLs)
-    tokens: []    // Array de strings (URLs)
+    cenarios: [], 
+    tokens: []    
   });
 
-  // Estados temporários para inputs de link
   const [tempLink, setTempLink] = useState("");
   const [tempType, setTempType] = useState("cenario");
 
-  // --- PERSISTÊNCIA DA ASSINATURA ---
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || auth.currentUser?.email?.split('@')[0] || "Narrador";
   });
@@ -92,10 +87,16 @@ export default function MestrePage() {
         setSessoes(loadedSessoes);
     });
 
+    // BUSCAR PERSONAGENS REAIS
+    const fetchChars = async () => {
+        const snap = await getDocs(collection(db, "characters"));
+        setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    };
+    fetchChars();
+
     return () => { unsubM(); unsubR(); unsubS(); };
   }, []);
 
-  // --- LOGICA DE CRIAÇÃO (MISSÃO) ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
@@ -121,7 +122,6 @@ export default function MestrePage() {
     } catch (e) { alert("Erro ao publicar."); }
   };
 
-  // --- LÓGICA DE ASSETS DA SESSÃO ---
   const handleAddAsset = () => {
       if (!tempLink) return;
       if (tempType === 'cenario') {
@@ -129,7 +129,7 @@ export default function MestrePage() {
       } else {
           setSessionForm(prev => ({ ...prev, tokens: [...prev.tokens, tempLink] }));
       }
-      setTempLink(""); // Limpa o input
+      setTempLink(""); 
   };
 
   const handleRemoveAsset = (type, index) => {
@@ -147,16 +147,15 @@ export default function MestrePage() {
       try {
         const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
         const inicio = new Date(sessionForm.dataInicio);
-        const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); // +24 horas
+        const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); 
 
-        // Salva arrays de links strings (super leve)
         await addDoc(collection(db, "sessoes"), {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
             mestreId: auth.currentUser.uid,
             dataInicio: sessionForm.dataInicio,
             expiraEm: fim.toISOString(),
-            participantes: sessaoDestinatarios,
+            participantes: sessaoDestinatarios, // Nomes dos personagens selecionados
             cenarios: sessionForm.cenarios,
             tokens: sessionForm.tokens,
             createdAt: serverTimestamp()
@@ -202,6 +201,19 @@ export default function MestrePage() {
                   <span className="mestre-tag">Narrador: {m.mestreNome}</span>
                   <h4>{m.nome}</h4>
                   <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
+                  
+                  {/* EXIBIR CANDIDATOS PARA O MESTRE VER */}
+                  {m.candidatos && m.candidatos.length > 0 && (
+                    <div className="candidates-mini-box">
+                       <strong>Candidatos:</strong>
+                       {m.candidatos.map(c => (
+                         <div key={c.uid} style={{fontSize: '10px', color: c.isLeader ? '#ffcc00' : '#ccc'}}>
+                           {c.isLeader && '👑'} {c.nome} ({c.classe})
+                         </div>
+                       ))}
+                    </div>
+                  )}
+
                   <Timer expiry={m.expiraEm} />
                   <div className="poster-actions">
                     <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
@@ -335,38 +347,7 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO DE RESENHA */}
-      {showResenhaModal && (
-        <div className="ff-modal-overlay-fixed">
-          <div className="ff-modal-scrollable ff-card">
-            <h3 className="modal-title-ff">ESCREVER CRÔNICA</h3>
-            <div className="modal-input-group">
-               <label>TÍTULO DA CRÔNICA</label>
-               <input className="ff-modal-input-dark" placeholder="Título..." value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} />
-            </div>
-            <div className="modal-input-group">
-               <label>CORPO DO TEXTO</label>
-               <textarea className="tall-area-ff-dark" placeholder="Use **texto** para negrito." value={resenha} onChange={(e) => setResenha(e.target.value)} />
-            </div>
-            <div className="player-selector-box-fixed">
-              <label>DESTINATÁRIOS (LISTA FIXA):</label>
-              <div className="destinatarios-grid-fixed">
-                {personagensDisponiveis.map(p => (
-                  <label key={p} className="chip-label-ff">
-                    <input type="checkbox" checked={destinatarios.includes(p)} onChange={() => destinatarios.includes(p) ? setDestinatarios(destinatarios.filter(x=>x!==p)) : setDestinatarios([...destinatarios, p])} /> {p}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="btn-group-ff">
-              <button className="btn-forjar-main" onClick={publicarResenha}>PUBLICAR</button>
-              <button className="btn-cancelar-main" onClick={() => setShowResenhaModal(false)}>FECHAR</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE CRIAÇÃO DE SESSÃO (COM INPUT DE LINKS) */}
+      {/* MODAL DE CRIAÇÃO DE SESSÃO (AGORA USA PERSONAGENS REAIS) */}
       {showSessionModal && (
           <div className="ff-modal-overlay-fixed">
               <div className="ff-modal-scrollable ff-card">
@@ -386,13 +367,18 @@ export default function MestrePage() {
                       </div>
 
                       <div className="player-selector-box-fixed">
-                          <label>PERSONAGENS PERMITIDOS:</label>
+                          <label>SELECIONAR JOGADORES (PERSONAGENS):</label>
                           <div className="destinatarios-grid-fixed">
-                              {personagensDisponiveis.map(p => (
-                                  <label key={p} className="chip-label-ff">
-                                      <input type="checkbox" checked={sessaoDestinatarios.includes(p)} onChange={() => sessaoDestinatarios.includes(p) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p)) : setSessaoDestinatarios([...sessaoDestinatarios, p])} /> {p}
+                              {personagensDb.length > 0 ? personagensDb.map(p => (
+                                  <label key={p.id} className="chip-label-ff">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={sessaoDestinatarios.includes(p.name)} 
+                                        onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} 
+                                      /> 
+                                      {p.name} ({p.class})
                                   </label>
-                              ))}
+                              )) : <p style={{color: '#666'}}>Nenhum personagem encontrado no banco.</p>}
                           </div>
                       </div>
 
@@ -414,7 +400,6 @@ export default function MestrePage() {
                           </div>
 
                           <div className="assets-lists">
-                              {/* LISTA DE CENÁRIOS */}
                               {sessionForm.cenarios.length > 0 && (
                                 <div className="asset-group">
                                     <label>CENÁRIOS:</label>
@@ -427,7 +412,6 @@ export default function MestrePage() {
                                 </div>
                               )}
 
-                              {/* LISTA DE TOKENS */}
                               {sessionForm.tokens.length > 0 && (
                                 <div className="asset-group">
                                     <label>TOKENS:</label>
@@ -507,7 +491,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* PAPIRO DA RESENHA */}
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
            <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
@@ -553,6 +536,7 @@ export default function MestrePage() {
         .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
         .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
         .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
+        .candidates-mini-box { margin-top: 8px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; }
 
         .sanchez-card { position: relative; overflow: hidden; }
         .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
