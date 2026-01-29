@@ -61,10 +61,13 @@ export default function JogadorVttPage() {
 
   // PERSISTÊNCIA E CARREGAMENTO
   useEffect(() => {
+    let unsubChar = () => {};
+    let unsubMissoes = () => {};
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
             const docRef = doc(db, "characters", user.uid);
-            const unsubChar = onSnapshot(docRef, (docSnap) => {
+            unsubChar = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     const currentLevel = data.character_sheet?.basic_info?.level || 1;
@@ -82,17 +85,17 @@ export default function JogadorVttPage() {
             });
 
             const qMissoes = query(collection(db, "missoes"));
-            const unsubMissoes = onSnapshot(qMissoes, (snap) => {
+            unsubMissoes = onSnapshot(qMissoes, (snap) => {
                 setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
 
-            return () => { unsubChar(); unsubMissoes(); };
         } else {
             setLoading(false); 
             navigate('/login');
         }
     });
-    return () => unsubscribeAuth();
+
+    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); };
   }, [navigate]);
 
   // DADOS DEPENDENTES DO PERSONAGEM (SESSÕES E RESENHAS)
@@ -116,14 +119,15 @@ export default function JogadorVttPage() {
         });
         setSessoesAtivas(ativas);
         setSessoesFuturas(futuras);
+        
+        // CORREÇÃO: Apenas atualiza o estado local, NÃO escreve no banco aqui
         if (currentVttSession) {
             const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
             if (sessionUpdated) {
-                setVttStatus('connected'); 
-                // Se o componente montou e já estava numa sessão, garante que está marcado como online
-                if(auth.currentUser) {
-                    const sessionRef = doc(db, "sessoes", sessionUpdated.id);
-                    updateDoc(sessionRef, { connected_players: arrayUnion(auth.currentUser.uid) }).catch(()=>{});
+                // Só marca visualmente como conectado, sem spam de banco
+                const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
+                if (playerInList) {
+                    setVttStatus('connected');
                 }
             }
         }
@@ -140,12 +144,11 @@ export default function JogadorVttPage() {
       return () => { unsubSessoes(); unsubResenhas(); };
   }, [personagem, currentVttSession]);
 
-  // CLEANUP AO SAIR
+  // CLEANUP AO SAIR DA SESSÃO
   useEffect(() => {
       return () => {
           if (currentVttSession && auth.currentUser) {
              const sessionRef = doc(db, "sessoes", currentVttSession.id);
-             // Pequeno delay para evitar remover se for só um refresh rápido, mas idealmente remove
              updateDoc(sessionRef, {
                  connected_players: arrayRemove(auth.currentUser.uid)
              }).catch(console.error);
@@ -181,11 +184,13 @@ export default function JogadorVttPage() {
     }
   };
 
+  // AQUI é onde a mágica acontece. Só escreve no banco UMA vez ao clicar.
   const enterVTT = async (sessao) => {
      setCurrentVttSession(sessao);
      setHasJoinedSession(true); 
      
      try {
+         // Marca o jogador como online
          const sessionRef = doc(db, "sessoes", sessao.id);
          await updateDoc(sessionRef, {
              connected_players: arrayUnion(auth.currentUser.uid)
@@ -458,24 +463,18 @@ export default function JogadorVttPage() {
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; background-repeat: no-repeat; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         .loading-screen { width: 100vw; height: 100vh; background: #000; color: #ffcc00; display: flex; align-items: center; justify-content: center; font-size: 24px; font-family: 'Cinzel', serif; }
-        
-        /* HUD */
         .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; box-shadow: 0 0 15px rgba(255,204,0,0.3); backdrop-filter: blur(5px); z-index: 50; transition: transform 0.2s; }
         .char-hud.clickable-hud:hover { transform: scale(1.05); cursor: pointer; border-color: #fff; box-shadow: 0 0 25px #ffcc00; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
         .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 5px #000; }
         .char-info h2 { margin: 0; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
         .char-meta { font-size: 12px; color: #00f2ff; font-weight: bold; }
-
-        /* LEVEL UP GLOBAL OVERLAY */
         .levelup-global-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 999999; display: flex; align-items: center; justify-content: center; animation: fadeOverlay 0.5s forwards; }
         .levelup-content { text-align: center; }
         .levelup-title { font-size: 80px; color: #ffcc00; text-shadow: 0 0 50px #ffcc00, 0 0 20px #fff; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); letter-spacing: 5px; margin-bottom: 10px; }
         .levelup-subtitle { font-size: 24px; color: #fff; margin-bottom: 40px; font-family: 'Lato', sans-serif; opacity: 0.8; }
         .levelup-confirm-btn { background: transparent; border: 2px solid #ffcc00; color: #ffcc00; padding: 15px 40px; font-size: 18px; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 2px; }
         .levelup-confirm-btn:hover { background: #ffcc00; color: #000; box-shadow: 0 0 30px #ffcc00; transform: scale(1.1); }
-
-        /* SESSÕES, BOTÕES, ETC (Mantidos) */
         .upcoming-sessions-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(255,204,0,0.3); z-index: 5; width: 400px; }
         .upcoming-sessions-banner h3 { color: #ffcc00; margin-bottom: 10px; font-size: 18px; }
         .countdown-row { display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; }

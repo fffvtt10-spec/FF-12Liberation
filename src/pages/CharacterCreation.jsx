@@ -21,6 +21,7 @@ const CharacterCreation = () => {
   // --- ESTADOS DO MODAL DE NOME ---
   const [showNameModal, setShowNameModal] = useState(false);
   const [charName, setCharName] = useState('');
+  const [isSaving, setIsSaving] = useState(false); // Estado para evitar cliques duplos
 
   const races = racesData.races;
 
@@ -34,7 +35,6 @@ const CharacterCreation = () => {
             
             if (docSnap.exists()) {
                 console.log("Personagem já existe. Redirecionando...");
-                // AGORA VAI FUNCIONAR PORQUE A ROTA EXISTE NO APP.JSX
                 navigate('/jogador-vtt'); 
             }
         } catch (error) {
@@ -126,11 +126,44 @@ const CharacterCreation = () => {
     setSelectedClass(null);
   };
 
-  // --- CRIAÇÃO REAL DO PERSONAGEM ---
+  // --- CRIAÇÃO REAL DO PERSONAGEM (CORRIGIDO) ---
   const handleFinalizeCreation = async () => {
-    if (!charName.trim() || !auth.currentUser) return;
+    if (!charName.trim() || !auth.currentUser || isSaving) return;
+    
+    setIsSaving(true); // Bloqueia múltiplos cliques
 
     try {
+      // DEFINIÇÃO DA FICHA INICIAL COMPLETA PARA EVITAR ERROS
+      const initialSheet = {
+          basic_info: { 
+              character_name: charName,
+              race: selectedRace.name,
+              level: 1,
+              experience: { current: 0, max: 100 },
+              guild_insignia: "",
+              special_image: "",
+              guild_rank_image: "" 
+          },
+          attributes: {
+             FOR: { value: 10 }, INT: { value: 10 }, SOR: { value: 10 },
+             CAR: { value: 10 }, VEL: { value: 10 }, CONS: { value: 10 }
+          },
+          status: {
+             hp: { current: 20, max: 20 },
+             mp: { current: 10, max: 10 },
+             arm: { value: 0 }, res: { value: 0 }, mov: { value: 3 }
+          },
+          inventory: { gil: 500, items: [] },
+          equipment: { slots: [{},{},{},{},{},{},{}] },
+          job_system: {
+             primary_class: { name: selectedClass, skills: [] },
+             secondary_class: { name: "Nenhuma", skills: [] },
+             reaction_ability: { name: "" },
+             passive_ability: { name: "" },
+             class_bonus: { value: "" }
+          }
+      };
+
       // Salva na coleção 'characters' usando o UID do usuário
       await setDoc(doc(db, "characters", auth.currentUser.uid), {
         uid: auth.currentUser.uid,
@@ -139,15 +172,17 @@ const CharacterCreation = () => {
         race: selectedRace.name,
         class: selectedClass,
         gender: selectedGender,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        character_sheet: initialSheet // <--- CAMPO CORRIGIDO QUE FALTAVA
       });
 
       console.log(`Personagem Criado: ${charName}`);
-      navigate('/jogador-vtt'); // VAI FUNCIONAR AGORA
+      navigate('/jogador-vtt'); 
 
     } catch (error) {
       console.error("Erro ao salvar personagem:", error);
       alert("Falha ao invocar personagem no banco de dados.");
+      setIsSaving(false);
     }
   };
 
@@ -318,10 +353,10 @@ const CharacterCreation = () => {
                  />
                  <button 
                    onClick={handleFinalizeCreation}
-                   disabled={!charName.trim()}
+                   disabled={!charName.trim() || isSaving}
                    className="rpg-btn-go"
                  >
-                   GO
+                   {isSaving ? "..." : "GO"}
                  </button>
                </div>
 

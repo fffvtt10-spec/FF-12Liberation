@@ -15,20 +15,10 @@ import CharacterCreation from './pages/CharacterCreation';
 import JogadorVttPage from './pages/JogadorVttPage';
 import MestreVTTPage from './pages/MestreVTTPage';
 
-// Rota do Jogador
-const JogadorPage = () => <div style={{color: 'white', padding: '50px'}}>PÁGINA DO JOGADOR EM CONSTRUÇÃO</div>;
-
 // Componente de Rota Protegida para Admin
-const ProtectedAdminRoute = ({ user, children }) => {
-  // Se ainda estiver carregando o estado do user, não redireciona
-  if (!user) {
-    return <Navigate to="/admin-login" />;
-  }
-  
-  if (user.email === 'fffvtt10@gmail.com') {
-    return children;
-  }
-  
+const ProtectedAdminRoute = ({ user, initializing, children }) => {
+  if (initializing) return null;
+  if (user && user.email === 'fffvtt10@gmail.com') return children;
   return <Navigate to="/admin-login" />;
 };
 
@@ -41,32 +31,22 @@ export default function App() {
       setUser(currentUser);
       setInitializing(false);
     });
-    return unsubscribe;
+    return unsubscribe; // Cleanup do listener de auth
   }, []);
 
   if (initializing) {
     return (
       <div style={{
-        height: '100vh',
-        width: '100vw',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#000',
-        overflow: 'hidden'
+        height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', background: '#000', overflow: 'hidden'
       }}>
         <img src={chocoboGif} alt="Loading..." style={{width: '100px', marginBottom: '20px', filter: 'drop-shadow(0 0 10px #ffcc00)'}} />
         <div style={{width: '200px', height: '4px', background: '#333', borderRadius: '2px', overflow: 'hidden'}}>
           <div className="progress-bar"></div>
         </div>
-        <p style={{marginTop: '10px'}}>CARREGANDO...</p>
+        <p style={{marginTop: '10px'}}>SINTONIZANDO ÉTER...</p>
         <style>{`
-          .progress-bar {
-            height: 100%; background: #ffcc00; width: 0%;
-            box-shadow: 0 0 10px #ffcc00;
-            animation: fillProgress 1s ease-in-out forwards;
-          }
+          .progress-bar { height: 100%; background: #ffcc00; width: 0%; box-shadow: 0 0 10px #ffcc00; animation: fillProgress 2s ease-in-out forwards; }
           p { color: #ffcc00; font-family: 'serif'; font-size: 10px; letter-spacing: 3px; animation: fadeText 1s infinite alternate; }
           @keyframes fillProgress { from { width: 0%; } to { width: 100%; } }
           @keyframes fadeText { from { opacity: 0.4; } to { opacity: 1; } }
@@ -82,10 +62,9 @@ export default function App() {
       
       {/* Rotas do Mestre */}
       <Route path="/mestre" element={<MestrePage />} /> 
-      <Route path="/mestre-vtt" element={<MestreVTTPage />} /> 
+      <Route path="/mestre-vtt" element={<MestreVTTPage />} />
       
       {/* Rotas do Jogador */}
-      <Route path="/jogador" element={<JogadorPage />} />
       <Route path="/create-character" element={<CharacterCreation />} />
       <Route path="/jogador-vtt" element={<JogadorVttPage />} />
 
@@ -94,13 +73,13 @@ export default function App() {
       <Route 
         path="/admin" 
         element={
-          <ProtectedAdminRoute user={user}>
+          <ProtectedAdminRoute user={user} initializing={initializing}>
             <AdminPage />
           </ProtectedAdminRoute>
         } 
       />
-
-      {/* Redirecionamento de segurança para rotas inexistentes */}
+      
+      {/* Fallback para evitar tela branca */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

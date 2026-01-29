@@ -294,7 +294,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             {/* Direita: Grupo (Novo Quadrado) e Rank */}
             <div className="header-right-group">
                 <div className="guild-item-box">
-                     <span className="header-label-top">GRUPO</span>
+                     <span className="header-label-top">BRASÃO</span>
                      <div 
                         className={`special-display ${isMaster ? 'clickable' : ''}`} 
                         style={getBgStyle(sheet.basic_info.special_image)}
