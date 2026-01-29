@@ -42,6 +42,9 @@ export default function JogadorVttPage() {
   const [sessoesAtivas, setSessoesAtivas] = useState([]); // Já começou
   const [sessoesFuturas, setSessoesFuturas] = useState([]); // Vai começar
   
+  // Controle de Entrada na Sessão (NOVO)
+  const [hasJoinedSession, setHasJoinedSession] = useState(false);
+
   // Modais e Visualizações
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [showMissionDetails, setShowMissionDetails] = useState(null); // Detalhes da missão
@@ -147,9 +150,11 @@ export default function JogadorVttPage() {
     }
   };
 
-  // --- ENTRAR NO VTT (ACIONA O STATUS) ---
+  // --- ENTRAR NO VTT (ACIONA O STATUS E SOME O BANNER) ---
   const enterVTT = (sessao) => {
      setCurrentVttSession(sessao);
+     setHasJoinedSession(true); // ESCONDE O BANNER CENTRAL
+
      // Verifica se a sessão já está ativa (horário)
      const agora = new Date();
      const inicio = new Date(sessao.dataInicio);
@@ -188,8 +193,8 @@ export default function JogadorVttPage() {
 
         {/* ÁREA CENTRAL: SESSÕES (FUTURAS E ATIVAS) */}
         
-        {/* 1. Sessões Futuras (Countdown) */}
-        {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && (
+        {/* 1. Sessões Futuras (Countdown) - Só aparece se não entrou e não tem ativa rolando */}
+        {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && !hasJoinedSession && (
            <div className="upcoming-sessions-banner">
               <h3>A SESSÃO VAI COMEÇAR EM BREVE</h3>
               {sessoesFuturas.map(sessao => (
@@ -201,8 +206,8 @@ export default function JogadorVttPage() {
            </div>
         )}
 
-        {/* 2. Sessões Ativas (Banner Vermelho) */}
-        {sessoesAtivas.length > 0 && (
+        {/* 2. Sessões Ativas (Banner Vermelho) - SÓ APARECE SE AINDA NÃO CLICOU EM ENTRAR */}
+        {sessoesAtivas.length > 0 && !hasJoinedSession && (
           <div className="active-sessions-banner fade-in">
              <h3>SESSÃO EM ANDAMENTO!</h3>
              {sessoesAtivas.map(sessao => (
@@ -214,7 +219,7 @@ export default function JogadorVttPage() {
           </div>
         )}
 
-        {/* STATUS DO VTT (CANTO SUPERIOR DIREITO) */}
+        {/* STATUS DO VTT (CANTO SUPERIOR DIREITO) - SÓ APARECE DEPOIS DE ENTRAR */}
         {vttStatus && currentVttSession && (
            <div className={`vtt-status-widget ${vttStatus}`}>
               <div className="status-indicator"></div>
@@ -222,7 +227,7 @@ export default function JogadorVttPage() {
                  {vttStatus === 'waiting' && (
                     <>
                       <h4>AGUARDANDO MESTRE</h4>
-                      <small>Preparando o tabuleiro...</small>
+                      <small>Sessão Conectada! Aguardando...</small>
                     </>
                  )}
                  {vttStatus === 'connected' && (
@@ -303,7 +308,7 @@ export default function JogadorVttPage() {
           </div>
         )}
 
-        {/* MODAL DE DETALHES DA MISSÃO (NOVO) */}
+        {/* MODAL DE DETALHES DA MISSÃO */}
         {showMissionDetails && (
             <div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}>
                 <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
