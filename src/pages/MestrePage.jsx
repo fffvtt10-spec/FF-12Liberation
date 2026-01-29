@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove } from "firebase/firestore";
+import { useNavigate } from 'react-router-dom'; // IMPORTAÇÃO DO NAVIGATE
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
 import sanchezImg from '../assets/sanchez.jpeg'; 
@@ -32,6 +33,7 @@ const Timer = ({ expiry }) => {
 };
 
 export default function MestrePage() {
+  const navigate = useNavigate(); // HOOK DE NAVEGAÇÃO
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
@@ -97,7 +99,6 @@ export default function MestrePage() {
         setSessoes(loadedSessoes);
     });
 
-    // CORREÇÃO: Usando onSnapshot para personagens também para garantir dados frescos
     const qC = query(collection(db, "characters"));
     const unsubC = onSnapshot(qC, (snap) => {
         setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -194,8 +195,10 @@ export default function MestrePage() {
       }
   };
 
+  // --- ATUALIZADO: REDIRECIONAR PARA O VTT DO MESTRE ---
   const enterVTT = (sessao) => {
-      alert(`Entrando no VTT do Mestre para a sessão: ${sessao.missaoNome}\nCarregando ${sessao.cenarios?.length || 0} cenários e ${sessao.tokens?.length || 0} tokens...`);
+      // Navega para a rota do VTT do Mestre
+      navigate('/mestre-vtt');
   };
 
   return (
