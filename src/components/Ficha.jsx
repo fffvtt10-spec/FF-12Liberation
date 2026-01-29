@@ -28,6 +28,9 @@ const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
 };
 
 export default function Ficha({ characterData, isMaster, onClose }) {
+  // Função auxiliar para gerar ID único para skills
+  const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
+
   // Estado local da ficha
   const [sheet, setSheet] = useState(characterData.character_sheet || {
     basic_info: { 
@@ -55,8 +58,14 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         slots: Array(7).fill({ item_id: null, item_name: "", item_img: "", effect: "", description: "" }) 
     },
     job_system: {
-        primary_class: { name: characterData.class || "Classe Primária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
-        secondary_class: { name: "Classe Secundária", skills: Array(4).fill({ name: "", cost: "", effect: "" }) },
+        primary_class: { 
+            name: characterData.class || "Classe Primária", 
+            skills: Array(5).fill(0).map(() => ({ id: generateId(), name: "", cost: "", effect: "", xp: { current: 0, max: 100 }, master: false })) 
+        },
+        secondary_class: { 
+            name: "Classe Secundária", 
+            skills: Array(5).fill(0).map(() => ({ id: generateId(), name: "", cost: "", effect: "", xp: { current: 0, max: 100 }, master: false })) 
+        },
         reaction_ability: { name: "", effect: "" },
         passive_ability: { name: "", effect: "" },
         class_bonus: { value: "" }
@@ -69,21 +78,38 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
   
-  // Estados de Upload
+  // Estados de Upload e Forja
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCallback, setUploadCallback] = useState(null);
-
-  // Estados de Forja
   const [showForgeSelector, setShowForgeSelector] = useState(false); 
   const [forgeItems, setForgeItems] = useState([]); 
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
-  // Efeito para atualizar a ficha do JOGADOR em tempo real quando o mestre salvar
+  // Estado para Drag and Drop de Skills
+  const [draggedSkill, setDraggedSkill] = useState(null);
+  const [dragSource, setDragSource] = useState(null); // 'primary' ou 'secondary'
+
+  // Sincronização
   useEffect(() => {
     if (characterData && characterData.character_sheet) {
-        setSheet(characterData.character_sheet);
+        // Mesclagem defensiva para garantir que skills novas tenham a estrutura correta se o banco estiver antigo
+        const incomingSheet = characterData.character_sheet;
+        
+        // Garante estrutura de XP nas skills se não existir
+        ['primary_class', 'secondary_class'].forEach(clsType => {
+            if (incomingSheet.job_system && incomingSheet.job_system[clsType] && incomingSheet.job_system[clsType].skills) {
+                incomingSheet.job_system[clsType].skills = incomingSheet.job_system[clsType].skills.map(s => ({
+                    ...s,
+                    id: s.id || generateId(),
+                    xp: s.xp || { current: 0, max: 100 },
+                    master: s.master || false
+                }));
+            }
+        });
+
+        setSheet(incomingSheet);
     }
   }, [characterData]); 
 
@@ -119,21 +145,76 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setUploadModalOpen(true);
   };
 
-  // --- FORJA ---
+  // --- LÓGICA DE SKILLS (DRAG AND DROP & XP) ---
+
+  const handleDragStart = (e, skill, source, index) => {
+      if (!isMaster) return; // Só mestre arrasta
+      setDraggedSkill({ skill, index });
+      setDragSource(source);
+      e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+      e.preventDefault();
+  };
+
+  const handleDrop = (e, targetSource, targetIndex) => {
+      e.preventDefault();
+      if (!draggedSkill || !isMaster) return;
+
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      const sourceList = newSheet.job_system[dragSource === 'primary' ? 'primary_class' : 'secondary_class'].skills;
+      const targetList = newSheet.job_system[targetSource === 'primary' ? 'primary_class' : 'secondary_class'].skills;
+
+      // Remove do original
+      const [movedItem] = sourceList.splice(draggedSkill.index, 1);
+
+      // Se for a mesma lista, ajusta indices
+      if (dragSource === targetSource) {
+          sourceList.splice(targetIndex, 0, movedItem);
+      } else {
+          // Listas diferentes
+          targetList.splice(targetIndex, 0, movedItem);
+      }
+
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
+      setDraggedSkill(null);
+      setDragSource(null);
+  };
+
+  const addSkillSlot = (classType) => {
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      newSheet.job_system[classType].skills.push({ id: generateId(), name: "", cost: "", effect: "", xp: { current: 0, max: 100 }, master: false });
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
+  };
+
+  const removeSkillSlot = (classType, index) => {
+      if (!window.confirm("Remover este slot de habilidade?")) return;
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      newSheet.job_system[classType].skills.splice(index, 1);
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
+  };
+
+  const toggleMastery = (classType, index) => {
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      const skill = newSheet.job_system[classType].skills[index];
+      skill.master = true;
+      skill.xp.current = skill.xp.max; // Garante visual cheio
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
+  };
+
+  // --- FORJA & EQUIPAMENTOS ---
   const handleOpenForgeSelector = async (slotIndex) => {
       if(!isMaster) return;
       setActiveSlotIndex(slotIndex);
-      
-      // ALTERAÇÃO: Busca itens 'vault'
       const q = query(collection(db, "game_items"), where("status", "==", "vault"));
       const snap = await getDocs(q);
       const allVaultItems = snap.docs.map(d => ({id: d.id, ...d.data()}));
-
-      // FILTRO: Itens sem dono (Globais) OU Itens do próprio jogador
-      const filteredItems = allVaultItems.filter(item => {
-          return !item.ownerId || item.ownerId === (characterData.uid || characterData.id);
-      });
-
+      const filteredItems = allVaultItems.filter(item => !item.ownerId || item.ownerId === (characterData.uid || characterData.id));
       setForgeItems(filteredItems);
       setShowForgeSelector(true);
   };
@@ -149,15 +230,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       };
       setSheet(newSheet);
       setHasUnsavedChanges(true);
-
       const itemRef = doc(db, "game_items", item.id);
-      await updateDoc(itemRef, { 
-          status: 'equipped', 
-          ownerId: characterData.uid || characterData.id,
-          slotIndex: activeSlotIndex,
-          updatedAt: serverTimestamp()
-      });
-
+      await updateDoc(itemRef, { status: 'equipped', ownerId: characterData.uid || characterData.id, slotIndex: activeSlotIndex, updatedAt: serverTimestamp() });
       setShowForgeSelector(false);
   };
 
@@ -167,14 +241,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       if(slot.item_id) {
           if(window.confirm("Isso devolverá o item para a Forja (Cofre). Confirmar?")) {
               const itemRef = doc(db, "game_items", slot.item_id);
-              // Mantém o ownerId se o item já tinha dono, para voltar pro cofre pessoal dele
-              // Se foi global, volta pra global. Mas como saber?
-              // Lógica simplificada: Se foi equipado, volta pro 'vault' mas mantém o owner atual (que é o charData.id)
-              // Assim, ele volta pro cofre pessoal desse jogador.
               await updateDoc(itemRef, { status: 'vault', slotIndex: null, updatedAt: serverTimestamp() });
           }
       }
-      
       const newSheet = JSON.parse(JSON.stringify(sheet));
       newSheet.equipment.slots[slotIndex] = { item_name: "", item_img: "", effect: "" };
       setSheet(newSheet);
@@ -188,31 +257,27 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         setShowLevelUpAnim(false);
         const currentLvl = sheet.basic_info.level || 1;
         const newXpMax = Math.floor(sheet.basic_info.experience.max * 1.5);
-        
         const newSheet = JSON.parse(JSON.stringify(sheet));
         newSheet.basic_info.level = currentLvl + 1;
         newSheet.basic_info.experience.current = 0;
         newSheet.basic_info.experience.max = newXpMax;
-        
         setSheet(newSheet);
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
         await updateDoc(charRef, { character_sheet: newSheet });
     }, 4000);
   };
 
-  // --- RADAR CHART LOGIC (REDUZIDO PARA 85) ---
+  // --- RADAR CHART LOGIC ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
   const radius = 85; 
   const center = 125; 
-
   const getPoint = (value, index, total) => {
     const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
     const x = center + (radius * (value / maxStat)) * Math.cos(angle);
     const y = center + (radius * (value / maxStat)) * Math.sin(angle);
     return { x, y };
   };
-
   const polyPoints = stats.map((stat, i) => {
     const val = sheet.attributes?.[stat]?.value || 0;
     const { x, y } = getPoint(val, i, stats.length);
@@ -221,23 +286,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   return (
     <div className="ficha-overlay-fixed">
-        {/* MODAL GLOBAL DE UPLOAD DE IMAGEM */}
-        <ImageUploadModal 
-            isOpen={uploadModalOpen} 
-            onClose={() => setUploadModalOpen(false)} 
-            onSave={uploadCallback} 
-            label={uploadLabel} 
-        />
+        <ImageUploadModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSave={uploadCallback} label={uploadLabel} />
 
-        {/* BOTÃO FLUTUANTE DE SALVAR (DISQUETE) */}
         {isMaster && hasUnsavedChanges && (
-            <button 
-                className="save-fab glowing" 
-                onClick={saveSheetToDb}
-                title="Salvar Alterações"
-            >
-                💾
-            </button>
+            <button className="save-fab glowing" onClick={saveSheetToDb} title="Salvar Alterações">💾</button>
         )}
 
       <div className="ficha-container fade-in">
@@ -245,102 +297,53 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
-            {/* Esquerda: Signo */}
             <div className="guild-insignia-box">
                 <span className="header-label-top">SIGNO</span>
-                <div 
-                    className={`insignia-display ${isMaster ? 'clickable' : ''}`} 
-                    style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}}
-                    onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}
-                    title={isMaster ? "Clique para alterar imagem" : ""}
-                >
-                </div>
+                <div className={`insignia-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_insignia || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
             </div>
-
-            {/* Centro: Infos Básicas */}
             <div className="header-info">
                 <h1>{sheet.basic_info.character_name}</h1>
                 <span className="sub-header">{sheet.basic_info.race} // {characterData.class}</span>
-                
-                {/* XP BAR & LEVEL */}
                 <div className="xp-container">
                     <div className="lvl-box">
                         <small>LVL</small>
-                        {isMaster ? (
-                            <input className="lvl-input" type="number" value={sheet.basic_info.level} onChange={e => updateField('basic_info.level', Number(e.target.value))} />
-                        ) : (
-                            <span>{sheet.basic_info.level}</span>
-                        )}
+                        {isMaster ? <input className="lvl-input" type="number" value={sheet.basic_info.level} onChange={e => updateField('basic_info.level', Number(e.target.value))} /> : <span>{sheet.basic_info.level}</span>}
                     </div>
                     <div className="xp-bar-box">
-                        <div className="xp-text">
-                            XP 
-                            {isMaster ? (
-                                <input className="xp-mini-input" value={sheet.basic_info.experience.current} onChange={e => updateField('basic_info.experience.current', Number(e.target.value))} />
-                            ) : sheet.basic_info.experience.current} 
-                            / 
-                            {isMaster ? (
-                                <input className="xp-mini-input" value={sheet.basic_info.experience.max} onChange={e => updateField('basic_info.experience.max', Number(e.target.value))} />
-                            ) : sheet.basic_info.experience.max}
-                        </div>
-                        <div className="xp-track">
-                            <div className="xp-fill" style={{width: `${Math.min((sheet.basic_info.experience.current / sheet.basic_info.experience.max) * 100, 100)}%`}}></div>
-                        </div>
+                        <div className="xp-text">XP {isMaster ? <input className="xp-mini-input" value={sheet.basic_info.experience.current} onChange={e => updateField('basic_info.experience.current', Number(e.target.value))} /> : sheet.basic_info.experience.current} / {isMaster ? <input className="xp-mini-input" value={sheet.basic_info.experience.max} onChange={e => updateField('basic_info.experience.max', Number(e.target.value))} /> : sheet.basic_info.experience.max}</div>
+                        <div className="xp-track"><div className="xp-fill" style={{width: `${Math.min((sheet.basic_info.experience.current / sheet.basic_info.experience.max) * 100, 100)}%`}}></div></div>
                     </div>
-                    {isMaster && sheet.basic_info.experience.current >= sheet.basic_info.experience.max && (
-                        <button className="btn-levelup glowing" onClick={handleLevelUp}>⚡ UP</button>
-                    )}
+                    {isMaster && sheet.basic_info.experience.current >= sheet.basic_info.experience.max && <button className="btn-levelup glowing" onClick={handleLevelUp}>⚡ UP</button>}
                 </div>
             </div>
-
-            {/* Direita: Rank Guilda */}
             <div className="guild-rank-box">
                 <span className="header-label-top">RANK</span>
-                <div 
-                    className={`rank-display ${isMaster ? 'clickable' : ''}`} 
-                    style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}}
-                    onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))}
-                    title={isMaster ? "Clique para alterar imagem" : ""}
-                >
-                </div>
+                <div className={`rank-display ${isMaster ? 'clickable' : ''}`} style={{backgroundImage: `url(${sheet.basic_info.guild_rank_image || 'https://via.placeholder.com/60?text=?'})`}} onClick={() => openUploadModal('Rank', (url) => updateField('basic_info.guild_rank_image', url))} title={isMaster ? "Clique para alterar imagem" : ""}></div>
             </div>
         </div>
 
-        {/* --- NAVEGAÇÃO DE ABAS --- */}
         <div className="ficha-tabs">
             <button className={`tab-btn ${activeTab === 'geral' ? 'active' : ''}`} onClick={() => setActiveTab('geral')}>VISÃO GERAL</button>
             <button className={`tab-btn ${activeTab === 'habilidades' ? 'active' : ''}`} onClick={() => setActiveTab('habilidades')}>GRIMÓRIO DE HABILIDADES</button>
         </div>
 
-        {/* --- CORPO --- */}
         <div className="ficha-body">
-            
             {activeTab === 'geral' ? (
                 <>
-                    {/* COLUNA ESQUERDA: ATRIBUTOS */}
+                    {/* VISÃO GERAL (Atributos, Equip, Inv) */}
                     <div className="col-attributes">
                         <h3 className="section-title">ATRIBUTOS</h3>
                         <div className="radar-wrapper">
                             <svg width="250" height="250" viewBox="0 0 250 250">
-                                {[20, 40, 60, 80, 100].map(r => (
-                                    <polygon key={r} points={stats.map((_, i) => { const {x,y} = getPoint(r, i, 6); return `${x},${y}`; }).join(" ")} fill="none" stroke="#333" strokeWidth="1" />
-                                ))}
+                                {[20, 40, 60, 80, 100].map(r => (<polygon key={r} points={stats.map((_, i) => { const {x,y} = getPoint(r, i, 6); return `${x},${y}`; }).join(" ")} fill="none" stroke="#333" strokeWidth="1" />))}
                                 <polygon points={polyPoints} fill="rgba(0, 242, 255, 0.2)" stroke="#00f2ff" strokeWidth="2" />
                                 {stats.map((stat, i) => {
                                     const {x, y} = getPoint(120, i, 6);
                                     const val = sheet.attributes?.[stat]?.value || 0;
-                                    return (
-                                        <foreignObject x={x - 20} y={y - 15} width="40" height="30" key={stat}>
-                                            <div className="stat-box-chart">
-                                                <span className="sb-label">{stat}</span>
-                                                {isMaster ? <input className="sb-input" value={val} onChange={(e) => updateField(`attributes.${stat}.value`, Number(e.target.value))} /> : <span className="sb-val">{val}</span>}
-                                            </div>
-                                        </foreignObject>
-                                    );
+                                    return (<foreignObject x={x - 20} y={y - 15} width="40" height="30" key={stat}><div className="stat-box-chart"><span className="sb-label">{stat}</span>{isMaster ? <input className="sb-input" value={val} onChange={(e) => updateField(`attributes.${stat}.value`, Number(e.target.value))} /> : <span className="sb-val">{val}</span>}</div></foreignObject>);
                                 })}
                             </svg>
                         </div>
-                        
                         <div className="secondary-stats">
                             <div className="stat-row"><label>HP</label><div className="stat-bars-inputs">{isMaster ? <input value={sheet.status.hp.current} onChange={e => updateField('status.hp.current', Number(e.target.value))} /> : <span>{sheet.status.hp.current}</span>}/{isMaster ? <input value={sheet.status.hp.max} onChange={e => updateField('status.hp.max', Number(e.target.value))} /> : <span>{sheet.status.hp.max}</span>}</div></div>
                             <div className="stat-row"><label>MP</label><div className="stat-bars-inputs mp">{isMaster ? <input value={sheet.status.mp.current} onChange={e => updateField('status.mp.current', Number(e.target.value))} /> : <span>{sheet.status.mp.current}</span>}/{isMaster ? <input value={sheet.status.mp.max} onChange={e => updateField('status.mp.max', Number(e.target.value))} /> : <span>{sheet.status.mp.max}</span>}</div></div>
@@ -352,16 +355,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         </div>
                     </div>
 
-                    {/* COLUNA CENTRAL: EQUIPAMENTOS */}
                     <div className="col-center-equip">
-                        <div 
-                            className={`char-image-frame ${isMaster ? 'clickable' : ''}`}
-                            onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))}
-                            title={isMaster ? "Clique para alterar foto" : ""}
-                        >
+                        <div className={`char-image-frame ${isMaster ? 'clickable' : ''}`} onClick={() => openUploadModal('Personagem', (url) => updateField('imgUrl', url))} title={isMaster ? "Clique para alterar foto" : ""}>
                             <div className="image-display" style={{backgroundImage: `url(${sheet.imgUrl || 'https://via.placeholder.com/300x400?text=Heroi'})`}}></div>
                         </div>
-                        
                         <div className="equip-slots-overlay">
                             {[
                                 {id: 0, label: "CABEÇA", style: { top: '-30px', left: '50%', transform: 'translateX(-50%)' }}, 
@@ -375,25 +372,20 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
                                     <div className="slot-square">
-                                        {!sheet.equipment?.slots?.[idx]?.item_img && isMaster && (
-                                            <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>
-                                        )}
+                                        {!sheet.equipment?.slots?.[idx]?.item_img && isMaster && <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>}
                                         {sheet.equipment?.slots?.[idx]?.item_img ? (
                                             <>
                                                 <div className="item-bg" style={{backgroundImage: `url(${sheet.equipment.slots[idx].item_img})`}}></div>
                                                 <button className="btn-eye-item" onClick={() => setViewItemDetails(sheet.equipment.slots[idx])}>👁️</button>
                                                 {isMaster && <button className="btn-return-forge" title="Devolver para Forja" onClick={() => handleUnequipItem(idx)}>↩️</button>}
                                             </>
-                                        ) : (
-                                            !isMaster && <span className="empty-text">Vazio</span>
-                                        )}
+                                        ) : (!isMaster && <span className="empty-text">Vazio</span>)}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* COLUNA DIREITA: INVENTÁRIO */}
                     <div className="col-inventory">
                         <h3 className="section-title">BOLSA & GIL</h3>
                         <div className="gil-display">
@@ -410,14 +402,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                             <>
                                                 <input className="inv-name" value={item.name} onChange={e => updateField(`inventory.items.${idx}.name`, e.target.value)} />
                                                 <input className="inv-qtd" type="number" value={item.quantity} onChange={e => updateField(`inventory.items.${idx}.quantity`, Number(e.target.value))} />
-                                                <button className="btn-x-red" onClick={() => {
-                                                    const newItems = sheet.inventory.items.filter((_, i) => i !== idx);
-                                                    updateField('inventory.items', newItems);
-                                                }}>×</button>
+                                                <button className="btn-x-red" onClick={() => { const newItems = sheet.inventory.items.filter((_, i) => i !== idx); updateField('inventory.items', newItems); }}>×</button>
                                             </>
-                                        ) : (
-                                            <><span className="i-name">{item.name || "Slot Vazio"}</span><span className="i-qtd">x{item.quantity || 0}</span></>
-                                        )}
+                                        ) : (<><span className="i-name">{item.name || "Slot Vazio"}</span><span className="i-qtd">x{item.quantity || 0}</span></>)}
                                     </div>
                                 ))}
                                 {isMaster && <button className="add-item-btn" onClick={() => updateField('inventory.items', [...(sheet.inventory.items || []), {name: "Novo Item", quantity: 1}])}>+ Slot</button>}
@@ -426,76 +413,80 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     </div>
                 </>
             ) : (
-                // --- ABA DE HABILIDADES (Mantida) ---
+                // --- ABA DE HABILIDADES COM BARRA DE XP E MASTERIZAÇÃO ---
                 <div className="skills-tab-content">
-                    <div className="skills-col">
-                        <h3 className="class-header">
-                            {isMaster ? <input className="class-name-input" value={sheet.job_system?.primary_class?.name} onChange={e => updateField('job_system.primary_class.name', e.target.value)} /> : sheet.job_system?.primary_class?.name}
-                        </h3>
-                        <div className="skills-list">
-                            {(sheet.job_system?.primary_class?.skills || []).map((skill, i) => (
-                                <div key={i} className="skill-card">
-                                    <div className="skill-top">
-                                        {isMaster ? <input placeholder="Nome Habilidade" value={skill.name} onChange={e => updateField(`job_system.primary_class.skills.${i}.name`, e.target.value)} className="skill-name-in" /> : <strong className="skill-name">{skill.name || "Slot Vazio"}</strong>}
-                                        {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.primary_class.skills.${i}.cost`, e.target.value)} className="skill-cost-in" /> : <span className="skill-cost">{skill.cost}</span>}
+                    {['primary_class', 'secondary_class'].map((classType, cIdx) => (
+                        <div key={classType} className="skills-col">
+                            <h3 className={`class-header ${classType === 'secondary_class' ? 'secondary' : ''}`}>
+                                {isMaster ? <input className="class-name-input" value={sheet.job_system?.[classType]?.name} onChange={e => updateField(`job_system.${classType}.name`, e.target.value)} /> : sheet.job_system?.[classType]?.name}
+                                {isMaster && <button className="btn-add-skill-slot" onClick={() => addSkillSlot(classType)}>+</button>}
+                            </h3>
+                            <div className="skills-list">
+                                {(sheet.job_system?.[classType]?.skills || []).map((skill, i) => (
+                                    <div 
+                                        key={skill.id} 
+                                        className={`skill-card ${classType === 'secondary_class' ? 'secondary' : ''} ${skill.master ? 'mastered' : ''}`}
+                                        draggable={isMaster}
+                                        onDragStart={(e) => handleDragStart(e, skill, classType === 'primary_class' ? 'primary' : 'secondary', i)}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, classType === 'primary_class' ? 'primary' : 'secondary', i)}
+                                    >
+                                        <div className="skill-top">
+                                            <div style={{display:'flex', alignItems:'center', gap:'5px', flex:1}}>
+                                                {skill.master && <span className="star-icon pulsing">★</span>}
+                                                {isMaster ? <input placeholder="Nome" value={skill.name} onChange={e => updateField(`job_system.${classType}.skills.${i}.name`, e.target.value)} className="skill-name-in" /> : <strong className="skill-name">{skill.name || "Slot Vazio"}</strong>}
+                                            </div>
+                                            {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.${classType}.skills.${i}.cost`, e.target.value)} className="skill-cost-in" /> : <span className="skill-cost">{skill.cost}</span>}
+                                            {isMaster && <button className="btn-x-red-small" onClick={() => removeSkillSlot(classType, i)}>×</button>}
+                                        </div>
+                                        {isMaster ? <textarea placeholder="Efeito..." value={skill.effect} onChange={e => updateField(`job_system.${classType}.skills.${i}.effect`, e.target.value)} className="skill-desc-in" /> : <p className="skill-desc">{skill.effect}</p>}
+                                        
+                                        {/* BARRA DE XP DA HABILIDADE */}
+                                        <div className="skill-xp-box">
+                                            <div className="xp-labels">
+                                                <span>XP</span>
+                                                {isMaster ? (
+                                                    <div style={{display:'flex'}}>
+                                                        <input className="xp-tiny" value={skill.xp?.current || 0} onChange={e => updateField(`job_system.${classType}.skills.${i}.xp.current`, Number(e.target.value))} /> / 
+                                                        <input className="xp-tiny" value={skill.xp?.max || 100} onChange={e => updateField(`job_system.${classType}.skills.${i}.xp.max`, Number(e.target.value))} />
+                                                    </div>
+                                                ) : <span>{skill.xp?.current || 0} / {skill.xp?.max || 100}</span>}
+                                            </div>
+                                            <div className={`skill-track ${skill.master ? 'grayed' : ''}`}>
+                                                <div className="skill-fill" style={{width: `${Math.min(((skill.xp?.current||0)/(skill.xp?.max||100))*100, 100)}%`}}></div>
+                                            </div>
+                                            {isMaster && !skill.master && (skill.xp?.current >= skill.xp?.max) && (
+                                                <button className="btn-masterize" onClick={() => toggleMastery(classType, i)}>MASTERIZAR</button>
+                                            )}
+                                        </div>
                                     </div>
-                                    {isMaster ? <textarea placeholder="Efeito..." value={skill.effect} onChange={e => updateField(`job_system.primary_class.skills.${i}.effect`, e.target.value)} className="skill-desc-in" /> : <p className="skill-desc">{skill.effect}</p>}
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    ))}
 
-                    <div className="skills-col">
-                        <h3 className="class-header secondary">
-                            {isMaster ? <input className="class-name-input" value={sheet.job_system?.secondary_class?.name} onChange={e => updateField('job_system.secondary_class.name', e.target.value)} /> : sheet.job_system?.secondary_class?.name}
-                        </h3>
-                        <div className="skills-list">
-                            {(sheet.job_system?.secondary_class?.skills || []).map((skill, i) => (
-                                <div key={i} className="skill-card secondary">
-                                    <div className="skill-top">
-                                        {isMaster ? <input placeholder="Nome Habilidade" value={skill.name} onChange={e => updateField(`job_system.secondary_class.skills.${i}.name`, e.target.value)} className="skill-name-in" /> : <strong className="skill-name">{skill.name || "Slot Vazio"}</strong>}
-                                        {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.secondary_class.skills.${i}.cost`, e.target.value)} className="skill-cost-in" /> : <span className="skill-cost">{skill.cost}</span>}
-                                    </div>
-                                    {isMaster ? <textarea placeholder="Efeito..." value={skill.effect} onChange={e => updateField(`job_system.secondary_class.skills.${i}.effect`, e.target.value)} className="skill-desc-in" /> : <p className="skill-desc">{skill.effect}</p>}
-                                </div>
-                            ))}
-                        </div>
-
+                    <div className="skills-col extra-col">
                         <div className="extra-abilities-box">
-                            <div className="ability-row">
-                                <label>REAÇÃO</label>
-                                {isMaster ? <input value={sheet.job_system?.reaction_ability?.name} onChange={e => updateField('job_system.reaction_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.reaction_ability?.name || "-"}</span>}
-                            </div>
-                            <div className="ability-row">
-                                <label>PASSIVA</label>
-                                {isMaster ? <input value={sheet.job_system?.passive_ability?.name} onChange={e => updateField('job_system.passive_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.passive_ability?.name || "-"}</span>}
-                            </div>
-                            <div className="bonus-row">
-                                <label>BÔNUS DE CLASSE</label>
-                                {isMaster ? <textarea value={sheet.job_system?.class_bonus?.value} onChange={e => updateField('job_system.class_bonus.value', e.target.value)} className="bonus-area" /> : <p>{sheet.job_system?.class_bonus?.value || "Nenhum"}</p>}
-                            </div>
+                            {/* Reação, Passiva e Bonus - Igual */}
+                            <div className="ability-row"><label>REAÇÃO</label>{isMaster ? <input value={sheet.job_system?.reaction_ability?.name} onChange={e => updateField('job_system.reaction_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.reaction_ability?.name || "-"}</span>}</div>
+                            <div className="ability-row"><label>PASSIVA</label>{isMaster ? <input value={sheet.job_system?.passive_ability?.name} onChange={e => updateField('job_system.passive_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.passive_ability?.name || "-"}</span>}</div>
+                            <div className="bonus-row"><label>BÔNUS DE CLASSE</label>{isMaster ? <textarea value={sheet.job_system?.class_bonus?.value} onChange={e => updateField('job_system.class_bonus.value', e.target.value)} className="bonus-area" /> : <p>{sheet.job_system?.class_bonus?.value || "Nenhum"}</p>}</div>
                         </div>
                     </div>
                 </div>
             )}
         </div>
 
-        {/* MODAL SELETOR DE ITENS DA FORJA */}
         {showForgeSelector && (
             <div className="item-selector-overlay" onClick={() => setShowForgeSelector(false)}>
                 <div className="item-selector-box" onClick={e => e.stopPropagation()}>
                     <h3>EQUIPAR DO COFRE</h3>
                     <div className="forge-list-scroll">
-                        {forgeItems.length === 0 && <p className="empty-text">Nenhum item disponível na Forja.</p>}
+                        {forgeItems.length === 0 && <p className="empty-text">Nenhum item disponível.</p>}
                         {forgeItems.map(item => (
                             <div key={item.id} className="forge-item-row" onClick={() => handleEquipItem(item)}>
                                 <img src={item.imagem} alt={item.nome} />
-                                <div>
-                                    <strong>{item.nome}</strong>
-                                    {/* Exibe se é do próprio jogador */}
-                                    {item.ownerId && <small style={{color:'#0f0'}}> (Seu Item)</small>}
-                                    <p>{item.descricao.substring(0, 40)}...</p>
-                                </div>
+                                <div><strong>{item.nome}</strong>{item.ownerId && <small style={{color:'#0f0'}}> (Seu Item)</small>}<p>{item.descricao.substring(0, 40)}...</p></div>
                             </div>
                         ))}
                     </div>
@@ -504,7 +495,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             </div>
         )}
 
-        {/* MODAL DETALHES DO ITEM */}
         {viewItemDetails && (
             <div className="item-selector-overlay" onClick={() => setViewItemDetails(null)}>
                 <div className="item-details-box" onClick={e => e.stopPropagation()}>
@@ -517,36 +507,27 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             </div>
         )}
 
-        {showLevelUpAnim && (
-            <div className="level-up-overlay"><h1 className="levelup-text">LEVEL UP!</h1></div>
-        )}
-
+        {showLevelUpAnim && (<div className="level-up-overlay"><h1 className="levelup-text">LEVEL UP!</h1></div>)}
       </div>
 
       <style>{`
         /* GERAL */
         .ficha-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 200000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
         .ficha-container { width: 1200px; height: 850px; max-width: 95vw; max-height: 98vh; background: #050a10; border: 2px solid #ffcc00; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); border-radius: 8px; overflow: hidden; font-family: 'Cinzel', serif; color: #fff; }
-        
         .close-btn-ficha { position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #f44; font-size: 24px; cursor: pointer; z-index: 200; font-weight: bold; }
-        
-        /* Botão Salvar Flutuante (FAB) */
         .save-fab { position: absolute; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: #222; border: 2px solid #444; color: #fff; font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 300; transition: 0.3s; box-shadow: 0 0 15px #000; }
         .save-fab:hover { background: #00f2ff; border-color: #fff; color: #000; box-shadow: 0 0 30px #00f2ff; }
         .save-fab.glowing { animation: pulseSave 1.5s infinite; border-color: #00f2ff; color: #00f2ff; }
         @keyframes pulseSave { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-
-        /* HEADER */
+        /* HEADER E OUTROS MANTIDOS IGUAIS ... */
         .ficha-header { padding: 25px 30px 10px 30px; background: linear-gradient(90deg, #101020, #000); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; height: 140px; position: relative; }
         .guild-insignia-box, .guild-rank-box { display: flex; flex-direction: column; align-items: center; width: 80px; position: relative; padding-top: 10px; }
         .header-label-top { font-size: 10px; color: #ffcc00; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
         .insignia-display, .rank-display { width: 70px; height: 70px; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid #333; border-radius: 50%; background-color: #000; position: relative; transition: 0.2s; }
         .clickable:hover { cursor: pointer; border-color: #ffcc00; box-shadow: 0 0 10px #ffcc00; }
-
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); }
         .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
-        
         .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: -5px; }
         .lvl-box { display: flex; flex-direction: column; align-items: center; background: #222; border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .lvl-box small { font-size: 8px; color: #ffcc00; }
@@ -559,24 +540,56 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .xp-fill { height: 100%; background: linear-gradient(90deg, #00f2ff, #0088ff); transition: width 0.5s; }
         .btn-levelup { background: linear-gradient(to bottom, #ffcc00, #ff8800); border: 2px solid #fff; color: #000; font-weight: bold; padding: 5px 15px; cursor: pointer; border-radius: 20px; animation: glow 1s infinite alternate; font-family: 'Cinzel', serif; font-size: 10px; }
         @keyframes glow { from { box-shadow: 0 0 10px #ffcc00; } to { box-shadow: 0 0 30px #ffcc00; transform: scale(1.05); } }
-
-        /* TABS */
         .ficha-tabs { display: flex; background: #111; border-bottom: 1px solid #333; margin-top: 0; }
         .tab-btn { flex: 1; background: transparent; border: none; padding: 15px; color: #666; font-family: 'Cinzel', serif; font-size: 16px; cursor: pointer; transition: 0.3s; border-bottom: 3px solid transparent; }
         .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
         .tab-btn.active { color: #ffcc00; border-bottom: 3px solid #ffcc00; background: rgba(255, 204, 0, 0.05); }
-
         .ficha-body { flex: 1; display: flex; padding: 30px 20px; gap: 20px; overflow: hidden; position: relative; }
         
-        /* COLUNA ATRIBUTOS */
+        /* ESTILOS DE HABILIDADES NOVOS */
+        .skills-tab-content { display: flex; width: 100%; height: 100%; gap: 20px; }
+        .skills-col { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); border: 1px solid #333; padding: 10px; border-radius: 4px; overflow: hidden; }
+        .skills-col.extra-col { flex: 0.5; }
+        .class-header { color: #00f2ff; font-size: 16px; border-bottom: 2px solid #00f2ff; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+        .class-header.secondary { color: #aaa; border-color: #666; }
+        .class-name-input { background: transparent; border: none; color: inherit; font-size: inherit; font-weight: bold; width: 80%; }
+        .btn-add-skill-slot { background: transparent; border: 1px solid #555; color: #fff; width: 20px; height: 20px; cursor: pointer; font-size: 14px; line-height: 1; }
+        .skills-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        .skill-card { background: rgba(0, 30, 60, 0.4); border: 1px solid #005577; padding: 8px; border-radius: 4px; cursor: grab; transition: 0.2s; }
+        .skill-card.secondary { background: rgba(30, 30, 30, 0.4); border-color: #444; }
+        .skill-card:active { cursor: grabbing; border-color: #ffcc00; }
+        .skill-card.mastered { border-color: #ffd700; background: rgba(50, 40, 0, 0.4); }
+        .skill-top { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .skill-name { color: #ffcc00; font-size: 13px; }
+        .skill-cost { color: #00f2ff; font-size: 11px; font-weight: bold; }
+        .skill-desc { font-size: 11px; color: #ccc; line-height: 1.3; margin: 0 0 5px 0; }
+        .skill-name-in, .skill-cost-in { background: transparent; border: none; color: #fff; font-size: 12px; }
+        .skill-name-in { flex: 1; font-weight: bold; color: #ffcc00; }
+        .skill-cost-in { width: 40px; text-align: right; color: #00f2ff; }
+        .skill-desc-in { width: 100%; background: transparent; border: none; color: #ccc; font-size: 11px; resize: none; font-family: sans-serif; height: 30px; }
+        
+        .skill-xp-box { margin-top: 5px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; }
+        .xp-labels { display: flex; justify-content: space-between; font-size: 9px; color: #888; margin-bottom: 2px; }
+        .xp-tiny { background: transparent; border: none; color: #aaa; width: 20px; text-align: center; font-size: 9px; }
+        .skill-track { width: 100%; height: 5px; background: #222; border-radius: 2px; overflow: hidden; }
+        .skill-track.grayed .skill-fill { background: #888; }
+        .skill-fill { height: 100%; background: #00f2ff; transition: width 0.3s; }
+        .btn-masterize { width: 100%; margin-top: 4px; background: linear-gradient(to right, #d4af37, #b8860b); border: none; color: #000; font-size: 9px; font-weight: bold; cursor: pointer; padding: 2px; border-radius: 2px; }
+        .star-icon { color: #ffd700; font-size: 14px; margin-right: 5px; text-shadow: 0 0 5px #ffd700; }
+        .pulsing { animation: pulseStar 1.5s infinite; }
+        @keyframes pulseStar { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
+        .btn-x-red-small { color: #f44; background: none; border: none; font-weight: bold; cursor: pointer; font-size: 12px; margin-left: 5px; }
+
+        /* OUTRAS COLUNAS */
         .col-attributes { width: 300px; display: flex; flex-direction: column; align-items: center; border-right: 1px solid #333; padding-right: 20px; }
+        .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
+        .col-inventory { width: 280px; border-left: 1px solid #333; padding-left: 20px; display: flex; flex-direction: column; }
         .section-title { color: #aaa; font-size: 14px; border-bottom: 1px solid #00f2ff; width: 100%; text-align: center; margin-bottom: 15px; padding-bottom: 5px; }
         .radar-wrapper { position: relative; margin-bottom: 20px; }
         .stat-box-chart { background: #000; border: 1px solid #ffcc00; width: 40px; height: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; box-shadow: 0 0 5px #000; }
         .sb-label { font-size: 8px; color: #aaa; }
         .sb-val { font-size: 12px; font-weight: bold; color: #fff; }
         .sb-input { width: 100%; height: 100%; background: transparent; border: none; color: #ffcc00; text-align: center; font-weight: bold; padding: 0; font-size: 12px; }
-
         .secondary-stats { width: 100%; }
         .stat-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .stat-row label { font-weight: bold; color: #ffcc00; width: 30px; }
@@ -588,31 +601,22 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .s-box label { display: block; font-size: 10px; color: #888; margin-bottom: 5px; }
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
-
-        /* COLUNA EQUIPAMENTOS */
-        .col-center-equip { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
         .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; transition: 0.2s; }
         .char-image-frame.clickable:hover { border-color: #ffcc00; cursor: pointer; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
-        
         .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }
         .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; }
         .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; position: absolute; top: 0; left: 0; }
         .empty-text { font-size: 9px; color: #666; text-align: center; line-height: 1; padding: 2px; }
-        
         .btn-plus-item { background: transparent; color: #ffcc00; font-size: 24px; border: none; cursor: pointer; font-weight: bold; }
         .btn-eye-item { position: absolute; bottom: 2px; right: 2px; font-size: 10px; background: rgba(0,0,0,0.8); color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 4px; z-index: 5; }
         .btn-return-forge { position: absolute; top: 2px; left: 2px; font-size: 10px; background: rgba(200, 0, 0, 0.8); color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 4px; z-index: 5; }
-
-        /* COLUNA INVENTÁRIO */
-        .col-inventory { width: 280px; border-left: 1px solid #333; padding-left: 20px; display: flex; flex-direction: column; }
         .gil-display { background: linear-gradient(90deg, rgba(255,204,0,0.1), transparent); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .coin-icon { font-size: 20px; }
         .gil-amount { font-size: 24px; font-weight: bold; color: #fff; flex: 1; text-align: right; }
         .gil-input-master { background: transparent; border: none; color: #fff; font-size: 24px; font-weight: bold; width: 100%; text-align: right; outline: none; }
-        /* NO SPIN BUTTONS */
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .currency { font-size: 10px; color: #ffcc00; font-weight: bold; }
         .items-list { flex: 1; display: flex; flex-direction: column; }
@@ -625,8 +629,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .i-name { color: #ddd; }
         .i-qtd { color: #00f2ff; font-weight: bold; }
         .add-item-btn { width: 100%; background: #222; border: 1px dashed #555; color: #888; padding: 5px; cursor: pointer; margin-top: 10px; font-size: 10px; }
-        
-        /* MODAL UPLOAD IMG */
         .img-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 300000; display: flex; align-items: center; justify-content: center; }
         .img-modal-content { background: #111; border: 1px solid #ffcc00; padding: 25px; width: 400px; border-radius: 8px; text-align: center; box-shadow: 0 0 30px rgba(255,204,0,0.2); }
         .img-modal-content h3 { color: #ffcc00; margin-top: 0; font-family: 'Cinzel', serif; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 20px; }
@@ -637,8 +639,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .btn-confirm:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
         .btn-cancel { background: #333; color: #fff; padding: 10px 25px; border: none; cursor: pointer; border-radius: 4px; }
         .btn-cancel:hover { background: #444; }
-
-        /* MODAIS DE ITEM */
         .item-selector-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300000; display: flex; align-items: center; justify-content: center; }
         .item-selector-box { width: 400px; height: 500px; background: #111; border: 1px solid #ffcc00; padding: 20px; display: flex; flex-direction: column; border-radius: 8px; }
         .item-selector-box h3 { color: #ffcc00; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
@@ -649,30 +649,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .forge-item-row strong { color: #00f2ff; display: block; font-size: 12px; }
         .forge-item-row p { font-size: 10px; color: #aaa; margin: 0; }
         .btn-cancel-modal { width: 100%; padding: 10px; background: #333; color: #fff; border: none; cursor: pointer; }
-        
         .item-details-box { width: 300px; background: #000; border: 1px solid #00f2ff; padding: 20px; text-align: center; border-radius: 8px; }
         .item-details-box img { width: 80px; height: 80px; border: 1px solid #fff; margin-bottom: 10px; }
         .item-details-box h3 { color: #00f2ff; margin: 0 0 10px 0; }
         .details-desc { font-size: 12px; color: #ccc; margin-bottom: 10px; font-style: italic; }
         .details-effect { font-size: 12px; color: #ffcc00; font-weight: bold; margin-bottom: 20px; }
-
-        /* ABA HABILIDADES (Estilos mantidos) */
-        .skills-tab-content { display: flex; width: 100%; height: 100%; gap: 30px; }
-        .skills-col { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); border: 1px solid #333; padding: 15px; border-radius: 4px; }
-        .class-header { color: #00f2ff; font-size: 18px; border-bottom: 2px solid #00f2ff; padding-bottom: 10px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px; }
-        .class-header.secondary { color: #aaa; border-color: #666; }
-        .class-name-input { background: transparent; border: none; color: inherit; font-size: inherit; font-weight: bold; width: 100%; text-transform: uppercase; }
-        .skills-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .skill-card { background: rgba(0, 30, 60, 0.4); border: 1px solid #005577; padding: 10px; border-radius: 4px; }
-        .skill-card.secondary { background: rgba(30, 30, 30, 0.4); border-color: #444; }
-        .skill-top { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
-        .skill-name { color: #ffcc00; font-size: 14px; }
-        .skill-cost { color: #00f2ff; font-size: 12px; font-weight: bold; }
-        .skill-desc { font-size: 12px; color: #ccc; line-height: 1.4; margin: 0; }
-        .skill-name-in, .skill-cost-in { background: transparent; border: none; color: #fff; font-size: 12px; }
-        .skill-name-in { flex: 1; font-weight: bold; color: #ffcc00; }
-        .skill-cost-in { width: 50px; text-align: right; color: #00f2ff; }
-        .skill-desc-in { width: 100%; background: transparent; border: none; color: #ccc; font-size: 12px; resize: none; font-family: sans-serif; }
         .extra-abilities-box { margin-top: 20px; border-top: 2px solid #444; padding-top: 15px; }
         .ability-row { display: flex; align-items: center; margin-bottom: 10px; background: #222; padding: 8px; border-radius: 4px; border-left: 3px solid #ffcc00; }
         .ability-row label { font-size: 10px; color: #888; width: 60px; font-weight: bold; }
@@ -682,12 +663,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .bonus-row label { font-size: 10px; color: #00f2ff; display: block; margin-bottom: 5px; font-weight: bold; }
         .bonus-row p { font-size: 12px; color: #ddd; font-style: italic; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px; }
         .bonus-area { width: 100%; height: 60px; background: rgba(0,0,0,0.5); border: 1px solid #444; color: #ddd; font-size: 12px; padding: 5px; resize: none; }
-
         .level-up-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; animation: fadeOverlay 4s forwards; pointer-events: none; }
         .levelup-text { font-size: 80px; color: #ffcc00; text-shadow: 0 0 50px #ffcc00, 0 0 20px #fff; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); letter-spacing: 5px; }
         @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes fadeOverlay { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
-        
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
