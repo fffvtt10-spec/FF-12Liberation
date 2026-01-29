@@ -5,13 +5,12 @@ import bazarIcon from '../assets/bazar.png';
 
 export default function Bazar({ isMestre }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [items, setItems] = useState([]); // Itens do Bazar (status="bazar")
-  const [vaultItems, setVaultItems] = useState([]); // Itens da Forja (status="vault")
+  const [items, setItems] = useState([]); 
+  const [vaultItems, setVaultItems] = useState([]); 
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Estados para Mestre
-  const [isEditing, setIsEditing] = useState(null); // ID do item sendo editado (já no bazar)
-  const [selectedVaultId, setSelectedVaultId] = useState(""); // ID selecionado do dropdown
+  const [isEditing, setIsEditing] = useState(null); 
+  const [selectedVaultId, setSelectedVaultId] = useState(""); 
 
   const [form, setForm] = useState({
     nome: '',
@@ -21,10 +20,8 @@ export default function Bazar({ isMestre }) {
     valorReal: ''
   });
 
-  // --- BUSCAR ITENS DO BAZAR (Venda) ---
   useEffect(() => {
     if (!isOpen) return;
-    // Pega itens da coleção ÚNICA onde status é 'bazar'
     const q = query(collection(db, "game_items"), where("status", "==", "bazar"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -32,10 +29,8 @@ export default function Bazar({ isMestre }) {
     return () => unsub();
   }, [isOpen]);
 
-  // --- BUSCAR ITENS DA FORJA (Para importar - apenas Mestre) ---
   useEffect(() => {
     if (!isOpen || !isMestre) return;
-    // Pega itens onde status é 'vault'
     const q = query(collection(db, "game_items"), where("status", "==", "vault"), orderBy("nome", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setVaultItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -43,7 +38,6 @@ export default function Bazar({ isMestre }) {
     return () => unsub();
   }, [isOpen, isMestre]);
 
-  // --- MESTRE: SELECIONAR ITEM DA FORJA ---
   const handleSelectVaultItem = (e) => {
     const vId = e.target.value;
     setSelectedVaultId(vId);
@@ -56,79 +50,48 @@ export default function Bazar({ isMestre }) {
         nome: selected.nome,
         descricao: selected.descricao,
         imagem: selected.imagem,
-        valorGil: '', // Mestre define agora
+        valorGil: '', 
         valorReal: ''
       });
     }
   };
 
-  // --- MESTRE: SALVAR/VENDER ITEM ---
   const handleSaveItem = async (e) => {
     e.preventDefault();
     if (!form.nome || !form.valorGil) return alert("Preencha nome e valor em Gil!");
 
     try {
-      const payload = {
-        ...form,
-        updatedAt: serverTimestamp()
-      };
+      const payload = { ...form, updatedAt: serverTimestamp() };
 
       if (isEditing) {
-        // Editando item já no bazar
         await updateDoc(doc(db, "game_items", isEditing), payload);
         setIsEditing(null);
       } else if (selectedVaultId) {
-        // MOVENDO DA FORJA PRO BAZAR (Atualiza Status)
-        await updateDoc(doc(db, "game_items", selectedVaultId), {
-            ...payload,
-            status: 'bazar'
-        });
+        await updateDoc(doc(db, "game_items", selectedVaultId), { ...payload, status: 'bazar' });
         setSelectedVaultId("");
       } else {
-        // Mestre criou item direto no bazar (Cria novo doc já como bazar)
-        await addDoc(collection(db, "game_items"), {
-          ...payload,
-          status: 'bazar',
-          ownerId: null,
-          createdAt: serverTimestamp()
-        });
+        await addDoc(collection(db, "game_items"), { ...payload, status: 'bazar', ownerId: null, createdAt: serverTimestamp() });
       }
-
       setForm({ nome: '', descricao: '', imagem: '', valorGil: '', valorReal: '' });
     } catch (err) {
       alert("Erro ao salvar item no Bazar.");
-      console.error(err);
     }
   };
 
-  // --- MESTRE: REMOVER DO BAZAR (VOLTA PRA FORJA) ---
   const handleRemoveFromBazar = async (id) => {
     if (window.confirm("Remover do mercado? O item voltará para a Forja.")) {
-      // NÃO DELETA O DOC. Atualiza status para 'vault'.
-      await updateDoc(doc(db, "game_items", id), {
-          status: 'vault',
-          updatedAt: serverTimestamp()
-      });
+      await updateDoc(doc(db, "game_items", id), { status: 'vault', updatedAt: serverTimestamp() });
     }
   };
 
-  // --- JOGADOR: COMPRAR ITEM ---
   const handleBuyItem = async (item) => {
     if (!auth.currentUser) return alert("Você precisa estar logado.");
-    
-    // Futuro: Verificar saldo de GIL na ficha
     const confirm = window.confirm(`Comprar "${item.nome}" por ${item.valorGil} Gil?`);
     if (confirm) {
         try {
-            // TRANSFERÊNCIA DE PROPRIEDADE (Bazar -> Inventário)
-            await updateDoc(doc(db, "game_items", item.id), {
-                status: 'inventory',
-                ownerId: auth.currentUser.uid,
-                updatedAt: serverTimestamp()
-            });
+            await updateDoc(doc(db, "game_items", item.id), { status: 'inventory', ownerId: auth.currentUser.uid, updatedAt: serverTimestamp() });
             alert(`Você comprou ${item.nome}! O item foi para seu inventário.`);
         } catch (err) {
-            console.error(err);
             alert("Erro na transação.");
         }
     }
@@ -136,7 +99,7 @@ export default function Bazar({ isMestre }) {
 
   const handleEditClick = (item) => {
     setIsEditing(item.id);
-    setSelectedVaultId(""); // Limpa seleção de vault se houver
+    setSelectedVaultId(""); 
     setForm(item);
   };
 
@@ -146,9 +109,7 @@ export default function Bazar({ isMestre }) {
     setForm({ nome: '', descricao: '', imagem: '', valorGil: '', valorReal: '' });
   };
 
-  const filteredItems = items.filter(item => 
-    item.nome.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = items.filter(item => item.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <>
@@ -157,47 +118,36 @@ export default function Bazar({ isMestre }) {
       </button>
 
       {isOpen && (
-        <div className="bazar-overlay" onClick={() => setIsOpen(false)}>
-          <div className="bazar-modal" onClick={e => e.stopPropagation()}>
+        <div className="bazar-overlay-flex" onClick={() => setIsOpen(false)}>
+          <div className="bazar-modal-centered" onClick={e => e.stopPropagation()}>
             
             <div className="bazar-header">
               <h2>MERCADO NEGRO</h2>
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
             </div>
 
-            {/* ÁREA DO MESTRE */}
             {isMestre && (
               <div className="mestre-panel">
                 <form onSubmit={handleSaveItem} className="bazar-form">
-                  
-                  {/* Dropdown só aparece se não estiver editando item existente */}
                   {!isEditing && (
                     <div className="row" style={{marginBottom: '10px'}}>
                         <select className="bazar-input" onChange={handleSelectVaultItem} value={selectedVaultId}>
                             <option value="">📥 Selecionar Item do Cofre (Forja)...</option>
-                            {vaultItems.map(v => (
-                                <option key={v.id} value={v.id}>{v.nome}</option>
-                            ))}
+                            {vaultItems.map(v => (<option key={v.id} value={v.id}>{v.nome}</option>))}
                         </select>
                     </div>
                   )}
-
                   <div className="row">
                     <input placeholder="Nome do Item" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} className="bazar-input" readOnly={!!selectedVaultId && !isEditing} />
                     <input placeholder="Link Imagem" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} className="bazar-input" />
                   </div>
-
                   <div className="row">
                     <input placeholder="Valor Gil" type="number" value={form.valorGil} onChange={e=>setForm({...form, valorGil: e.target.value})} className="bazar-input" required />
                     <input placeholder="Valor Real (R$)" type="number" value={form.valorReal} onChange={e=>setForm({...form, valorReal: e.target.value})} className="bazar-input" />
                   </div>
-                  
                   <textarea placeholder="Descrição do item..." value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} className="bazar-input area" />
-                  
                   <div className="form-actions">
-                    <button type="submit" className="btn-save">
-                        {isEditing ? "SALVAR ALTERAÇÕES" : (selectedVaultId ? "COLOCAR À VENDA" : "CRIAR E VENDER")}
-                    </button>
+                    <button type="submit" className="btn-save">{isEditing ? "SALVAR ALTERAÇÕES" : (selectedVaultId ? "COLOCAR À VENDA" : "CRIAR E VENDER")}</button>
                     {(isEditing || selectedVaultId) && <button type="button" onClick={handleCancelEdit} className="btn-cancel">CANCELAR</button>}
                   </div>
                 </form>
@@ -205,13 +155,7 @@ export default function Bazar({ isMestre }) {
             )}
 
             <div className="search-bar-container">
-              <input 
-                type="text" 
-                placeholder="🔍 Procurar mercadoria..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
-              />
+              <input type="text" placeholder="🔍 Procurar mercadoria..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
             </div>
 
             <div className="bazar-grid">
@@ -221,13 +165,11 @@ export default function Bazar({ isMestre }) {
                   <div className="item-info">
                     <h4>{item.nome}</h4>
                     <p className="desc">{item.descricao}</p>
-                    
                     <div className="prices">
                       <span className="price-tag gil">💰 {item.valorGil} G</span>
                       {item.valorReal && <span className="price-tag real">💎 R$ {item.valorReal}</span>}
                     </div>
                   </div>
-
                   <div className="item-actions">
                     {isMestre ? (
                       <>
@@ -248,12 +190,25 @@ export default function Bazar({ isMestre }) {
       )}
 
       <style>{`
-        .bazar-trigger-btn { position: fixed; bottom: 30px; right: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; cursor: pointer; z-index: 9999; transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center; color: #ffcc00; font-weight: bold; font-size: 10px; }
-        .bazar-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 20px #ffcc00; }
-        .bazar-trigger-btn img { width: 100%; height: 100%; object-fit: cover; }
+        .bazar-trigger-btn { position: fixed; bottom: 30px; right: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; cursor: pointer; z-index: 9999; transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center; }
+        .bazar-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #ffcc00; }
+        .bazar-trigger-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
-        .bazar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .bazar-modal { width: 800px; height: 750px; max-height: 90vh; background: #0d0d15; border: 1px solid #ffcc00; display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; }
+        /* NOVO CSS PARA CENTRALIZAR O MODAL SEM CORTAR */
+        .bazar-overlay-flex { 
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+            background: rgba(0,0,0,0.85); z-index: 100000; 
+            display: flex; align-items: center; justify-content: center; 
+            backdrop-filter: blur(5px); 
+        }
+        .bazar-modal-centered { 
+            width: 800px; max-width: 95vw; 
+            height: 750px; max-height: 90vh; /* Garante que cabe na tela */
+            background: #0d0d15; border: 1px solid #ffcc00; 
+            display: flex; flex-direction: column; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); border-radius: 8px; 
+            overflow: hidden; 
+        }
 
         .bazar-header { background: linear-gradient(90deg, #1a1a1a, #000); padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffcc00; }
         .bazar-header h2 { margin: 0; color: #ffcc00; font-family: serif; letter-spacing: 2px; text-shadow: 0 0 10px #ffcc00; font-size: 24px; }
