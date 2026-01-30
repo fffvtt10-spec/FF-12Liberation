@@ -38,18 +38,22 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       }
       
       if (isMaster) {
-        const rawLinks = sessaoData.cenarios || [];
+        // --- CORREÇÃO AQUI: BUSCAR DE 'mapas' E NÃO DE 'cenarios' ---
+        // A categoria "Tabletop" no MestrePage salva em 'mapas'
+        const rawLinks = sessaoData.mapas || []; 
         const savedMaps = sessaoData.saved_maps || [];
         
         const combinedList = rawLinks.map((link, index) => {
+            // Verifica se já foi salvo/renomeado antes
             const existing = savedMaps.find(m => m.url === link);
             if (existing) return existing;
+            // Se não, cria um objeto temporário
             return { id: `temp_${index}`, name: `Mapa Importado ${index + 1}`, url: link, isTemp: true };
         });
         setMapList(combinedList);
       }
     }
-  }, [sessaoData, isMaster]); // Dependência sessaoData garante atualização em tempo real
+  }, [sessaoData, isMaster]); 
 
   // --- CÁLCULO DO GRID PERFEITO ---
   const handleImageLoad = (e) => {
@@ -253,7 +257,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                 <div className="manager-box" onClick={e => e.stopPropagation()}>
                     <h3 className="manager-title">SALA DE CARTOGRAFIA</h3>
                     <div className="manager-list">
-                        {mapList.length === 0 && <p className="empty-msg">Nenhum mapa importado.</p>}
+                        {mapList.length === 0 && <p className="empty-msg">Nenhum mapa importado para a mesa.</p>}
                         {mapList.map((map, idx) => (
                             <div key={idx} className="manager-item">
                                 <img src={map.url} className="thumb-preview" alt="thumb" />

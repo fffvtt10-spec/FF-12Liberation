@@ -142,7 +142,7 @@ export default function AdminPage() {
         <source src={videoFundo} type="video/mp4" />
       </video>
       <div className="admin-overlay">
-        <h1 className="admin-title">PAINEL DO NARRADOR</h1>
+        <h1 className="admin-title">PAINEL DO ADMINISTRADOR</h1>
 
         <div className="admin-grid">
             {/* CARD DE CRIAR USUÁRIO */}
@@ -153,7 +153,7 @@ export default function AdminPage() {
                     <input placeholder="Palavra-Passe" type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
                     <select value={newRole} onChange={e => setNewRole(e.target.value)}>
                         <option value="jogador">Jogador</option>
-                        <option value="mestre">Mestre Auxiliar</option>
+                        <option value="mestre">Mestre</option>
                     </select>
                     <button type="submit" disabled={loading} className="btn-summon">
                         {loading ? "INVOCANDO..." : "CRIAR ACESSO"}

@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import racesData from '../data/races.json';
 import classesData from '../data/classes.json';
 import bgCharacter from '../assets/fundo-character.jpg';
-// IMPORTS DO FIREBASE
 import { db, auth } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+// IMPORTAR A MÚSICA GLOBAL PARA PARAR
+import { backgroundMusic } from './LandingPage';
 
 const CharacterCreation = () => {
   const navigate = useNavigate();
@@ -17,13 +18,19 @@ const CharacterCreation = () => {
   const [selectedRace, setSelectedRace] = useState(null); 
   const [selectedGender, setSelectedGender] = useState('female');
   const [selectedClass, setSelectedClass] = useState(null);
-
-  // --- ESTADOS DO MODAL DE NOME ---
   const [showNameModal, setShowNameModal] = useState(false);
   const [charName, setCharName] = useState('');
   const [isSaving, setIsSaving] = useState(false); 
 
   const races = racesData.races;
+
+  // --- GARANTIR SILÊNCIO ---
+  useEffect(() => {
+    if (backgroundMusic) {
+      backgroundMusic.pause();
+      backgroundMusic.currentTime = 0;
+    }
+  }, []);
 
   // 1. VERIFICAÇÃO DE SEGURANÇA
   useEffect(() => {
@@ -43,7 +50,7 @@ const CharacterCreation = () => {
     checkExistingCharacter();
   }, [navigate]);
 
-  // 2. Limpeza de Audio
+  // 2. Limpeza de Audio (para outros sons)
   useEffect(() => {
     const stopAudio = () => {
       const audioElements = document.querySelectorAll('audio, video');
@@ -56,10 +63,15 @@ const CharacterCreation = () => {
       });
     };
     stopAudio();
-    const timeout = setTimeout(stopAudio, 500);
-    return () => clearTimeout(timeout);
   }, []);
 
+  // ... (RESTANTE DO CÓDIGO PERMANECE IGUAL AO QUE VOCÊ JÁ TINHA) ...
+  // ... (Incluindo handlers, renderização e CSS) ...
+  // Vou ocultar o meio para não ficar gigante, mas você deve manter o resto do arquivo igual.
+  // Apenas certifique-se de manter o useEffect "GARANTIR SILÊNCIO" no topo.
+
+  // ...
+  
   // 3. Centralização do Carousel
   useEffect(() => {
     if (viewState === 'carousel' && carouselRef.current) {
@@ -70,7 +82,6 @@ const CharacterCreation = () => {
     }
   }, [activeIndex, viewState]);
 
-  // 4. Scroll RÁPIDO
   const handleWheelScroll = (e) => {
     if (carouselRef.current) {
       carouselRef.current.scrollLeft += e.deltaY * 4; 
@@ -125,13 +136,11 @@ const CharacterCreation = () => {
     setSelectedClass(null);
   };
 
-  // --- CRIAÇÃO REAL DO PERSONAGEM (CORRIGIDO E OTIMIZADO) ---
   const handleFinalizeCreation = async () => {
     if (!charName.trim() || !auth.currentUser || isSaving) return;
     setIsSaving(true); 
 
     try {
-      // ESTRUTURA DE DADOS COMPLETA PARA EVITAR BUGS NA FICHA
       const initialSheet = {
           basic_info: { 
               character_name: charName,
@@ -170,10 +179,9 @@ const CharacterCreation = () => {
         class: selectedClass,
         gender: selectedGender,
         createdAt: serverTimestamp(),
-        character_sheet: initialSheet // <-- AQUI ESTAVA O PROBLEMA
+        character_sheet: initialSheet 
       });
 
-      console.log(`Personagem Criado: ${charName}`);
       navigate('/jogador-vtt'); 
 
     } catch (error) {
@@ -188,7 +196,6 @@ const CharacterCreation = () => {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       
-      {/* CSS DO MODAL DE NOME (Estilo Dourado/Pergaminho) */}
       <style>{`
         @keyframes scaleIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .rpg-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
@@ -324,7 +331,6 @@ const CharacterCreation = () => {
         </div>
       )}
 
-      {/* --- MODAL DE NOME --- */}
       {showNameModal && (
         <div className="rpg-modal-overlay">
            <div className="rpg-modal-box">

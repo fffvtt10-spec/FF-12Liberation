@@ -73,6 +73,7 @@ export default function MestrePage() {
     mapas: [],      // Tabletop
     cenarios: [],   // Cenários
     monstros: [],   // Monstros (Combate)
+    npcs: [],       // NPCs (NOVO)
     jogadores: []   // Tokens Jogadores
   });
   const [tempLink, setTempLink] = useState("");
@@ -217,6 +218,7 @@ export default function MestrePage() {
             mapas: sessionForm.mapas,
             cenarios: sessionForm.cenarios,
             monstros: sessionForm.monstros,
+            npcs: sessionForm.npcs, // --- ADICIONADO ---
             jogadores: sessionForm.jogadores,
 
             connected_players: [],
@@ -224,7 +226,7 @@ export default function MestrePage() {
             createdAt: serverTimestamp()
         });
         setShowSessionModal(false);
-        setSessionForm({ missaoId: '', dataInicio: '', mapas: [], cenarios: [], monstros: [], jogadores: [] });
+        setSessionForm({ missaoId: '', dataInicio: '', mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
         setSessaoDestinatarios([]);
         alert("Sessão criada com sucesso!");
       } catch (err) {
@@ -474,7 +476,7 @@ export default function MestrePage() {
                                 value={tempLink} 
                                 onChange={e => setTempLink(e.target.value)} 
                               />
-                              {/* SELETOR DE CATEGORIA */}
+                              {/* SELETOR DE CATEGORIA ATUALIZADO */}
                               <select 
                                 className="ff-select-dark small-select" 
                                 value={tempType} 
@@ -483,6 +485,7 @@ export default function MestrePage() {
                                 <option value="mapas">Tabletop</option>
                                 <option value="cenarios">Cenário</option>
                                 <option value="monstros">Monstros</option>
+                                <option value="npcs">NPCs</option> {/* --- OPÇÃO FALTANTE ADICIONADA --- */}
                                 <option value="jogadores">Jogadores</option>
                               </select>
                               <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
@@ -491,6 +494,7 @@ export default function MestrePage() {
                               {sessionForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('mapas', i)}>×</button></div>))}
                               {sessionForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenarios', i)}>×</button></div>))}
                               {sessionForm.monstros.map((link, i) => (<div key={`mon-${i}`} className="asset-item"><span className="truncate-link">[MONSTRO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('monstros', i)}>×</button></div>))}
+                              {sessionForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('npcs', i)}>×</button></div>))} {/* --- LISTA DE NPCs --- */}
                               {sessionForm.jogadores.map((link, i) => (<div key={`jog-${i}`} className="asset-item"><span className="truncate-link">[JOGADOR] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('jogadores', i)}>×</button></div>))}
                           </div>
                       </div>
