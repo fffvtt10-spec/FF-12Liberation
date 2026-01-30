@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, deleteDoc, updateDoc, setDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore"; // ADICIONADO setDoc
+import { collection, addDoc, deleteDoc, updateDoc, setDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore"; 
 import bazarIcon from '../assets/bazar.png'; 
 
-// AGORA ACEITA playerData PARA VERIFICAR SALDO
-export default function Bazar({ isMestre, playerData }) {
+export default function Bazar({ isMestre, playerData, vttDock }) { // RECEBE vttDock
   const [isOpen, setIsOpen] = useState(false);
   const [items, setItems] = useState([]); 
   const [vaultItems, setVaultItems] = useState([]); 
@@ -34,7 +33,6 @@ export default function Bazar({ isMestre, playerData }) {
     if (!isOpen || !isMestre) return;
     const q = query(collection(db, "game_items"), where("status", "==", "vault"), orderBy("nome", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      // Filtra apenas os que não tem dono para venda geral
       const available = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.ownerId);
       setVaultItems(available);
     });
@@ -90,7 +88,6 @@ export default function Bazar({ isMestre, playerData }) {
   const handleBuyItem = async (item) => {
     if (!auth.currentUser) return alert("Você precisa estar logado.");
     
-    // VERIFICAÇÃO DE SALDO
     const currentGil = playerData?.character_sheet?.inventory?.gil || 0;
     const price = Number(item.valorGil);
 
@@ -101,20 +98,13 @@ export default function Bazar({ isMestre, playerData }) {
     const confirm = window.confirm(`Comprar "${item.nome}" por ${item.valorGil} Gil?`);
     if (confirm) {
         try {
-            // 1. Debita o valor do jogador
             const newGil = currentGil - price;
-            
-            // CORREÇÃO AQUI: Usar setDoc com merge em vez de updateDoc para evitar erro de "No document"
             const charRef = doc(db, "characters", auth.currentUser.uid);
-            
             const updatedSheet = JSON.parse(JSON.stringify(playerData.character_sheet));
             updatedSheet.inventory.gil = newGil;
             
-            // setDoc com merge = true garante que se o documento não existir (por algum erro), ele cria, 
-            // e se existir, ele apenas atualiza o campo character_sheet
             await setDoc(charRef, { character_sheet: updatedSheet }, { merge: true });
 
-            // 2. Atualiza o item para "solicitado"
             await updateDoc(doc(db, "game_items", item.id), { 
                 status: 'requested', 
                 ownerId: auth.currentUser.uid, 
@@ -130,7 +120,6 @@ export default function Bazar({ isMestre, playerData }) {
     }
   };
 
-  // Se for mestre, ele vê itens 'requested' também para aprovar
   const [requestedItems, setRequestedItems] = useState([]);
   
   useEffect(() => {
@@ -171,21 +160,23 @@ export default function Bazar({ isMestre, playerData }) {
 
   const filteredItems = items.filter(item => item.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Função auxiliar para validar imagem e evitar erro de rede
   const getSafeImage = (url) => {
       return (url && url.startsWith('http')) ? `url(${url})` : `url('https://via.placeholder.com/150?text=Item')`;
   };
 
   return (
     <>
-      <button className="bazar-trigger-btn" onClick={() => setIsOpen(true)} title="Abrir Bazar">
+      <button 
+        className={`bazar-trigger-btn ${vttDock ? 'vtt-dock-style' : ''}`} 
+        onClick={() => setIsOpen(true)} 
+        title="Abrir Bazar"
+      >
         <img src={bazarIcon} alt="Bazar" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='BAZAR'}} />
       </button>
 
       {isOpen && (
         <div className="bazar-overlay-flex" onClick={() => setIsOpen(false)}>
           <div className="bazar-modal-centered" onClick={e => e.stopPropagation()}>
-            
             <div className="bazar-header">
               <h2>MERCADO NEGRO</h2>
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
@@ -193,7 +184,6 @@ export default function Bazar({ isMestre, playerData }) {
 
             {isMestre && (
               <div className="mestre-panel">
-                {/* ÁREA DE APROVAÇÃO DE VENDAS */}
                 {requestedItems.length > 0 && (
                     <div className="requests-box">
                         <h4>PEDIDOS DE COMPRA ({requestedItems.length})</h4>
@@ -268,37 +258,40 @@ export default function Bazar({ isMestre, playerData }) {
       )}
 
       <style>{`
+        /* ESTILO PADRÃO (FIXO) */
         .bazar-trigger-btn { position: fixed; bottom: 30px; right: 30px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; cursor: pointer; z-index: 9999; transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center; }
         .bazar-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #ffcc00; }
         .bazar-trigger-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
-        /* NOVO CSS PARA CENTRALIZAR O MODAL SEM CORTAR */
-        .bazar-overlay-flex { 
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-            background: rgba(0,0,0,0.85); z-index: 100000; 
-            display: flex; align-items: center; justify-content: center; 
-            backdrop-filter: blur(5px); 
+        /* ESTILO QUANDO NO DOCK DO VTT (SOBRESCREVE O FIXO) */
+        .bazar-trigger-btn.vtt-dock-style {
+            position: relative; 
+            bottom: auto; 
+            right: auto; 
+            width: 50px; 
+            height: 50px; 
+            margin: 0; 
+            z-index: auto;
+            border: 2px solid #555;
+            background: #111;
+            box-shadow: 0 0 10px #000;
         }
-        .bazar-modal-centered { 
-            width: 800px; max-width: 95vw; 
-            height: 750px; max-height: 90vh; /* Garante que cabe na tela */
-            background: #0d0d15; border: 1px solid #ffcc00; 
-            display: flex; flex-direction: column; 
-            box-shadow: 0 0 50px rgba(0,0,0,0.8); border-radius: 8px; 
-            overflow: hidden; 
+        .bazar-trigger-btn.vtt-dock-style:hover {
+            border-color: #ffcc00;
+            color: #ffcc00;
+            transform: scale(1.1);
         }
 
+        .bazar-overlay-flex { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .bazar-modal-centered { width: 800px; max-width: 95vw; height: 750px; max-height: 90vh; background: #0d0d15; border: 1px solid #ffcc00; display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; }
         .bazar-header { background: linear-gradient(90deg, #1a1a1a, #000); padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffcc00; }
         .bazar-header h2 { margin: 0; color: #ffcc00; font-family: serif; letter-spacing: 2px; text-shadow: 0 0 10px #ffcc00; font-size: 24px; }
         .close-btn { background: transparent; border: none; color: #fff; font-size: 30px; cursor: pointer; }
-
         .mestre-panel { background: rgba(255, 204, 0, 0.05); padding: 15px; border-bottom: 1px solid #333; }
-        
         .requests-box { background: rgba(0, 242, 255, 0.1); border: 1px solid #00f2ff; padding: 10px; margin-bottom: 15px; border-radius: 4px; }
         .requests-box h4 { color: #00f2ff; margin: 0 0 10px 0; font-size: 12px; }
         .request-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 12px; color: #fff; }
         .btn-approve { background: #00f2ff; color: #000; border: none; padding: 5px 10px; font-weight: bold; cursor: pointer; border-radius: 3px; }
-
         .bazar-form { display: flex; flex-direction: column; gap: 10px; }
         .bazar-form .row { display: flex; gap: 10px; }
         .bazar-input { background: #000; border: 1px solid #444; color: #fff; padding: 10px; flex: 1; outline: none; font-family: serif; }
@@ -306,30 +299,23 @@ export default function Bazar({ isMestre, playerData }) {
         .form-actions { display: flex; gap: 10px; }
         .btn-save { flex: 1; background: #ffcc00; border: none; padding: 10px; font-weight: bold; cursor: pointer; color: #000; }
         .btn-cancel { background: #333; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; }
-
         .search-bar-container { padding: 15px; background: #000; border-bottom: 1px solid #333; }
         .search-input { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 20px; text-align: center; outline: none; font-size: 16px; }
-
         .bazar-grid { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; scrollbar-width: none; -ms-overflow-style: none; }
         .bazar-grid::-webkit-scrollbar { display: none; }
-
         .bazar-item-card { background: linear-gradient(90deg, rgba(20,20,30,0.9), rgba(0,0,0,0.8)); border: 1px solid #444; display: flex; align-items: center; padding: 10px; border-radius: 4px; transition: 0.2s; }
         .bazar-item-card:hover { border-color: #00f2ff; box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
-        
         .item-img { width: 80px; height: 80px; background-size: cover; background-position: center; border: 1px solid #666; margin-right: 15px; border-radius: 4px; background-color: #000; }
         .item-info { flex: 1; }
         .item-info h4 { margin: 0 0 5px 0; color: #fff; font-size: 18px; letter-spacing: 1px; }
         .item-info .desc { margin: 0 0 10px 0; color: #aaa; font-size: 12px; font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        
         .prices { display: flex; gap: 10px; }
         .price-tag { padding: 4px 8px; border-radius: 3px; font-weight: bold; font-size: 12px; }
         .price-tag.gil { background: rgba(255,255,0,0.1); color: #ffcc00; border: 1px solid #ffcc00; }
         .price-tag.real { background: rgba(0, 242, 255, 0.1); color: #00f2ff; border: 1px solid #00f2ff; }
-
         .item-actions { display: flex; gap: 8px; align-items: center; margin-left: 15px; }
         .btn-buy { background: #00f2ff; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%); transition: 0.2s; }
         .btn-buy:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
-        
         .btn-icon { background: transparent; border: 1px solid #444; color: #fff; padding: 8px; cursor: pointer; border-radius: 4px; font-size: 16px; }
         .btn-icon:hover { background: #fff; color: #000; }
         .btn-icon.delete:hover { background: #f44; border-color: #f44; color: #fff; }
