@@ -21,18 +21,17 @@ const CharacterCreation = () => {
   // --- ESTADOS DO MODAL DE NOME ---
   const [showNameModal, setShowNameModal] = useState(false);
   const [charName, setCharName] = useState('');
-  const [isSaving, setIsSaving] = useState(false); // Estado para evitar cliques duplos
+  const [isSaving, setIsSaving] = useState(false); 
 
   const races = racesData.races;
 
-  // 1. VERIFICAÇÃO DE SEGURANÇA: Se já tem personagem, expulsa para a Home do Jogador
+  // 1. VERIFICAÇÃO DE SEGURANÇA
   useEffect(() => {
     const checkExistingCharacter = async () => {
         if (!auth.currentUser) return;
         try {
             const docRef = doc(db, "characters", auth.currentUser.uid);
             const docSnap = await getDoc(docRef);
-            
             if (docSnap.exists()) {
                 console.log("Personagem já existe. Redirecionando...");
                 navigate('/jogador-vtt'); 
@@ -126,14 +125,13 @@ const CharacterCreation = () => {
     setSelectedClass(null);
   };
 
-  // --- CRIAÇÃO REAL DO PERSONAGEM (CORRIGIDO) ---
+  // --- CRIAÇÃO REAL DO PERSONAGEM (CORRIGIDO E OTIMIZADO) ---
   const handleFinalizeCreation = async () => {
     if (!charName.trim() || !auth.currentUser || isSaving) return;
-    
-    setIsSaving(true); // Bloqueia múltiplos cliques
+    setIsSaving(true); 
 
     try {
-      // DEFINIÇÃO DA FICHA INICIAL COMPLETA PARA EVITAR ERROS
+      // ESTRUTURA DE DADOS COMPLETA PARA EVITAR BUGS NA FICHA
       const initialSheet = {
           basic_info: { 
               character_name: charName,
@@ -164,7 +162,6 @@ const CharacterCreation = () => {
           }
       };
 
-      // Salva na coleção 'characters' usando o UID do usuário
       await setDoc(doc(db, "characters", auth.currentUser.uid), {
         uid: auth.currentUser.uid,
         email: auth.currentUser.email,
@@ -173,7 +170,7 @@ const CharacterCreation = () => {
         class: selectedClass,
         gender: selectedGender,
         createdAt: serverTimestamp(),
-        character_sheet: initialSheet // <--- CAMPO CORRIGIDO QUE FALTAVA
+        character_sheet: initialSheet // <-- AQUI ESTAVA O PROBLEMA
       });
 
       console.log(`Personagem Criado: ${charName}`);
@@ -181,7 +178,7 @@ const CharacterCreation = () => {
 
     } catch (error) {
       console.error("Erro ao salvar personagem:", error);
-      alert("Falha ao invocar personagem no banco de dados.");
+      alert("Falha ao invocar personagem.");
       setIsSaving(false);
     }
   };

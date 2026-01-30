@@ -46,6 +46,7 @@ export default function MestreVTTPage() {
 
               if (ativa) {
                 setSessaoAtiva(ativa);
+                // ATUALIZAÇÃO EM TEMPO REAL DOS JOGADORES CONECTADOS
                 setConnectedPlayers(ativa.connected_players || []); 
                 
                 // BLINDAGEM DE COTA: Só grava se estiver false. Evita loop infinito.
@@ -74,14 +75,12 @@ export default function MestreVTTPage() {
              updateDoc(doc(db, "sessoes", sessaoAtiva.id), { dm_online: false }).catch(() => {});
         }
     };
-  }, [navigate]); // Removido sessaoAtiva das dependências para evitar recriação do listener
+  }, [navigate]); 
 
   // --- 2. CARREGAR DADOS DOS PERSONAGENS DA SESSÃO ---
   useEffect(() => {
     if (!sessaoAtiva || !sessaoAtiva.participantes) return;
 
-    // Nota: Isso lê todos os personagens. Se tiver muitos, consome leitura.
-    // Mas para manter a funcionalidade original, mantivemos assim.
     const q = query(collection(db, "characters"));
     const unsub = onSnapshot(q, (snap) => {
         const allChars = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -90,7 +89,7 @@ export default function MestreVTTPage() {
     });
 
     return () => unsub();
-  }, [sessaoAtiva?.id]); // Só recarrega se o ID da sessão mudar
+  }, [sessaoAtiva?.id]); 
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);

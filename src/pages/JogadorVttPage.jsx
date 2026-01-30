@@ -120,14 +120,16 @@ export default function JogadorVttPage() {
         setSessoesAtivas(ativas);
         setSessoesFuturas(futuras);
         
-        // CORREÇÃO: Apenas atualiza o estado local, NÃO escreve no banco aqui
+        // Verifica se ainda está conectado visualmente
         if (currentVttSession) {
             const sessionUpdated = ativas.find(s => s.id === currentVttSession.id);
             if (sessionUpdated) {
-                // Só marca visualmente como conectado, sem spam de banco
                 const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
                 if (playerInList) {
                     setVttStatus('connected');
+                } else {
+                    // Se foi kickado ou caiu
+                    setVttStatus('waiting');
                 }
             }
         }
@@ -144,17 +146,35 @@ export default function JogadorVttPage() {
       return () => { unsubSessoes(); unsubResenhas(); };
   }, [personagem, currentVttSession]);
 
-  // CLEANUP AO SAIR DA SESSÃO
+  // --- LÓGICA DE PRESENÇA (ONLINE/OFFLINE) CORRIGIDA ---
   useEffect(() => {
+      if (!currentVttSession || !auth.currentUser) return;
+
+      const sessionRef = doc(db, "sessoes", currentVttSession.id);
+      const userId = auth.currentUser.uid;
+
+      // 1. Ao montar (entrar na sessão): Adiciona aos conectados
+      updateDoc(sessionRef, {
+          connected_players: arrayUnion(userId)
+      }).catch(err => console.error("Erro ao conectar:", err));
+
+      // 2. Define ação de limpeza para quando fechar a aba (F5/Close)
+      const handleBeforeUnload = () => {
+          // Tenta enviar o beacon de desconexão (funciona melhor em fechamento de aba)
+          // Nota: updateDoc normal pode não dar tempo no unload, mas no React cleanup sim.
+          // Para garantir, deixamos o cleanup do React lidar com a navegação interna
+          // e o cleanup aqui é backup.
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      // 3. Cleanup do React (Navegação interna ou F5)
       return () => {
-          if (currentVttSession && auth.currentUser) {
-             const sessionRef = doc(db, "sessoes", currentVttSession.id);
-             updateDoc(sessionRef, {
-                 connected_players: arrayRemove(auth.currentUser.uid)
-             }).catch(console.error);
-          }
-      }
-  }, [currentVttSession]);
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+          updateDoc(sessionRef, {
+              connected_players: arrayRemove(userId)
+          }).catch(err => console.error("Erro ao desconectar:", err));
+      };
+  }, [currentVttSession]); // Só roda quando muda a sessão ativa (Entra/Sai)
 
   const handleConfirmLevelUp = () => {
       setShowLevelUpModal(false);
@@ -184,21 +204,11 @@ export default function JogadorVttPage() {
     }
   };
 
-  // AQUI é onde a mágica acontece. Só escreve no banco UMA vez ao clicar.
-  const enterVTT = async (sessao) => {
+  const enterVTT = (sessao) => {
+     // Apenas seta o estado. O useEffect acima cuida do banco de dados automaticamente.
      setCurrentVttSession(sessao);
      setHasJoinedSession(true); 
      
-     try {
-         // Marca o jogador como online
-         const sessionRef = doc(db, "sessoes", sessao.id);
-         await updateDoc(sessionRef, {
-             connected_players: arrayUnion(auth.currentUser.uid)
-         });
-     } catch (e) {
-         console.error("Erro ao conectar na sessão db", e);
-     }
-
      const agora = new Date();
      const inicio = new Date(sessao.dataInicio);
      if (agora >= inicio) {

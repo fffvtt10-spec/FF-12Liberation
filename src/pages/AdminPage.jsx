@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db, login } from '../firebase';
-import { createUserWithEmailAndPassword, sendPasswordResetEmail, updatePassword } from "firebase/auth"; 
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc } from "firebase/firestore";
+import { auth, db, firebaseConfig } from '../firebase'; // Importa config para o App Secundário
+import { initializeApp, deleteApp } from "firebase/app"; 
+import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updatePassword, connectAuthEmulator } from "firebase/auth"; 
+import { collection, getDocs, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { backgroundMusic } from './LandingPage'; 
+import videoFundo from '../assets/video-fundo.mp4'; 
 
 export default function AdminPage() {
   const [users, setUsers] = useState([]);
@@ -12,6 +14,7 @@ export default function AdminPage() {
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('jogador'); 
   const [adminPass, setAdminPass] = useState('');
+  const [loading, setLoading] = useState(false); 
 
   useEffect(() => {
     if (backgroundMusic) {
@@ -42,32 +45,52 @@ export default function AdminPage() {
     }
   };
 
+  // --- FUNÇÃO BLINDADA: CRIA USUÁRIO SEM DESLOGAR O ADMIN ---
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    const adminEmail = 'fffvtt10@gmail.com'; 
-    // !!! ATENÇÃO !!! VOCÊ PRECISA COLOCAR A SENHA REAL AQUI ABAIXO !!!
-    const adminPassOriginal = 'SUA_SENHA_AQUI'; 
+    if (!newEmail || !newPassword) return alert("Preencha todos os campos!");
+
+    setLoading(true);
+    let secondaryApp = null;
 
     try {
-      // 1. Cria usuário (Desloga o admin)
-      const userCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
-      const user = userCredential.user;
+      // 1. Cria uma instância temporária do Firebase
+      secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+      const secondaryAuth = getAuth(secondaryApp);
 
-      // 2. Salva no banco
-      await setDoc(doc(db, "users", user.uid), {
+      // Se estiver rodando local, força o app secundário a usar o emulador na porta 9099
+      if (window.location.hostname === "localhost") {
+        connectAuthEmulator(secondaryAuth, "http://127.0.0.1:9099");
+      }
+
+      // 2. Cria o usuário nessa instância (quem loga nela é o novo user, não o admin)
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newEmail, newPassword);
+      const newUser = userCredential.user;
+
+      // 3. Salva os dados no Firestore usando a instância PRINCIPAL (db do Admin)
+      await setDoc(doc(db, "users", newUser.uid), {
         email: newEmail,
         role: newRole,
+        uid: newUser.uid,
         active: true,
-        createdAt: new Date()
+        createdAt: serverTimestamp()
       });
 
-      alert("Usuário invocado! Reconectando Admin...");
-      // 3. Reloga o admin (Isso quebrava sem a senha correta)
-      await login(adminEmail, adminPassOriginal); 
-      
-      setNewEmail(''); setNewPassword(''); fetchData();
+      // 4. Desloga da instância secundária para limpar memória
+      await signOut(secondaryAuth);
+
+      alert(`Usuário ${newEmail} invocado com sucesso!`);
+      setNewEmail('');
+      setNewPassword('');
+      fetchData(); // Atualiza a lista na tela
+
     } catch (err) {
-      alert("Erro no processo (Verifique a senha no código!): " + err.message);
+      console.error(err);
+      alert("Erro ao invocar usuário: " + err.message);
+    } finally {
+      // Destrói o app secundário
+      if (secondaryApp) await deleteApp(secondaryApp);
+      setLoading(false);
     }
   };
 
@@ -85,7 +108,6 @@ export default function AdminPage() {
     }
   };
 
-  // NOVA FUNÇÃO: Deleta APENAS o personagem, mantendo a conta
   const handleDeleteChar = async (uid) => {
     if (window.confirm("Tem certeza que deseja apagar APENAS o personagem deste usuário? Ele terá que criar outro.")) {
       try {
@@ -115,102 +137,97 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="admin-dashboard">
-      <div className="ether-vortex"></div>
-      
-      <div className="admin-content">
-        <h1 className="main-title">GESTÃO DO ÉTER SUPREMO</h1>
-        
-        <div className="cards-grid">
-          {/* Balão 1: Criar Conta */}
-          <div className="ff-card fade-in">
-            <h3>INVOCAR NOVA CONTA</h3>
-            <form onSubmit={handleCreateUser}>
-              <input type="email" placeholder="E-mail do Alvo" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
-              <input type="password" placeholder="Definir Senha Inicial" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-              <select value={newRole} onChange={e => setNewRole(e.target.value)}>
-                <option value="jogador">JOGADOR</option>
-                <option value="mestre">MESTRE</option>
-              </select>
-              <button type="submit">CRIAR ACESSO</button>
-            </form>
-          </div>
+    <div className="admin-container">
+       <video autoPlay loop muted playsInline className="background-video-admin">
+        <source src={videoFundo} type="video/mp4" />
+      </video>
+      <div className="admin-overlay">
+        <h1 className="admin-title">PAINEL DO NARRADOR</h1>
 
-          {/* Balão 2: Gerenciar Usuários e Seus Personagens */}
-          <div className="ff-card fade-in">
-            <h3>VIAJANTES E MESTRES</h3>
-            <div className="list-box">
-              {users.map(u => {
-                const charInfo = getCharName(u.id);
-                return (
-                  <div key={u.id} className="item">
-                    <div style={{flex: 1}}>
-                      <span className={`badge ${u.role}`}>{u.role.toUpperCase()}</span>
-                      <p className="email-text">{u.email}</p>
-                      
-                      {/* Exibir Personagem com botão de exclusão independente */}
-                      {charInfo && (
-                        <div style={{display: 'flex', alignItems: 'center', marginTop: '4px'}}>
-                           <span style={{fontSize: '10px', color: '#ffcc00', marginRight: '10px'}}>
-                             ⚔️ {charInfo.name} ({charInfo.class})
-                           </span>
-                           <button className="btn-mini-del" onClick={() => handleDeleteChar(u.id)} title="Apagar Personagem">
-                             💀 Excluir Char
-                           </button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="btn-group">
-                      <button onClick={() => {
-                        sendPasswordResetEmail(auth, u.email);
-                        alert("E-mail de reset enviado.");
-                      }}>RESET</button>
-                      <button className="del" onClick={() => handleDeleteUser(u.id, u.email)}>BANIR</button>
-                    </div>
-                  </div>
-                );
-              })}
+        <div className="admin-grid">
+            {/* CARD DE CRIAR USUÁRIO */}
+            <div className="admin-card">
+                <h3>INVOCAR NOVO JOGADOR</h3>
+                <form onSubmit={handleCreateUser}>
+                    <input placeholder="E-mail Arcano" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
+                    <input placeholder="Palavra-Passe" type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+                    <select value={newRole} onChange={e => setNewRole(e.target.value)}>
+                        <option value="jogador">Jogador</option>
+                        <option value="mestre">Mestre Auxiliar</option>
+                    </select>
+                    <button type="submit" disabled={loading} className="btn-summon">
+                        {loading ? "INVOCANDO..." : "CRIAR ACESSO"}
+                    </button>
+                </form>
             </div>
-          </div>
 
-          {/* Balão 3: Minha Chave */}
-          <div className="ff-card fade-in">
-            <h3>MINHA CHAVE DE ADMIN</h3>
-            <input type="password" placeholder="Nova Senha" value={adminPass} onChange={e => setAdminPass(e.target.value)} />
-            <button onClick={handleUpdateAdminPass}>TROCAR MINHA SENHA</button>
-          </div>
+            {/* LISTA DE USUÁRIOS */}
+            <div className="admin-card scroll-card">
+                <h3>ALMAS REGISTRADAS ({users.length})</h3>
+                <div className="list-container">
+                    {users.map(u => {
+                        const charInfo = getCharName(u.id);
+                        return (
+                            <div key={u.id} className="list-item">
+                                <div className="item-info">
+                                    <span className="item-main">{u.email}</span>
+                                    <span className={`badge ${u.role}`}>{u.role.toUpperCase()}</span>
+                                    {charInfo && (
+                                        <span style={{fontSize: '10px', color: '#ffcc00', marginTop: '2px'}}>
+                                            ⚔️ {charInfo.name}
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
+                                    <button className="btn-ban" onClick={() => handleDeleteUser(u.id, u.email)}>BANIR</button>
+                                    {charInfo && <button className="btn-ban" style={{borderColor:'#f80', color:'#f80'}} onClick={() => handleDeleteChar(u.id)}>DEL CHAR</button>}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* TROCAR SENHA ADMIN */}
+            <div className="admin-card">
+                <h3>MINHA CHAVE MESTRA</h3>
+                <input type="password" placeholder="Nova Senha" value={adminPass} onChange={e => setAdminPass(e.target.value)} />
+                <button className="btn-summon" style={{background:'#333', border:'1px solid #fff'}} onClick={handleUpdateAdminPass}>ATUALIZAR</button>
+            </div>
         </div>
       </div>
 
       <style>{`
-        .admin-dashboard { background: radial-gradient(circle at center, #001a33 0%, #000000 100%); min-height: 100vh; color: #fff; font-family: 'Segoe UI', sans-serif; position: relative; overflow: hidden; }
-        .ether-vortex { content: ""; position: absolute; top: -100%; left: -100%; width: 300%; height: 300%; background: conic-gradient(from 0deg, transparent, rgba(0, 242, 255, 0.08), transparent); animation: rotateEther 30s linear infinite; z-index: 0; pointer-events: none; }
-        @keyframes rotateEther { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .admin-content { position: relative; z-index: 1; padding: 40px; }
-        .main-title { color: #ffcc00; text-align: center; letter-spacing: 5px; margin-bottom: 50px; text-shadow: 0 0 10px #ffcc00; }
-        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; }
-        .ff-card { background: rgba(0, 10, 30, 0.85); border: 1px solid rgba(0, 242, 255, 0.5); padding: 25px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,242,255,0.1); backdrop-filter: blur(10px); }
-        h3 { color: #00f2ff; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-        .item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #111; }
-        .email-text { font-size: 11px; color: #ccc; margin: 2px 0; overflow: hidden; text-overflow: ellipsis; }
-        .badge { font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: bold; color: #000; }
-        .badge.mestre { background: #ffcc00; }
+        .admin-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; font-family: 'Cinzel', serif; color: #fff; background: #000; }
+        .background-video-admin { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; object-fit: cover; transform: translate(-50%, -50%); opacity: 0.4; pointer-events: none; }
+        .admin-overlay { position: relative; z-index: 10; padding: 40px; display: flex; flex-direction: column; height: 100%; }
+        .admin-title { color: #ffcc00; text-align: center; font-size: 32px; letter-spacing: 5px; margin-bottom: 30px; text-shadow: 0 0 10px #ffcc00; }
+        .admin-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; height: 100%; }
+        .admin-card { background: rgba(0, 10, 20, 0.9); border: 1px solid #ffcc00; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; backdrop-filter: blur(10px); }
+        .admin-card h3 { color: #00f2ff; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; font-size: 16px; letter-spacing: 2px; }
+        .scroll-card .list-container { overflow-y: auto; flex: 1; padding-right: 5px; }
+        .scroll-card .list-container::-webkit-scrollbar { width: 5px; }
+        .scroll-card .list-container::-webkit-scrollbar-thumb { background: #333; }
+        
+        input, select { background: #000; border: 1px solid #444; color: #fff; padding: 12px; width: 100%; margin-bottom: 15px; font-family: 'serif'; outline: none; }
+        input:focus, select:focus { border-color: #ffcc00; }
+        
+        .btn-summon { width: 100%; background: #ffcc00; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-summon:hover:not(:disabled) { background: #fff; box-shadow: 0 0 15px #fff; }
+        .btn-summon:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+        .list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; margin-bottom: 8px; border-radius: 4px; border: 1px solid transparent; }
+        .list-item:hover { border-color: #00f2ff; }
+        .item-info { display: flex; flex-direction: column; }
+        .item-main { font-weight: bold; color: #eee; font-size: 14px; }
+        .item-sub { font-size: 10px; color: #aaa; }
+        
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #000; text-transform: uppercase; margin-right: 5px; }
         .badge.jogador { background: #00f2ff; }
-        .btn-group { display: flex; gap: 8px; align-items: center; }
-        input, select { background: rgba(0,0,0,0.8); border: 1px solid #444; color: #fff; padding: 12px; width: 100%; margin-bottom: 15px; outline: none; transition: 0.3s; }
-        input:focus { border-color: #ffcc00; }
-        button { background: transparent; border: 1px solid #00f2ff; color: #fff; padding: 8px 15px; cursor: pointer; transition: 0.3s; font-size: 11px; }
-        button:hover { background: #fff; color: #000; box-shadow: 0 0 10px #fff; }
-        button.del { border-color: #ff4444; color: #ff4444; }
-        button.del:hover { background: #ff4444; color: white; border-color: #ff4444; }
-        .btn-mini-del { padding: 2px 6px; font-size: 9px; border-color: #ff4444; color: #ff4444; margin-left: 0; }
-        .btn-mini-del:hover { background: #ff4444; color: #fff; }
-        .list-box { max-height: 250px; overflow-y: auto; }
-        .list-box::-webkit-scrollbar { width: 4px; }
-        .list-box::-webkit-scrollbar-thumb { background: #00f2ff; }
-        .fade-in { animation: fadeIn 1.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .badge.mestre { background: #ffcc00; }
+        
+        .btn-ban { background: transparent; border: 1px solid #f44; color: #f44; font-size: 10px; padding: 4px 8px; cursor: pointer; }
+        .btn-ban:hover { background: #f44; color: #fff; }
       `}</style>
     </div>
   );
