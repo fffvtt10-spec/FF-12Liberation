@@ -3,7 +3,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, co
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
-// ADICIONADO "export" AQUI (ESSENCIAL PARA O ADMIN PAGE)
+// Configuração do Firebase
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -21,11 +21,13 @@ export const db = getFirestore(app);
 export const storage = getStorage(app); 
 
 // --- LÓGICA DE CONEXÃO COM EMULADOR (MODO DEV) ---
-if (window.location.hostname === "localhost") {
+// CORREÇÃO: Verifica tanto 'localhost' quanto '127.0.0.1' para evitar conectar na nuvem por engano
+if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
   console.log("🔧 MODO DEV: Conectando aos Emuladores do Firebase...");
   
   // Conecta Auth (Porta 9099)
-  connectAuthEmulator(auth, "http://127.0.0.1:9099");
+  // Nota: O segundo parâmetro deve ser a URL base completa para evitar erros de protocolo
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   
   // Conecta Firestore (Porta 8080)
   connectFirestoreEmulator(db, "127.0.0.1", 8080);

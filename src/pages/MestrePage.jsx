@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom'; 
 import { backgroundMusic } from './LandingPage'; 
@@ -37,12 +37,11 @@ const Timer = ({ expiry }) => {
 export default function MestrePage() {
   const navigate = useNavigate();
   
-  // Estados de Dados
+  const [currentUser, setCurrentUser] = useState(null);
   const [missoes, setMissoes] = useState([]);
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
-  
   const [loading, setLoading] = useState(true);
 
   // Modais
@@ -62,22 +61,22 @@ export default function MestrePage() {
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
-  
   const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
-
   const [form, setForm] = useState({
     nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
-
+  
+  // --- ATUALIZAÇÃO: CATEGORIAS ESPECÍFICAS PARA OS BOTÕES ---
   const [sessionForm, setSessionForm] = useState({
-    missaoId: '',
-    dataInicio: '',
-    cenarios: [], 
-    tokens: []    
+    missaoId: '', 
+    dataInicio: '', 
+    mapas: [],      // Tabletop
+    cenarios: [],   // Cenários
+    monstros: [],   // Monstros (Combate)
+    jogadores: []   // Tokens Jogadores
   });
-
   const [tempLink, setTempLink] = useState("");
-  const [tempType, setTempType] = useState("cenario");
+  const [tempType, setTempType] = useState("mapas"); // Default selection
 
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || "Narrador";
@@ -87,38 +86,57 @@ export default function MestrePage() {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // --- SINCRONIZAÇÃO BLINDADA (F5) ---
+  // --- 1. AUTH & LOADING FIX ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
         if (user) {
-            const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
-            const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-            const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
-            const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-            const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
-            const unsubS = onSnapshot(qS, (snap) => {
-                const loadedSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                setSessoes(loadedSessoes);
-            });
-
-            const qC = query(collection(db, "characters"));
-            const unsubC = onSnapshot(qC, (snap) => {
-                setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            });
-
-            setLoading(false);
-            return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
+            setCurrentUser(user);
+            setLoading(false); 
         } else {
-            setLoading(false); // Se não tiver user, para o loading (vai pra login ou fica vazio)
+            setLoading(false);
+            navigate('/login'); 
         }
     });
 
-    return () => unsubscribeAuth();
-  }, []);
+    return () => unsub();
+  }, [navigate]);
+
+  // --- 2. DADOS (Assíncrono) ---
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Queries com tratamento de erro no snapshot para evitar "sumiço" silencioso
+    const qM = query(collection(db, "missoes"), where("mestreId", "==", currentUser.uid), orderBy("createdAt", "desc"));
+    const qR = query(collection(db, "resenhas"), where("mestreId", "==", currentUser.uid), orderBy("createdAt", "desc"));
+    const qS = query(collection(db, "sessoes"), where("mestreId", "==", currentUser.uid), orderBy("dataInicio", "asc"));
+    const qC = query(collection(db, "characters"));
+
+    const unsubM = onSnapshot(qM, 
+      (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (error) => console.error("Erro ao carregar Missões (Verifique Índices no Console):", error)
+    );
+    
+    const unsubR = onSnapshot(qR, 
+      (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (error) => console.error("Erro ao carregar Resenhas:", error)
+    );
+
+    const unsubS = onSnapshot(qS, 
+      (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (error) => console.error("Erro ao carregar Sessões:", error)
+    );
+
+    const unsubC = onSnapshot(qC, 
+      (snap) => setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (error) => console.error("Erro ao carregar Personagens:", error)
+    );
+
+    return () => {
+        unsubM(); unsubR(); unsubS(); unsubC();
+    };
+  }, [currentUser]); 
 
   useEffect(() => {
       if (selectedFicha) {
@@ -130,25 +148,25 @@ export default function MestrePage() {
   // --- HANDLERS ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
+    if (!currentUser) return;
     try {
       const msToAdd = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000 + 
                       (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000 + 
                       (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
       await addDoc(collection(db, "missoes"), {
-        ...form, mestreNome: mestreIdentidade, mestreId: auth.currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
+        ...form, mestreNome: mestreIdentidade, mestreId: currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
       });
       setShowModal(false);
       setForm({ nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
-    } catch (err) { alert("Erro ao forjar cartaz."); }
+    } catch (err) { alert("Erro ao forjar cartaz: " + err.message); }
   };
 
   const publicarResenha = async () => {
-    if (!tituloResenha || !resenha || !auth.currentUser) return alert("Preencha título e conteúdo!");
+    if (!tituloResenha || !resenha || !currentUser) return alert("Preencha título e conteúdo!");
     try {
       const expiraEm = new Date(); expiraEm.setDate(expiraEm.getDate() + 1); 
       await addDoc(collection(db, "resenhas"), {
-        titulo: tituloResenha, conteudo: resenha, mestre: mestreIdentidade, mestreId: auth.currentUser.uid, destinatarios, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
+        titulo: tituloResenha, conteudo: resenha, mestre: mestreIdentidade, mestreId: currentUser.uid, destinatarios, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
       });
       setShowResenhaModal(false); setResenha(""); setTituloResenha(""); setDestinatarios([]);
     } catch (e) { alert("Erro ao publicar."); }
@@ -165,25 +183,24 @@ export default function MestrePage() {
 
   const handleAddAsset = () => {
       if (!tempLink) return;
-      if (tempType === 'cenario') {
-          setSessionForm(prev => ({ ...prev, cenarios: [...prev.cenarios, tempLink] }));
-      } else {
-          setSessionForm(prev => ({ ...prev, tokens: [...prev.tokens, tempLink] }));
-      }
+      // Adiciona na array correta baseada na seleção
+      setSessionForm(prev => ({
+          ...prev,
+          [tempType]: [...prev[tempType], tempLink]
+      }));
       setTempLink(""); 
   };
 
   const handleRemoveAsset = (type, index) => {
-      if (type === 'cenario') {
-          setSessionForm(prev => ({ ...prev, cenarios: prev.cenarios.filter((_, i) => i !== index) }));
-      } else {
-          setSessionForm(prev => ({ ...prev, tokens: prev.tokens.filter((_, i) => i !== index) }));
-      }
+      setSessionForm(prev => ({
+          ...prev,
+          [type]: prev[type].filter((_, i) => i !== index)
+      }));
   };
 
   const criarSessao = async (e) => {
       e.preventDefault();
-      if (!sessionForm.missaoId || !sessionForm.dataInicio || !auth.currentUser) return alert("Selecione a missão e o horário!");
+      if (!sessionForm.missaoId || !sessionForm.dataInicio || !currentUser) return alert("Selecione a missão e o horário!");
       try {
         const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
         const inicio = new Date(sessionForm.dataInicio);
@@ -191,18 +208,23 @@ export default function MestrePage() {
         await addDoc(collection(db, "sessoes"), {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
-            mestreId: auth.currentUser.uid,
+            mestreId: currentUser.uid,
             dataInicio: sessionForm.dataInicio,
             expiraEm: fim.toISOString(),
             participantes: sessaoDestinatarios, 
+            
+            // Novos Campos
+            mapas: sessionForm.mapas,
             cenarios: sessionForm.cenarios,
-            tokens: sessionForm.tokens,
+            monstros: sessionForm.monstros,
+            jogadores: sessionForm.jogadores,
+
             connected_players: [],
             dm_online: false,
             createdAt: serverTimestamp()
         });
         setShowSessionModal(false);
-        setSessionForm({ missaoId: '', dataInicio: '', cenarios: [], tokens: [] });
+        setSessionForm({ missaoId: '', dataInicio: '', mapas: [], cenarios: [], monstros: [], jogadores: [] });
         setSessaoDestinatarios([]);
         alert("Sessão criada com sucesso!");
       } catch (err) {
@@ -349,7 +371,7 @@ export default function MestrePage() {
                                <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
                            </div>
                            <div className="sessao-assets-count">
-                               🖼️ {s.cenarios?.length || 0} Cenários • ♟️ {s.tokens?.length || 0} Tokens
+                               🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
                            </div>
                            <div className="poster-actions" style={{marginTop: '15px'}}>
                                <button className="btn-cyan" onClick={() => setViewMembers(s)}>👥 MEMBROS</button>
@@ -425,7 +447,7 @@ export default function MestrePage() {
       {showResenhaModal && (
         <div className="ff-modal-overlay-fixed">
           <div className="ff-modal-scrollable ff-card">
-            <h3 className="modal-title-ff">ESCREVER RESENHA</h3>
+            <h3 className="modal-title-ff">ESCREVER CRÔNICA</h3>
             <div className="modal-input-group"><label>TÍTULO</label><input className="ff-modal-input-dark" value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} /></div>
             <div className="modal-input-group"><label>CORPO</label><textarea className="tall-area-ff-dark" value={resenha} onChange={(e) => setResenha(e.target.value)} /></div>
             <div className="player-selector-box-fixed"><label>DESTINATÁRIOS:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={destinatarios.includes(p.name)} onChange={() => destinatarios.includes(p.name) ? setDestinatarios(destinatarios.filter(x=>x!==p.name)) : setDestinatarios([...destinatarios, p.name])} /> {p.name}</label>))}</div></div>
@@ -442,14 +464,37 @@ export default function MestrePage() {
                       <div className="modal-input-group"><label>SELECIONAR MISSÃO</label><select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required><option value="">-- Escolha --</option>{missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}</select></div>
                       <div className="modal-input-group"><label>DATA E HORÁRIO</label><input type="datetime-local" className="ff-input-dark" value={sessionForm.dataInicio} onChange={e => setSessionForm({...sessionForm, dataInicio: e.target.value})} required /></div>
                       <div className="player-selector-box-fixed"><label>JOGADORES:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={sessaoDestinatarios.includes(p.name)} onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} /> {p.name} ({p.class})</label>))}</div></div>
+                      
                       <div className="upload-section-box">
                           <h4 className="upload-section-title">IMPORTAR IMAGENS</h4>
-                          <div className="link-import-row"><input className="ff-input-dark" value={tempLink} onChange={e => setTempLink(e.target.value)} /><select className="ff-select-dark small-select" value={tempType} onChange={e => setTempType(e.target.value)}><option value="cenario">Cenário</option><option value="token">Token</option></select><button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button></div>
+                          <div className="link-import-row">
+                              <input 
+                                className="ff-input-dark" 
+                                placeholder="Link da imagem..."
+                                value={tempLink} 
+                                onChange={e => setTempLink(e.target.value)} 
+                              />
+                              {/* SELETOR DE CATEGORIA */}
+                              <select 
+                                className="ff-select-dark small-select" 
+                                value={tempType} 
+                                onChange={e => setTempType(e.target.value)}
+                              >
+                                <option value="mapas">Tabletop</option>
+                                <option value="cenarios">Cenário</option>
+                                <option value="monstros">Monstros</option>
+                                <option value="jogadores">Jogadores</option>
+                              </select>
+                              <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
+                          </div>
                           <div className="assets-lists">
-                              {sessionForm.cenarios.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenario', i)}>×</button></div>))}
-                              {sessionForm.tokens.map((link, i) => (<div key={i} className="asset-item"><span className="truncate-link">{link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('token', i)}>×</button></div>))}
+                              {sessionForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('mapas', i)}>×</button></div>))}
+                              {sessionForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenarios', i)}>×</button></div>))}
+                              {sessionForm.monstros.map((link, i) => (<div key={`mon-${i}`} className="asset-item"><span className="truncate-link">[MONSTRO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('monstros', i)}>×</button></div>))}
+                              {sessionForm.jogadores.map((link, i) => (<div key={`jog-${i}`} className="asset-item"><span className="truncate-link">[JOGADOR] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('jogadores', i)}>×</button></div>))}
                           </div>
                       </div>
+
                       <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">AGENDAR</button><button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button></div>
                   </form>
               </div>
