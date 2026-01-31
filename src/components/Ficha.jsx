@@ -2,6 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 
+// --- LISTA DE ÍCONES DE HABILIDADE ---
+const SKILL_ICONS = [
+    'h-Basica.png',
+    'h-avançada.png',
+    'h-lendaria.png',
+    'h-magica.png',
+    'h-mestre.png',
+    'h-passiva.png',
+    'h-reacao.png',
+    'h-secreta.png'
+];
+
 // --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
 const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
@@ -49,6 +61,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   // Estado para Drag and Drop de Skills
   const [draggedSkill, setDraggedSkill] = useState(null);
   const [dragSource, setDragSource] = useState(null); 
+  
+  // Estado para Seleção de Ícone de Habilidade
+  const [iconSelectorTarget, setIconSelectorTarget] = useState(null); // { classType, skillIndex }
 
   // Ref para level up
   const prevLevelRef = useRef(sheet.basic_info?.level);
@@ -94,7 +109,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setUploadModalOpen(true);
   };
 
-  // --- LÓGICA DE SKILLS (DRAG AND DROP & XP) ---
+  // --- LÓGICA DE SKILLS (DRAG AND DROP & XP & ICON) ---
   const handleDragStart = (e, skill, source, index) => {
       if (!isMaster) return; 
       setDraggedSkill({ skill, index });
@@ -131,7 +146,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const addSkillSlot = (classType) => {
       const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
       const newSheet = JSON.parse(JSON.stringify(sheet));
-      newSheet.job_system[classType].skills.push({ id: generateId(), name: "", cost: "", effect: "", xp: { current: 0, max: 100 }, master: false });
+      newSheet.job_system[classType].skills.push({ id: generateId(), name: "", cost: "", effect: "", xp: { current: 0, max: 100 }, master: false, icon: "h-Basica.png" });
       setSheet(newSheet);
       setHasUnsavedChanges(true);
   };
@@ -151,6 +166,13 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       skill.xp.current = skill.xp.max; 
       setSheet(newSheet);
       setHasUnsavedChanges(true);
+  };
+
+  const handleSkillIconSelect = (iconName) => {
+      if (!iconSelectorTarget) return;
+      const { classType, skillIndex } = iconSelectorTarget;
+      updateField(`job_system.${classType}.skills.${skillIndex}.icon`, iconName);
+      setIconSelectorTarget(null);
   };
 
   // --- FORJA & EQUIPAMENTOS ---
@@ -361,9 +383,18 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                             <div className="stat-row"><label>HP</label><div className="stat-bars-inputs">{isMaster ? <input value={sheet.status.hp.current} onChange={e => updateField('status.hp.current', Number(e.target.value))} /> : <span>{sheet.status.hp.current}</span>}/{isMaster ? <input value={sheet.status.hp.max} onChange={e => updateField('status.hp.max', Number(e.target.value))} /> : <span>{sheet.status.hp.max}</span>}</div></div>
                             <div className="stat-row"><label>MP</label><div className="stat-bars-inputs mp">{isMaster ? <input value={sheet.status.mp.current} onChange={e => updateField('status.mp.current', Number(e.target.value))} /> : <span>{sheet.status.mp.current}</span>}/{isMaster ? <input value={sheet.status.mp.max} onChange={e => updateField('status.mp.max', Number(e.target.value))} /> : <span>{sheet.status.mp.max}</span>}</div></div>
                             <div className="stat-row-simple">
-                                <div className="s-box"><label>ARM</label>{isMaster ? <input value={sheet.status.arm.value} onChange={e => updateField('status.arm.value', Number(e.target.value))} /> : <span>{sheet.status.arm.value}</span>}</div>
-                                <div className="s-box"><label>RES</label>{isMaster ? <input value={sheet.status.res.value} onChange={e => updateField('status.res.value', Number(e.target.value))} /> : <span>{sheet.status.res.value}</span>}</div>
-                                <div className="s-box"><label>MOV</label>{isMaster ? <input value={sheet.status.mov?.value || 3} onChange={e => updateField('status.mov.value', Number(e.target.value))} /> : <span>{sheet.status.mov?.value || 3}</span>}</div>
+                                <div className="s-box">
+                                    <img src="/simbolos/ARM.png" alt="ARM" className="stat-icon-img" />
+                                    {isMaster ? <input value={sheet.status.arm.value} onChange={e => updateField('status.arm.value', Number(e.target.value))} /> : <span>{sheet.status.arm.value}</span>}
+                                </div>
+                                <div className="s-box">
+                                    <img src="/simbolos/RES.png" alt="RES" className="stat-icon-img" />
+                                    {isMaster ? <input value={sheet.status.res.value} onChange={e => updateField('status.res.value', Number(e.target.value))} /> : <span>{sheet.status.res.value}</span>}
+                                </div>
+                                <div className="s-box">
+                                    <img src="/simbolos/MOV.png" alt="MOV" className="stat-icon-img" />
+                                    {isMaster ? <input value={sheet.status.mov?.value || 3} onChange={e => updateField('status.mov.value', Number(e.target.value))} /> : <span>{sheet.status.mov?.value || 3}</span>}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -453,9 +484,20 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                                 {skill.master && <span className="star-icon pulsing">★</span>}
                                                 {isMaster ? <input placeholder="Nome" value={skill.name} onChange={e => updateField(`job_system.${classType}.skills.${i}.name`, e.target.value)} className="skill-name-in" /> : <strong className="skill-name">{skill.name || "Slot Vazio"}</strong>}
                                             </div>
-                                            {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.${classType}.skills.${i}.cost`, e.target.value)} className="skill-cost-in" /> : <span className="skill-cost">{skill.cost}</span>}
+                                            {/* ÍCONE DA HABILIDADE SELECIONÁVEL */}
+                                            <div 
+                                                className={`skill-type-icon ${isMaster ? 'clickable' : ''}`} 
+                                                onClick={() => isMaster && setIconSelectorTarget({ classType, skillIndex: i })}
+                                                title={isMaster ? "Mudar Tipo" : ""}
+                                            >
+                                                <img src={`/simbolos/${skill.icon || 'h-Basica.png'}`} alt="Tipo" />
+                                            </div>
                                             {isMaster && <button className="btn-x-red-small" onClick={() => removeSkillSlot(classType, i)}>×</button>}
                                         </div>
+                                        <div style={{display:'flex', justifyContent:'flex-end', marginBottom:'5px'}}>
+                                            {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.${classType}.skills.${i}.cost`, e.target.value)} className="skill-cost-in" style={{width:'100%', textAlign:'right'}} /> : <span className="skill-cost" style={{marginLeft:'auto'}}>{skill.cost}</span>}
+                                        </div>
+
                                         {isMaster ? <textarea placeholder="Efeito..." value={skill.effect} onChange={e => updateField(`job_system.${classType}.skills.${i}.effect`, e.target.value)} className="skill-desc-in" /> : <p className="skill-desc">{skill.effect}</p>}
                                         
                                         <div className="skill-xp-box">
@@ -508,6 +550,27 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 </div>
             )}
         </div>
+
+        {/* MODAL DE SELEÇÃO DE ÍCONE DE HABILIDADE */}
+        {iconSelectorTarget && (
+            <div className="item-selector-overlay" onClick={() => setIconSelectorTarget(null)}>
+                <div className="item-selector-box" onClick={e => e.stopPropagation()} style={{height: 'auto', maxHeight:'400px'}}>
+                    <h3>ESCOLHA O TIPO</h3>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', padding: '10px'}}>
+                        {SKILL_ICONS.map(iconName => (
+                            <div 
+                                key={iconName} 
+                                style={{cursor: 'pointer', border: '1px solid #333', padding: '5px', borderRadius: '4px', textAlign: 'center'}}
+                                onClick={() => handleSkillIconSelect(iconName)}
+                            >
+                                <img src={`/simbolos/${iconName}`} alt={iconName} style={{width: '40px', height: 'auto'}} />
+                            </div>
+                        ))}
+                    </div>
+                    <button className="btn-cancel-modal" onClick={() => setIconSelectorTarget(null)}>CANCELAR</button>
+                </div>
+            </div>
+        )}
 
         {showForgeSelector && (
             <div className="item-selector-overlay" onClick={() => setShowForgeSelector(false)}>
@@ -594,11 +657,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         }
         .skills-list::-webkit-scrollbar { display: none; }
         
-        .skill-card { background: rgba(0, 30, 60, 0.4); border: 1px solid #005577; padding: 8px; border-radius: 4px; cursor: grab; transition: 0.2s; }
+        .skill-card { background: rgba(0, 30, 60, 0.4); border: 1px solid #005577; padding: 8px; border-radius: 4px; cursor: grab; transition: 0.2s; position: relative; }
         .skill-card.secondary { background: rgba(30, 30, 30, 0.4); border-color: #444; }
         .skill-card:active { cursor: grabbing; border-color: #ffcc00; }
         .skill-card.mastered { border-color: #ffd700; background: rgba(50, 40, 0, 0.4); }
-        .skill-top { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .skill-top { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; align-items: flex-start; }
         .skill-name { color: #ffcc00; font-size: 13px; }
         .skill-cost { color: #00f2ff; font-size: 11px; font-weight: bold; }
         .skill-desc { font-size: 11px; color: #ccc; line-height: 1.3; margin: 0 0 5px 0; }
@@ -606,6 +669,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .skill-name-in { flex: 1; font-weight: bold; color: #ffcc00; }
         .skill-cost-in { width: 40px; text-align: right; color: #00f2ff; }
         .skill-desc-in { width: 100%; background: transparent; border: none; color: #ccc; font-size: 11px; resize: none; font-family: sans-serif; height: 30px; }
+        .skill-type-icon { width: 25px; height: 25px; margin-left: 5px; }
+        .skill-type-icon img { width: 100%; height: 100%; object-fit: contain; }
         
         .skill-xp-box { margin-top: 5px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; }
         .xp-labels { display: flex; justify-content: space-between; font-size: 9px; color: #888; margin-bottom: 2px; }
@@ -636,10 +701,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .stat-bars-inputs.mp { background: rgba(0,0,255,0.1); border-color: #225; }
         .stat-bars-inputs input { background: transparent; border: none; color: #fff; width: 40px; text-align: center; font-family: 'serif'; font-weight: bold; }
         .stat-row-simple { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
-        .s-box { flex: 1; background: #111; border: 1px solid #444; padding: 10px; text-align: center; border-radius: 4px; }
+        .s-box { flex: 1; background: #111; border: 1px solid #444; padding: 10px; text-align: center; border-radius: 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .s-box label { display: block; font-size: 10px; color: #888; margin-bottom: 5px; }
         .s-box input { background: transparent; border: none; color: #fff; text-align: center; font-size: 18px; width: 100%; font-weight: bold; }
         .s-box span { font-size: 18px; font-weight: bold; }
+        .stat-icon-img { width: 30px; height: 30px; object-fit: contain; }
         .char-image-frame { width: 300px; height: 450px; border: 2px solid #333; position: relative; background: #000; border-radius: 150px; overflow: hidden; box-shadow: inset 0 0 50px #000; margin-top: -20px; z-index: 1; transition: 0.2s; }
         .char-image-frame.clickable:hover { border-color: #ffcc00; cursor: pointer; }
         .image-display { width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.8; }
