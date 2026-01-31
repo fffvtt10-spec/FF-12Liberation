@@ -262,15 +262,26 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         
         {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
-            {/* Esquerda: Signo */}
-            <div className="guild-insignia-box">
-                <span className="header-label-top">SIGNO</span>
-                <div 
-                    className={`insignia-display ${isMaster ? 'clickable' : ''}`} 
-                    style={getBgStyle(sheet.basic_info.guild_insignia)}
-                    onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}
-                    title={isMaster ? "Clique para alterar imagem" : ""}
-                >
+            {/* Esquerda: Signo e Raça (Antigo Brasão) */}
+            <div className="header-left-group" style={{display: 'flex', gap: '20px', alignItems: 'flex-end'}}>
+                <div className="guild-insignia-box">
+                    <span className="header-label-top">SIGNO</span>
+                    <div 
+                        className={`insignia-display ${isMaster ? 'clickable' : ''}`} 
+                        style={getBgStyle(sheet.basic_info.guild_insignia)}
+                        onClick={() => openUploadModal('Signo', (url) => updateField('basic_info.guild_insignia', url))}
+                        title={isMaster ? "Clique para alterar imagem" : ""}
+                    >
+                    </div>
+                </div>
+                <div className="guild-item-box">
+                     <span className="header-label-top">RAÇA</span>
+                     <div 
+                        className={`special-display ${isMaster ? 'clickable' : ''}`} 
+                        style={getBgStyle(sheet.basic_info.special_image)}
+                        onClick={() => openUploadModal('Raça', (url) => updateField('basic_info.special_image', url))}
+                        title={isMaster ? "Clique para alterar imagem" : ""}
+                     ></div>
                 </div>
             </div>
             
@@ -291,15 +302,24 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 </div>
             </div>
             
-            {/* Direita: Grupo (Novo Quadrado) e Rank */}
+            {/* Direita: Classe 1, Classe 2 e Rank */}
             <div className="header-right-group">
                 <div className="guild-item-box">
-                     <span className="header-label-top">BRASÃO</span>
+                     <span className="header-label-top">CLASSE 1ª</span>
                      <div 
                         className={`special-display ${isMaster ? 'clickable' : ''}`} 
-                        style={getBgStyle(sheet.basic_info.special_image)}
-                        onClick={() => openUploadModal('Especial', (url) => updateField('basic_info.special_image', url))}
-                        title={isMaster ? "Clique para alterar imagem especial" : ""}
+                        style={getBgStyle(sheet.basic_info.class1_image)}
+                        onClick={() => openUploadModal('Classe 1ª', (url) => updateField('basic_info.class1_image', url))}
+                        title={isMaster ? "Clique para alterar imagem" : ""}
+                     ></div>
+                </div>
+                <div className="guild-item-box">
+                     <span className="header-label-top">CLASSE 2ª</span>
+                     <div 
+                        className={`special-display ${isMaster ? 'clickable' : ''}`} 
+                        style={getBgStyle(sheet.basic_info.class2_image)}
+                        onClick={() => openUploadModal('Classe 2ª', (url) => updateField('basic_info.class2_image', url))}
+                        title={isMaster ? "Clique para alterar imagem" : ""}
                      ></div>
                 </div>
 
@@ -466,6 +486,23 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                             <div className="ability-row"><label>REAÇÃO</label>{isMaster ? <input value={sheet.job_system?.reaction_ability?.name} onChange={e => updateField('job_system.reaction_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.reaction_ability?.name || "-"}</span>}</div>
                             <div className="ability-row"><label>PASSIVA</label>{isMaster ? <input value={sheet.job_system?.passive_ability?.name} onChange={e => updateField('job_system.passive_ability.name', e.target.value)} className="ab-input" /> : <span>{sheet.job_system?.passive_ability?.name || "-"}</span>}</div>
                             <div className="bonus-row"><label>BÔNUS DE CLASSE</label>{isMaster ? <textarea value={sheet.job_system?.class_bonus?.value} onChange={e => updateField('job_system.class_bonus.value', e.target.value)} className="bonus-area" /> : <p>{sheet.job_system?.class_bonus?.value || "Nenhum"}</p>}</div>
+                            
+                            {/* NOVO CAMPO: TÍTULO */}
+                            <div className="bonus-row" style={{marginTop:'15px'}}>
+                                <label>TÍTULO</label>
+                                {isMaster ? 
+                                    <input 
+                                        className="ab-input"
+                                        style={{background: 'rgba(0,0,0,0.5)', padding: '5px', width: '100%', border: '1px solid #444', borderRadius: '4px'}}
+                                        value={sheet.basic_info?.custom_title || ""} 
+                                        onChange={e => updateField('basic_info.custom_title', e.target.value)} 
+                                    /> 
+                                    : 
+                                    <p style={{background: 'rgba(0,0,0,0.5)', padding: '8px', borderRadius: '4px', fontSize: '12px', color: '#ffcc00', fontWeight: 'bold', margin: 0}}>
+                                        {sheet.basic_info?.custom_title || "Sem Título"}
+                                    </p>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
