@@ -485,8 +485,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                                 {isMaster ? <input placeholder="Nome" value={skill.name} onChange={e => updateField(`job_system.${classType}.skills.${i}.name`, e.target.value)} className="skill-name-in" /> : <strong className="skill-name">{skill.name || "Slot Vazio"}</strong>}
                                             </div>
                                             
-                                            {/* CUSTO VOLTOU PRO TOPO, MAIS DISCRETO */}
-                                            {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.${classType}.skills.${i}.cost`, e.target.value)} className="skill-cost-in" /> : <span className="skill-cost">{skill.cost}</span>}
+                                            
 
                                             {/* ÍCONE DA HABILIDADE SELECIONÁVEL */}
                                             <div 
