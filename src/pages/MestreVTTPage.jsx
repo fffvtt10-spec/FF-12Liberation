@@ -13,14 +13,71 @@ import SceneryViewer from '../components/SceneryViewer';
 import NPCViewer from '../components/NPCViewer'; 
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
-// Ícones
-const IconTabletop = () => <span>🗺️</span>; 
-const IconDice = () => <span>🎲</span>;     
-const IconScenery = () => <span>🖼️</span>;  
-const IconMonsters = () => <span>⚔️</span>; 
-const IconNPC = () => <span>👤</span>;      
-const IconPlayers = () => <span>♟️</span>;   
-const IconCombat = () => <span>⚔️</span>;
+// --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
+
+// Mapa Dobrável
+const IconTabletop = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+    <line x1="8" y1="2" x2="8" y2="18" />
+    <line x1="16" y1="6" x2="16" y2="22" />
+  </svg>
+);
+
+// D20 Estilizado
+const IconDice = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" />
+    <path d="M12 22V12" />
+  </svg>
+);
+
+// Quadro/Paisagem
+const IconScenery = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+
+// Caveira/Monstro
+const IconMonsters = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2c-4 0-8 3-8 8 0 4 3 7 5 7.5V21h6v-3.5c2-.5 5-3.5 5-7.5 0-5-4-8-8-8z" />
+    <path d="M9 10h.01" />
+    <path d="M15 10h.01" />
+    <path d="M10 14h4" />
+  </svg>
+);
+
+// Silhueta de Pessoa
+const IconNPC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+// Peão de Xadrez (Jogador)
+const IconPlayers = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2a3 3 0 0 1 3 3c0 2-3 3-3 3s-3-1-3-3a3 3 0 0 1 3-3z" />
+    <path d="M15 9c1 1 2.5 2 2.5 4 0 2-2.5 4-2.5 4H9s-2.5-2-2.5-4c0-2 1.5-3 2.5-4" />
+    <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+    <line x1="7" y1="22" x2="17" y2="22" />
+  </svg>
+);
+
+// Espadas Cruzadas
+const IconCombat = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+    <path d="M13 19l6-6" />
+    <path d="M16 16l4 4" />
+    <path d="M19 21l2-2" />
+  </svg>
+);
 
 export default function MestreVTTPage() {
   const navigate = useNavigate();
@@ -32,9 +89,6 @@ export default function MestreVTTPage() {
   const [connectedPlayers, setConnectedPlayers] = useState([]);
   const [selectedFicha, setSelectedFicha] = useState(null);
   
-  // --- NOVO: ESTADO PARA O TIMER DE LOADING ---
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-
   // Modais
   const [showMapManager, setShowMapManager] = useState(false);
   const [showSceneryManager, setShowSceneryManager] = useState(false); 
@@ -69,7 +123,7 @@ export default function MestreVTTPage() {
 
   useEffect(() => { sessaoRef.current = sessaoAtiva; }, [sessaoAtiva]);
 
-  // --- TIMER DE LOADING DE 2 SEGUNDOS ---
+  // --- 1. MINIMUM TIME LOADING ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
@@ -77,7 +131,10 @@ export default function MestreVTTPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Auth & Session
+  // Check Loading State
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
+  // --- 2. AUTH & DATA ---
   useEffect(() => {
     let unsubSession = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -117,7 +174,7 @@ export default function MestreVTTPage() {
     }
   }, [sessaoAtiva?.id]); 
 
-  // Data
+  // Data Characters
   useEffect(() => {
     const qAll = query(collection(db, "characters"));
     const unsubAll = onSnapshot(qAll, (snap) => {
@@ -131,7 +188,7 @@ export default function MestreVTTPage() {
     return () => unsubAll();
   }, [sessaoAtiva?.participantes]); 
 
-  // Monster Functions
+  // Monster/Player Handlers
   const handleSaveMonster = async () => {
       try {
           await addDoc(collection(db, "bestiary"), { ...monsterForm, mestreId: auth.currentUser.uid, createdAt: new Date().toISOString() });
@@ -168,7 +225,7 @@ export default function MestreVTTPage() {
       setShowPlayerManager(false); 
   };
 
-  // --- FUNÇÕES COMBAT TRACKER ---
+  // Combat Tracker Handlers
   const handleRemoveToken = async (tokenId) => {
       const updatedTokens = sessaoAtiva.tokens.filter(t => t.id !== tokenId);
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
@@ -200,32 +257,18 @@ export default function MestreVTTPage() {
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: newTokens });
   };
 
-  // --- DRAG WINDOW LOGIC ---
   const handleTrackerMouseDown = (e) => {
       setIsDraggingTracker(true);
-      setDragOffsetTracker({
-          x: e.clientX - trackerPos.x,
-          y: e.clientY - trackerPos.y
-      });
+      setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
   };
-
   const handleWindowMouseMove = (e) => {
-      if (isDraggingTracker) {
-          setTrackerPos({
-              x: e.clientX - dragOffsetTracker.x,
-              y: e.clientY - dragOffsetTracker.y
-          });
-      }
+      if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
   };
+  const handleWindowMouseUp = () => { setIsDraggingTracker(false); };
 
-  const handleWindowMouseUp = () => {
-      setIsDraggingTracker(false);
-  };
-
-  // --- TOKEN EDIT LOGIC ---
+  // Token Edit Logic
   const handleUpdateTokenStats = async () => {
       if(!editingToken || !sessaoAtiva) return;
-      
       const updatedTokens = sessaoAtiva.tokens.map(t => {
           if(t.id === editingToken.id) {
               let newToken = { ...t };
@@ -241,7 +284,6 @@ export default function MestreVTTPage() {
           }
           return t;
       });
-
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
       setEditingToken(null);
   };
@@ -252,19 +294,19 @@ export default function MestreVTTPage() {
       setEditingToken({ ...editingToken, [axis]: currentVal + val });
   };
 
-  // --- TELA DE CARREGAMENTO (PADRONIZADA COM CHOCOBO) ---
+  // --- LOADING SCREEN (PADRONIZADA) ---
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         height: '100vh', width: '100vw', 
-        background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', // Fundo azulado
+        background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', 
         color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
       }}>
         <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
         <p style={{ 
           fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
-          animation: 'pulseText 2s infinite ease-in-out' // 2 segundos
+          animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
         <style>{`
           @keyframes pulseText { 
@@ -394,7 +436,6 @@ export default function MestreVTTPage() {
                                       <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                   </div>
                                   <div className="act-btns">
-                                      {/* BOTÃO OLHO (VISIBILIDADE) */}
                                       <button 
                                         className="btn-icon-sm" 
                                         title={isVisible ? "Ocultar" : "Mostrar"} 
@@ -460,7 +501,7 @@ export default function MestreVTTPage() {
           </div>
       )}
 
-      {/* DOCK FERRAMENTAS */}
+      {/* DOCK FERRAMENTAS - Z-INDEX 2000 */}
       <div className="dm-tools-dock">
           <div className="tool-group"><Bazar isMestre={true} vttDock={true} /><div className="tool-label">BAZAR</div></div>
           <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA</div></div>
