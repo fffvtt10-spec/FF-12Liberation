@@ -23,7 +23,9 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setErro(""); 
 
-    if (email !== 'fffvtt10@gmail.com') {
+    const emailAdmin = import.meta.env.VITE_ADMIN_EMAIL; 
+
+    if (email !== emailAdmin) {
       setErro("VOCÊ NÃO TEM PERMISSÃO DE NARRADOR.");
       return;
     }
