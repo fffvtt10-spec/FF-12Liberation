@@ -32,6 +32,9 @@ export default function MestreVTTPage() {
   const [connectedPlayers, setConnectedPlayers] = useState([]);
   const [selectedFicha, setSelectedFicha] = useState(null);
   
+  // --- NOVO: ESTADO PARA O TIMER DE LOADING ---
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
   // Modais
   const [showMapManager, setShowMapManager] = useState(false);
   const [showSceneryManager, setShowSceneryManager] = useState(false); 
@@ -65,6 +68,14 @@ export default function MestreVTTPage() {
   const sessaoRef = useRef(null);
 
   useEffect(() => { sessaoRef.current = sessaoAtiva; }, [sessaoAtiva]);
+
+  // --- TIMER DE LOADING DE 2 SEGUNDOS ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, 2000); 
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auth & Session
   useEffect(() => {
@@ -241,8 +252,30 @@ export default function MestreVTTPage() {
       setEditingToken({ ...editingToken, [axis]: currentVal + val });
   };
 
-  if (loading) return <div style={{background:'#000', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}><img src={chocoboGif} width="100"/></div>;
-  if (!sessaoAtiva) return <div style={{color:'#f44', padding:50, background:'#000', height:'100vh'}}>NENHUMA SESSÃO ATIVA.</div>;
+  // --- TELA DE CARREGAMENTO (PADRONIZADA COM CHOCOBO) ---
+  if (loading || !minTimeElapsed) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', width: '100vw', 
+        background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', // Fundo azulado
+        color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
+      }}>
+        <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
+        <p style={{ 
+          fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
+          animation: 'pulseText 2s infinite ease-in-out' // 2 segundos
+        }}>Sintonizando Éter...</p>
+        <style>{`
+          @keyframes pulseText { 
+            0% { opacity: 0.3; } 
+            50% { opacity: 1; } 
+            100% { opacity: 0.3; } 
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
@@ -361,6 +394,7 @@ export default function MestreVTTPage() {
                                       <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                   </div>
                                   <div className="act-btns">
+                                      {/* BOTÃO OLHO (VISIBILIDADE) */}
                                       <button 
                                         className="btn-icon-sm" 
                                         title={isVisible ? "Ocultar" : "Mostrar"} 
@@ -426,7 +460,7 @@ export default function MestreVTTPage() {
           </div>
       )}
 
-      {/* DOCK FERRAMENTAS - Z-INDEX CORRIGIDO PARA 2000 */}
+      {/* DOCK FERRAMENTAS */}
       <div className="dm-tools-dock">
           <div className="tool-group"><Bazar isMestre={true} vttDock={true} /><div className="tool-label">BAZAR</div></div>
           <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA</div></div>
@@ -501,7 +535,7 @@ export default function MestreVTTPage() {
           </div>
       )}
 
-      {/* --- MODAL DE EDIÇÃO DE TOKEN (REFINADO PARA NÃO CORTAR) --- */}
+      {/* --- MODAL DE EDIÇÃO DE TOKEN (REFINADO) --- */}
       {editingToken && (
           <div className="modal-overlay-custom" onClick={() => setEditingToken(null)}>
               <div className="modal-box-custom refined-edit" onClick={e => e.stopPropagation()}>

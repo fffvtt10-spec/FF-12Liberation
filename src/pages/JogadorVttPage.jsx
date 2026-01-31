@@ -81,6 +81,9 @@ export default function JogadorVttPage() {
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const prevLevelRef = useRef(null); 
   const audioRef = useRef(new Audio(levelUpMusic)); 
+  
+  // Loading Check
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
     if (backgroundMusic) { backgroundMusic.pause(); backgroundMusic.currentTime = 0; }
@@ -100,6 +103,14 @@ export default function JogadorVttPage() {
     });
     setSessoesAtivas(ativas); setSessoesFuturas(futuras);
   }, [currentTime, allSessoes]);
+
+  // Loading Timer
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, 2000); 
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let unsubChar = () => {}; let unsubMissoes = () => {};
@@ -194,7 +205,31 @@ export default function JogadorVttPage() {
   };
   const handleWindowMouseUp = () => { setIsDraggingTracker(false); };
 
-  if (loading) return <div className="loading-screen"><img src={chocoboGif} width="100"/></div>;
+  // --- LOADING SCREEN ---
+  if (loading || !minTimeElapsed) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', width: '100vw', 
+        background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', 
+        color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
+      }}>
+        <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
+        <p style={{ 
+          fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
+          animation: 'pulseText 2s infinite ease-in-out' 
+        }}>Sintonizando Éter...</p>
+        <style>{`
+          @keyframes pulseText { 
+            0% { opacity: 0.3; } 
+            50% { opacity: 1; } 
+            100% { opacity: 0.3; } 
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
   return (
@@ -216,7 +251,7 @@ export default function JogadorVttPage() {
         {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
-        {/* MODAL DE COMBATE */}
+        {/* MODAL DE COMBATE (VISUALIZADOR ARRASTÁVEL) */}
         {showCombatTracker && currentVttSession && (
             <div 
                 className="combat-tracker-panel player-view fade-in"
@@ -343,7 +378,7 @@ export default function JogadorVttPage() {
         <Bazar isMestre={false} playerData={personagem} /> 
         
         {showMissionModal && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}><div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-compact"><h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3><button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button></div><div className="missions-grid-compact">{missoes.map(m => (<div key={m.id} className={`mission-card-compact rank-${m.rank}`}><div className="mc-left"><span className="mc-rank">{m.rank}</span></div><div className="mc-center"><h4 className="mc-title">{m.nome}</h4><span className="mc-reward">💰 {m.gilRecompensa} Gil</span></div><div className="mc-right"><button className="btn-details-mini" onClick={() => setShowMissionDetails(m)}>Ver Detalhes</button><button className="btn-accept-mini" onClick={() => handleCandidatar(m)}>ACEITAR</button></div></div>))}</div></div></div>)}
-        {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-pill">✦ {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
+        {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
         {viewImage && (<div className="ff-modal-overlay-flex" style={{zIndex: 100001}} onClick={() => setViewImage(null)}><div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div></div>)}
         {showResenhasList && (<div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}><div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-row"><h3 className="modal-title-ff">RESENHAS</h3><button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button></div><div className="resenhas-list-container">{resenhas.map(r => (<div key={r.id} className="resenha-row-player" onClick={() => { setViewResenha(r); setShowResenhasList(false); }}><h4>{r.titulo}</h4></div>))}</div></div></div>)}
         {viewResenha && (<div className="papiro-overlay-full" onClick={() => setViewResenha(null)}><div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}><h2 className="papiro-title-real">{viewResenha.titulo}</h2><div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo }}></div><button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button></div></div>)}

@@ -44,6 +44,9 @@ export default function MestrePage() {
   const [personagensDb, setPersonagensDb] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- NOVO: ESTADO PARA O TIMER DE LOADING ---
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
   // Modais
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
@@ -86,6 +89,14 @@ export default function MestrePage() {
   useEffect(() => {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
+
+  // --- TIMER DE LOADING DE 2 SEGUNDOS ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, 2000); 
+    return () => clearTimeout(timer);
+  }, []);
 
   // --- 1. AUTH & LOADING FIX ---
   useEffect(() => {
@@ -238,27 +249,27 @@ export default function MestrePage() {
       navigate('/mestre-vtt');
   };
 
-  if (loading) {
+  // --- TELA DE CARREGAMENTO CHOCOBO ---
+  if (loading || !minTimeElapsed) {
     return (
-      <div className="ether-loading">
-          <div className="loading-blur-bg"></div>
-          <div className="loading-content">
-          <img src={chocoboGif} alt="Carregando..." className="chocobo-anim" />
-          <div className="loading-bar"><div className="loading-fill"></div></div>
-          <p>CARREGANDO DADOS DO MESTRE...</p>
-          </div>
-          <style>{`
-          .ether-loading { height: 100vh; width: 100vw; background: #000; display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; z-index: 9999; }
-          .loading-blur-bg { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #001a33 0%, #000 100%); filter: blur(40px); animation: pulseBlur 2s infinite alternate; }
-          .loading-content { position: relative; z-index: 10; text-align: center; }
-          .chocobo-anim { width: 120px; filter: drop-shadow(0 0 10px #ffcc00); margin-bottom: 20px; }
-          .loading-bar { width: 200px; height: 2px; background: rgba(255, 255, 255, 0.1); margin: 0 auto 15px auto; border-radius: 10px; overflow: hidden; }
-          .loading-fill { height: 100%; width: 0%; background: #ffcc00; box-shadow: 0 0 10px #ffcc00; animation: fillProgress 1s ease-in-out forwards; }
-          p { color: #ffcc00; font-family: 'serif'; font-size: 10px; letter-spacing: 3px; animation: fadeText 1s infinite alternate; }
-          @keyframes fillProgress { from { width: 0%; } to { width: 100%; } }
-          @keyframes pulseBlur { from { opacity: 0.5; } to { opacity: 0.8; } }
-          @keyframes fadeText { from { opacity: 0.4; } to { opacity: 1; } }
-          `}</style>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', width: '100vw', 
+        background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', 
+        color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
+      }}>
+        <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
+        <p style={{ 
+          fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
+          animation: 'pulseText 2s infinite ease-in-out' 
+        }}>Sintonizando Éter...</p>
+        <style>{`
+          @keyframes pulseText { 
+            0% { opacity: 0.3; } 
+            50% { opacity: 1; } 
+            100% { opacity: 0.3; } 
+          }
+        `}</style>
       </div>
     );
   }
