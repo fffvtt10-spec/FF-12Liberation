@@ -104,7 +104,6 @@ export default function MestrePage() {
     const unsub = onAuthStateChanged(auth, (user) => {
         if (user) {
             setCurrentUser(user);
-            // Inicia listeners apenas se logado
             const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
@@ -115,7 +114,7 @@ export default function MestrePage() {
             const unsubS = onSnapshot(qS, (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubC = onSnapshot(qC, (snap) => {
                 setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                setLoading(false); // Dados carregados
+                setLoading(false); 
             });
 
             return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
@@ -322,7 +321,7 @@ export default function MestrePage() {
           {/* COLUNA 2: RESENHAS */}
           <div className="ff-card sanchez-card board-column">
             <div className="sanchez-header-top no-border">
-              <h3>RESENHA DO SANCHEZ</h3>
+              <h3>RESENHA DO SANCHES</h3>
               <button className="ff-add-btn-gold-small" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
             </div>
             <div className="mission-scroll">
@@ -378,7 +377,7 @@ export default function MestrePage() {
           <img src={fichaIcon} alt="Fichas" />
       </button>
 
-      {/* BOTÕES FLUTUANTES DE SISTEMA (BAZAR E FORJA - RESTAURADOS) */}
+      {/* BOTÕES FLUTUANTES DE SISTEMA */}
       <Bazar isMestre={true} />
       <Forja />
 
@@ -470,7 +469,6 @@ export default function MestrePage() {
                                 value={tempLink} 
                                 onChange={e => setTempLink(e.target.value)} 
                               />
-                              {/* SELETOR ATUALIZADO: REMOVIDO MONSTROS E JOGADORES DAQUI */}
                               <select 
                                 className="ff-select-dark small-select" 
                                 value={tempType} 
@@ -599,7 +597,7 @@ export default function MestrePage() {
         .btn-red { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .btn-red:hover { background: rgba(239, 68, 68, 0.1); }
         
-        /* SANCHEZ */
+        /* SANCHES */
         .sanchez-card { border-color: #00f2ff; }
         .sanchez-header-top { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f2ff; background: rgba(0, 242, 255, 0.05); }
         .sanchez-header-top h3 { color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); }
