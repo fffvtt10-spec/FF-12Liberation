@@ -113,7 +113,7 @@ export default function LoginPage() {
         )}
       </div>
 
-      <button className="admin-portal-btn" onClick={irParaAdmin} title="Acesso ao Narrador">
+      <button className="admin-portal-btn" onClick={irParaAdmin} title="Acesso ao Admin">
         <img src={iconAdmin} alt="Portal Admin" />
       </button>
 
