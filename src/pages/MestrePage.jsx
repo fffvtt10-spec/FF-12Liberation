@@ -153,7 +153,7 @@ export default function MestrePage() {
   const publicarResenha = async () => {
     if (!tituloResenha || !resenha || !currentUser) return alert("Preencha título e conteúdo!");
     try {
-      const expiraEm = new Date(); expiraEm.setDate(expiraEm.getDate() + 1); 
+      const expiraEm = new Date(); expiraEm.setDate(expiraEm.getDate() + 7); 
       await addDoc(collection(db, "resenhas"), {
         titulo: tituloResenha, conteudo: resenha, mestre: mestreIdentidade, mestreId: currentUser.uid, destinatarios, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
       });
