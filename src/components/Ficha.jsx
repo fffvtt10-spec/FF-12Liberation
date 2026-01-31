@@ -484,6 +484,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                                 {skill.master && <span className="star-icon pulsing">★</span>}
                                                 {isMaster ? <input placeholder="Nome" value={skill.name} onChange={e => updateField(`job_system.${classType}.skills.${i}.name`, e.target.value)} className="skill-name-in" /> : <strong className="skill-name">{skill.name || "Slot Vazio"}</strong>}
                                             </div>
+                                            
+                                            {/* CUSTO VOLTOU PRO TOPO, MAIS DISCRETO */}
+                                            {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.${classType}.skills.${i}.cost`, e.target.value)} className="skill-cost-in" /> : <span className="skill-cost">{skill.cost}</span>}
+
                                             {/* ÍCONE DA HABILIDADE SELECIONÁVEL */}
                                             <div 
                                                 className={`skill-type-icon ${isMaster ? 'clickable' : ''}`} 
@@ -493,9 +497,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                                 <img src={`/simbolos/${skill.icon || 'h-Basica.png'}`} alt="Tipo" />
                                             </div>
                                             {isMaster && <button className="btn-x-red-small" onClick={() => removeSkillSlot(classType, i)}>×</button>}
-                                        </div>
-                                        <div style={{display:'flex', justifyContent:'flex-end', marginBottom:'5px'}}>
-                                            {isMaster ? <input placeholder="Custo" value={skill.cost} onChange={e => updateField(`job_system.${classType}.skills.${i}.cost`, e.target.value)} className="skill-cost-in" style={{width:'100%', textAlign:'right'}} /> : <span className="skill-cost" style={{marginLeft:'auto'}}>{skill.cost}</span>}
                                         </div>
 
                                         {isMaster ? <textarea placeholder="Efeito..." value={skill.effect} onChange={e => updateField(`job_system.${classType}.skills.${i}.effect`, e.target.value)} className="skill-desc-in" /> : <p className="skill-desc">{skill.effect}</p>}
@@ -560,7 +561,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         {SKILL_ICONS.map(iconName => (
                             <div 
                                 key={iconName} 
-                                style={{cursor: 'pointer', border: '1px solid #333', padding: '5px', borderRadius: '4px', textAlign: 'center'}}
+                                style={{cursor: 'pointer', border: '1px solid #333', padding: '5px', borderRadius: '4px', textAlign: 'center', background: '#fff'}}
                                 onClick={() => handleSkillIconSelect(iconName)}
                             >
                                 <img src={`/simbolos/${iconName}`} alt={iconName} style={{width: '40px', height: 'auto'}} />
@@ -663,13 +664,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .skill-card.mastered { border-color: #ffd700; background: rgba(50, 40, 0, 0.4); }
         .skill-top { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; align-items: flex-start; }
         .skill-name { color: #ffcc00; font-size: 13px; }
-        .skill-cost { color: #00f2ff; font-size: 11px; font-weight: bold; }
+        .skill-cost { color: #00f2ff; font-size: 11px; font-weight: bold; margin-left: auto; margin-right: 10px; }
         .skill-desc { font-size: 11px; color: #ccc; line-height: 1.3; margin: 0 0 5px 0; }
         .skill-name-in, .skill-cost-in { background: transparent; border: none; color: #fff; font-size: 12px; }
         .skill-name-in { flex: 1; font-weight: bold; color: #ffcc00; }
-        .skill-cost-in { width: 40px; text-align: right; color: #00f2ff; }
+        .skill-cost-in { width: 40px; text-align: right; color: #00f2ff; margin-right: 10px; }
         .skill-desc-in { width: 100%; background: transparent; border: none; color: #ccc; font-size: 11px; resize: none; font-family: sans-serif; height: 30px; }
-        .skill-type-icon { width: 25px; height: 25px; margin-left: 5px; }
+        
+        /* ICONE NO GRID PEQUENO E BRANCO */
+        .skill-type-icon { width: 30px; height: 30px; margin-left: 5px; background: #fff; padding: 2px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
         .skill-type-icon img { width: 100%; height: 100%; object-fit: contain; }
         
         .skill-xp-box { margin-top: 5px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; }
