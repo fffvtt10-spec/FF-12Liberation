@@ -657,15 +657,17 @@ export default function MestrePage() {
         .chip-label-ff:hover { background: rgba(255,255,255,0.05); }
         .chip-label-ff input { width: auto; margin: 0; }
 
-        /* PAPIRO REAL (CARTA) */
+        /* PAPIRO REAL (FIXED & IMPROVED) */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-        .papiro-real-container { width: 600px; height: 800px; max-height: 90vh; background-size: 100% 100%; position: relative; padding: 80px 60px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; color: #3e2723; font-family: 'Cinzel', serif; text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
+        .papiro-real-container { width: 800px; max-width: 95vw; height: 85vh; background-size: 100% 100%; position: relative; padding: 100px 90px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; color: #3e2723; font-family: 'Cinzel', serif; text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
         .sanchez-oval-view-no-border { width: 80px; height: 80px; border-radius: 50%; background-size: cover; border: 4px solid #8d6e63; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .papiro-title-real { font-size: 2rem; margin: 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; }
+        .papiro-title-real { font-size: 2.5rem; margin: 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; }
         .papiro-mestre-sub { font-size: 0.9rem; font-style: italic; color: #5d4037; margin-bottom: 30px; }
-        .papiro-body-real { font-size: 1.1rem; line-height: 1.6; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 10px; font-family: 'Lato', serif; font-weight: 500; }
-        .papiro-close-btn { margin-top: 20px; background: #3e2723; color: #d7ccc8; border: 2px solid #5d4037; padding: 10px 30px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; }
+        .papiro-body-real { font-size: 1.2rem; line-height: 1.8; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 15px; font-family: 'Lato', serif; font-weight: 600; }
+        .papiro-close-btn { margin-top: 20px; background: transparent; color: #d7ccc8; border: 2px solid #5d4037; color: #5d4037; padding: 10px 40px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; font-size: 1.1rem; }
         .papiro-close-btn:hover { background: #5d4037; color: #fff; }
+        .papiro-body-real::-webkit-scrollbar { width: 8px; }
+        .papiro-body-real::-webkit-scrollbar-thumb { background: #8d6e63; border-radius: 4px; }
 
         /* DETALHES MISSÃO (MODERN DARK) */
         .detail-view-main { width: 800px; height: 600px; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }

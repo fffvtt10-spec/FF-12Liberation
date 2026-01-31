@@ -359,11 +359,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         <div className="equip-slots-overlay">
                             {[
                                 {id: 0, label: "CABEÇA", style: { top: '-30px', left: '50%', transform: 'translateX(-50%)' }}, 
-                                {id: 1, label: "CORPO", style: { top: '80px', right: '-15px' }}, 
+                                {id: 1, label: "ACESS. 2", style: { top: '80px', right: '-15px' }}, 
                                 {id: 2, label: "MÃO DIR.", style: { bottom: '120px', right: '-15px' }}, 
                                 {id: 3, label: "MÃO ESQ.", style: { bottom: '120px', left: '-15px' }}, 
                                 {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-15px' }}, 
-                                {id: 5, label: "ACESS. 2", style: { bottom: '-20px', left: '60px' }}, 
+                                {id: 5, label: "CORPO", style: { bottom: '-20px', left: '60px' }}, 
                                 {id: 6, label: "PÉS", style: { bottom: '-20px', right: '60px' }} 
                             ].map((slot, idx) => (
                                 <div key={idx} className="equip-slot" style={slot.style}>
