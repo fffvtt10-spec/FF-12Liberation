@@ -553,9 +553,28 @@ export default function JogadorVttPage() {
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 15px; background: transparent; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
         .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
 
-        /* PAPIRO REAL (FIXED & IMPROVED) */
+        /* PAPIRO REAL (CORRIGIDO PARA ELIMINAR BORDA E AJUSTAR TEXTO) */
         .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .papiro-real-container { width: 800px; max-width: 95vw; height: 85vh; background-size: 100% 100%; position: relative; padding: 100px 80px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; color: #3e2723; font-family: 'Cinzel', serif; text-shadow: none; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .papiro-real-container { 
+            width: 850px; 
+            max-width: 95vw; 
+            height: 90vh; 
+            background-size: 100% 100%; 
+            background-repeat: no-repeat;
+            position: relative; 
+            /* AUMENTO DO PADDING PARA FUGIR DAS BORDAS DO DESENHO */
+            padding: 140px 100px 120px 100px; 
+            box-sizing: border-box; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            color: #3e2723; 
+            font-family: 'Cinzel', serif; 
+            text-shadow: none; 
+            /* REMOVIDO box-shadow QUADRADO E TROCADO POR DROP-SHADOW NO PNG */
+            box-shadow: none; 
+            filter: drop-shadow(0 10px 30px rgba(0,0,0,0.8));
+        }
         .papiro-title-real { font-size: 2.5rem; margin: 0 0 20px 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; color: #3e2723; }
         .papiro-body-real { font-size: 1.2rem; line-height: 1.8; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 15px; font-family: 'Lato', serif; font-weight: 600; color: #3e2723; }
         .papiro-close-btn { margin-top: 20px; background: transparent; color: #5d4037; border: 2px solid #5d4037; padding: 10px 40px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; font-size: 1.1rem; }
