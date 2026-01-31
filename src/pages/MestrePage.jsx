@@ -378,6 +378,10 @@ export default function MestrePage() {
           <img src={fichaIcon} alt="Fichas" />
       </button>
 
+      {/* BOTÕES FLUTUANTES DE SISTEMA (BAZAR E FORJA - RESTAURADOS) */}
+      <Bazar isMestre={true} />
+      <Forja />
+
       {/* MODAL DE LISTA DE FICHAS */}
       {showFichasList && (
           <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
