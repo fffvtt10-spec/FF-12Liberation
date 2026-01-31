@@ -42,9 +42,9 @@ export default function MestrePage() {
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
+  
+  // Loading Control
   const [loading, setLoading] = useState(true);
-
-  // --- NOVO: ESTADO PARA O TIMER DE LOADING ---
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   // Modais
@@ -69,18 +69,17 @@ export default function MestrePage() {
     nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
   
-  // --- ATUALIZAÇÃO: CATEGORIAS ESPECÍFICAS PARA OS BOTÕES ---
   const [sessionForm, setSessionForm] = useState({
     missaoId: '', 
     dataInicio: '', 
-    mapas: [],      // Tabletop
-    cenarios: [],   // Cenários
-    monstros: [],   // Monstros (Combate)
-    npcs: [],       // NPCs (NOVO)
-    jogadores: []   // Tokens Jogadores
+    mapas: [],      
+    cenarios: [],   
+    monstros: [],   
+    npcs: [],       
+    jogadores: []   
   });
   const [tempLink, setTempLink] = useState("");
-  const [tempType, setTempType] = useState("mapas"); // Default selection
+  const [tempType, setTempType] = useState("mapas"); 
 
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || "Narrador";
@@ -90,22 +89,36 @@ export default function MestrePage() {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // --- TIMER DE LOADING DE 2 SEGUNDOS ---
+  // --- 1. MINIMUM TIME LOADING LOGIC ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
-    }, 2000); 
+    }, 2000); // 2 Segundos Mínimos
     return () => clearTimeout(timer);
   }, []);
 
-  // --- 1. AUTH & LOADING FIX ---
+  // --- 2. AUTH & DATA ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
 
     const unsub = onAuthStateChanged(auth, (user) => {
         if (user) {
             setCurrentUser(user);
-            setLoading(false); 
+            // Inicia listeners apenas se logado
+            const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
+            const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
+            const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
+            const qC = query(collection(db, "characters"));
+
+            const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            const unsubS = onSnapshot(qS, (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            const unsubC = onSnapshot(qC, (snap) => {
+                setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                setLoading(false); // Dados carregados
+            });
+
+            return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
         } else {
             setLoading(false);
             navigate('/login'); 
@@ -114,41 +127,6 @@ export default function MestrePage() {
 
     return () => unsub();
   }, [navigate]);
-
-  // --- 2. DADOS (Assíncrono) ---
-  useEffect(() => {
-    if (!currentUser) return;
-
-    // Queries com tratamento de erro no snapshot para evitar "sumiço" silencioso
-    const qM = query(collection(db, "missoes"), where("mestreId", "==", currentUser.uid), orderBy("createdAt", "desc"));
-    const qR = query(collection(db, "resenhas"), where("mestreId", "==", currentUser.uid), orderBy("createdAt", "desc"));
-    const qS = query(collection(db, "sessoes"), where("mestreId", "==", currentUser.uid), orderBy("dataInicio", "asc"));
-    const qC = query(collection(db, "characters"));
-
-    const unsubM = onSnapshot(qM, 
-      (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (error) => console.error("Erro ao carregar Missões (Verifique Índices no Console):", error)
-    );
-    
-    const unsubR = onSnapshot(qR, 
-      (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (error) => console.error("Erro ao carregar Resenhas:", error)
-    );
-
-    const unsubS = onSnapshot(qS, 
-      (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (error) => console.error("Erro ao carregar Sessões:", error)
-    );
-
-    const unsubC = onSnapshot(qC, 
-      (snap) => setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (error) => console.error("Erro ao carregar Personagens:", error)
-    );
-
-    return () => {
-        unsubM(); unsubR(); unsubS(); unsubC();
-    };
-  }, [currentUser]); 
 
   useEffect(() => {
       if (selectedFicha) {
@@ -195,7 +173,6 @@ export default function MestrePage() {
 
   const handleAddAsset = () => {
       if (!tempLink) return;
-      // Adiciona na array correta baseada na seleção
       setSessionForm(prev => ({
           ...prev,
           [tempType]: [...prev[tempType], tempLink]
@@ -224,14 +201,11 @@ export default function MestrePage() {
             dataInicio: sessionForm.dataInicio,
             expiraEm: fim.toISOString(),
             participantes: sessaoDestinatarios, 
-            
-            // Novos Campos
             mapas: sessionForm.mapas,
             cenarios: sessionForm.cenarios,
             monstros: sessionForm.monstros,
-            npcs: sessionForm.npcs, // --- ADICIONADO ---
+            npcs: sessionForm.npcs,
             jogadores: sessionForm.jogadores,
-
             connected_players: [],
             dm_online: false,
             createdAt: serverTimestamp()
@@ -249,7 +223,7 @@ export default function MestrePage() {
       navigate('/mestre-vtt');
   };
 
-  // --- TELA DE CARREGAMENTO CHOCOBO ---
+  // --- TELA DE CARREGAMENTO (PADRONIZADA 2S) ---
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -258,16 +232,16 @@ export default function MestrePage() {
         background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', 
         color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
       }}>
-        <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
+        <img src={chocoboGif} alt="Carregando..." style={{ width: '120px', marginBottom: '20px' }} />
         <p style={{ 
-          fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
+          fontSize: '18px', letterSpacing: '4px', textTransform: 'uppercase',
           animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
         <style>{`
           @keyframes pulseText { 
-            0% { opacity: 0.3; } 
-            50% { opacity: 1; } 
-            100% { opacity: 0.3; } 
+            0% { opacity: 0.4; transform: scale(0.98); } 
+            50% { opacity: 1; transform: scale(1.02); } 
+            100% { opacity: 0.4; transform: scale(0.98); } 
           }
         `}</style>
       </div>
@@ -399,6 +373,11 @@ export default function MestrePage() {
         </div>
       </div>
 
+      {/* BOTÃO FLUTUANTE DE FICHAS */}
+      <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
+          <img src={fichaIcon} alt="Fichas" />
+      </button>
+
       {/* MODAL DE LISTA DE FICHAS */}
       {showFichasList && (
           <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
@@ -487,7 +466,7 @@ export default function MestrePage() {
                                 value={tempLink} 
                                 onChange={e => setTempLink(e.target.value)} 
                               />
-                              {/* SELETOR DE CATEGORIA ATUALIZADO */}
+                              {/* SELETOR ATUALIZADO: REMOVIDO MONSTROS E JOGADORES DAQUI */}
                               <select 
                                 className="ff-select-dark small-select" 
                                 value={tempType} 
@@ -495,21 +474,16 @@ export default function MestrePage() {
                               >
                                 <option value="mapas">Tabletop</option>
                                 <option value="cenarios">Cenário</option>
-                                <option value="monstros">Monstros</option>
-                                <option value="npcs">NPCs</option> {/* --- OPÇÃO FALTANTE ADICIONADA --- */}
-                                <option value="jogadores">Jogadores</option>
+                                <option value="npcs">NPCs</option>
                               </select>
                               <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
                           </div>
                           <div className="assets-lists">
                               {sessionForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('mapas', i)}>×</button></div>))}
                               {sessionForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenarios', i)}>×</button></div>))}
-                              {sessionForm.monstros.map((link, i) => (<div key={`mon-${i}`} className="asset-item"><span className="truncate-link">[MONSTRO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('monstros', i)}>×</button></div>))}
-                              {sessionForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('npcs', i)}>×</button></div>))} {/* --- LISTA DE NPCs --- */}
-                              {sessionForm.jogadores.map((link, i) => (<div key={`jog-${i}`} className="asset-item"><span className="truncate-link">[JOGADOR] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('jogadores', i)}>×</button></div>))}
+                              {sessionForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('npcs', i)}>×</button></div>))}
                           </div>
                       </div>
-
                       <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">AGENDAR</button><button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button></div>
                   </form>
               </div>
@@ -517,13 +491,13 @@ export default function MestrePage() {
       )}
 
       {viewMembers && (
-        <div className="ff-modal-overlay-fixed" onClick={() => setViewMembers(null)}>
-           <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{height: 'auto', maxHeight: '500px'}}>
-              <h3 className="modal-title-ff">MEMBROS ALOCADOS</h3>
-              <div className="destinatarios-grid-fixed">{viewMembers.participantes?.map((nome, idx) => (<div key={idx} className="chip-label-ff" style={{cursor: 'default', color: '#fff', borderColor: '#00f2ff'}}>👤 {nome}</div>))}</div>
-              <button className="btn-cancelar-main" style={{marginTop: '20px', width: '100%'}} onClick={() => setViewMembers(null)}>FECHAR</button>
-           </div>
-        </div>
+          <div className="ff-modal-overlay-fixed" onClick={() => setViewMembers(null)}>
+              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{height: 'auto', maxHeight: '500px'}}>
+                  <h3 className="modal-title-ff">MEMBROS ALOCADOS</h3>
+                  <div className="destinatarios-grid-fixed">{viewMembers.participantes?.map((nome, idx) => (<div key={idx} className="chip-label-ff" style={{cursor: 'default', color: '#fff', borderColor: '#00f2ff'}}>👤 {nome}</div>))}</div>
+                  <button className="btn-cancelar-main" style={{marginTop: '20px', width: '100%'}} onClick={() => setViewMembers(null)}>FECHAR</button>
+              </div>
+          </div>
       )}
 
       {showDetails && (
@@ -531,29 +505,23 @@ export default function MestrePage() {
           <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
             <div className="detail-header-modern"><div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div><div className="detail-title-col"><h2>{showDetails.nome}</h2><span className="detail-narrator">Narrador: {showDetails.mestreNome}</span></div></div>
             <div className="detail-body-grid">
-               <div className="detail-info-row"><div className="info-item"><label>🌍 LOCAL</label><span>{showDetails.local || "Desconhecido"}</span></div><div className="info-item"><label>👤 CONTRATANTE</label><span>{showDetails.contratante || "Anônimo"}</span></div></div>
-               
-               <div className="detail-section">
-                   <label className="section-label">VAGAS</label>
-                   <div style={{background: '#111', padding: '10px', borderRadius: '4px'}}>
-                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#aaa', marginBottom:'5px'}}>
-                            <span>STATUS DO GRUPO</span>
-                            <span>{showDetails.candidatos ? showDetails.candidatos.length : 0} / {showDetails.grupo || '?'}</span>
-                        </div>
-                        <div style={{width: '100%', height: '6px', background: '#333', borderRadius:'3px'}}>
-                            <div style={{
-                                width: `${Math.min(((showDetails.candidatos?.length || 0) / (parseInt(showDetails.grupo) || 1)) * 100, 100)}%`, 
-                                height:'100%', 
-                                background: (showDetails.candidatos?.length >= parseInt(showDetails.grupo)) ? '#f44' : '#00f2ff'
-                            }}></div>
-                        </div>
-                   </div>
-               </div>
-
-               <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO</label><p className="section-text">{showDetails.descricaoMissao}</p></div>
-               <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS</label><p className="section-text">{showDetails.objetivosMissao}</p></div>
-               <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showDetails.requisitos}</p></div>
-               <div className="detail-section reward-section"><label className="section-label">💎 RECOMPENSAS</label><div className="reward-content-box"><div className="gil-display-row"><span className="gil-icon">💰</span> <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span></div>{showDetails.recompensa && (<div className="extra-rewards-list">{showDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div></div>
+              <div className="detail-info-row"><div className="info-item"><label>🌍 LOCAL</label><span>{showDetails.local || "Desconhecido"}</span></div><div className="info-item"><label>👤 CONTRATANTE</label><span>{showDetails.contratante || "Anônimo"}</span></div></div>
+              <div className="detail-section">
+                <label className="section-label">VAGAS</label>
+                <div style={{background: '#111', padding: '10px', borderRadius: '4px'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#aaa', marginBottom:'5px'}}>
+                    <span>STATUS DO GRUPO</span>
+                    <span>{showDetails.candidatos ? showDetails.candidatos.length : 0} / {showDetails.grupo || '?'}</span>
+                  </div>
+                  <div style={{width: '100%', height: '6px', background: '#333', borderRadius:'3px'}}>
+                    <div style={{ width: `${Math.min(((showDetails.candidatos?.length || 0) / (parseInt(showDetails.grupo) || 1)) * 100, 100)}%`, height:'100%', background: (showDetails.candidatos?.length >= parseInt(showDetails.grupo)) ? '#f44' : '#00f2ff' }}></div>
+                  </div>
+                </div>
+              </div>
+              <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO</label><p className="section-text">{showDetails.descricaoMissao}</p></div>
+              <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS</label><p className="section-text">{showDetails.objetivosMissao}</p></div>
+              <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showDetails.requisitos}</p></div>
+              <div className="detail-section reward-section"><label className="section-label">💎 RECOMPENSAS</label><div className="reward-content-box"><div className="gil-display-row"><span className="gil-icon">💰</span> <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span></div>{showDetails.recompensa && (<div className="extra-rewards-list">{showDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div></div>
             </div>
             <button className="ff-final-close-btn" onClick={() => setShowDetails(null)}>FECHAR RELATÓRIO</button>
           </div>
@@ -568,143 +536,158 @@ export default function MestrePage() {
 
       {viewResenha && (
         <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
-           <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
-              <div className="sanchez-oval-view-no-border" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-              <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
-              <p className="papiro-mestre-sub">Narrador: {viewResenha.mestre}</p>
-              <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }}></div>
-              <div className="papiro-dest-list"><strong>ENVIADO PARA:</strong> {viewResenha.destinatarios?.join(", ")}</div>
-              <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
-           </div>
+          <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
+            <div className="sanchez-oval-view-no-border" style={{backgroundImage: `url(${sanchezImg})`}}></div>
+            <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
+            <p className="papiro-mestre-sub">Narrador: {viewResenha.mestre}</p>
+            <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo }}></div>
+            <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
+          </div>
         </div>
       )}
 
-      <div className="master-floating-group">
-          <Forja /> 
-          <Bazar isMestre={true} />
-          <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Gerenciar Fichas">
-            <img src={fichaIcon} alt="Fichas" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='FICHAS'}} />
-          </button>
-      </div>
-
       <style>{`
-        /* ESTILOS MANTIDOS + NOVOS */
-        .mestre-container { background: #000; min-height: 100vh; position: relative; color: #fff; font-family: 'serif'; overflow: hidden; }
-        .mestre-bg-image-full { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center top; background-repeat: no-repeat; opacity: 0.35; z-index: 0; filter: contrast(125%) brightness(75%); }
-        .mestre-content { position: relative; z-index: 1; padding: 20px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        /* --- ESTILOS PRINCIPAIS MESTRE --- */
+        .mestre-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #020617; font-family: 'Cinzel', serif; color: #e2e8f0; }
+        .mestre-bg-image-full { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.3; z-index: 0; animation: slowPan 60s infinite alternate; }
+        @keyframes slowPan { from { transform: scale(1.0); } to { transform: scale(1.1); } }
         
-        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .ff-title { color: #ffcc00; text-shadow: 0 0 10px #ffcc00; letter-spacing: 5px; font-size: 2rem; margin: 0; }
-        .mestre-identity-box { display: flex; align-items: center; gap: 10px; border: 1px solid #ffcc00; padding: 8px 15px; background: rgba(0, 10, 30, 0.9); }
-        .mestre-identity-box input { background: #fff; border: 1px solid #ffcc00; color: #000; padding: 5px 10px; font-weight: bold; font-family: 'serif'; outline: none; }
-
-        /* GRID RESPONSIVO TELA ÚNICA */
-        .mestre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; flex: 1; overflow: hidden; padding-bottom: 60px; /* Espaço para botões flutuantes */ }
+        .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .ff-title { font-size: 2rem; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); letter-spacing: 4px; margin: 0; }
+        .mestre-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); border: 1px solid #fbbf24; border-radius: 4px; }
+        .mestre-identity-box label { font-size: 0.8rem; color: #fbbf24; font-weight: bold; }
+        .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #555; color: #fff; font-family: 'Cinzel', serif; text-align: center; width: 150px; }
         
-        /* CARDS TELA ÚNICA */
-        .ff-card { background: rgba(0, 10, 30, 0.95); border: 1px solid #ffcc00; padding: 15px; border-radius: 4px; backdrop-filter: blur(10px); display: flex; flex-direction: column; max-height: 100%; }
-        .board-column { flex: 1; overflow: hidden; min-height: 0; }
+        .mestre-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+        .board-column { display: flex; flex-direction: column; height: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; overflow: hidden; backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card-header { padding: 15px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
+        .card-header h3 { margin: 0; color: #e2e8f0; font-size: 1rem; letter-spacing: 2px; }
+        .no-border { border-bottom: none !important; }
         
-        .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
-        .card-header.no-border { border-bottom: none; }
-        
-        .mission-scroll { flex: 1; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: #ffcc00 #000; }
+        .mission-scroll { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; scrollbar-width: thin; scrollbar-color: #fbbf24 #0f172a; }
         .mission-scroll::-webkit-scrollbar { width: 6px; }
-        .mission-scroll::-webkit-scrollbar-thumb { background: #ffcc00; }
+        .mission-scroll::-webkit-scrollbar-thumb { background: #fbbf24; border-radius: 3px; }
+        
+        /* CARD MISSÃO */
+        .mission-poster { background: #1e293b; border: 1px solid #334155; padding: 15px; border-radius: 4px; position: relative; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .mission-poster:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-color: #fbbf24; }
+        .mission-poster h4 { margin: 25px 0 5px 0; color: #fbbf24; font-size: 1.1rem; text-transform: uppercase; }
+        .poster-rank-label-fixed { position: absolute; top: 10px; right: 10px; font-weight: 900; font-size: 1.5rem; opacity: 0.3; color: #fff; }
+        .mestre-tag { font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 5px; }
+        .gil-recompensa { font-size: 0.9rem; color: #fcd34d; font-weight: bold; margin-bottom: 10px; }
+        
+        .vagas-container { background: #0f172a; padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
+        .vagas-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #cbd5e1; margin-bottom: 4px; }
+        .vagas-track { height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
+        .vagas-fill { height: 100%; transition: width 0.3s ease; }
+        
+        .candidates-mini-box { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-bottom: 10px; font-size: 0.75rem; }
+        .cand-row-master { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-bottom: 2px; border-bottom: 1px dashed #334155; }
+        .btn-kick-x { background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-kick-x:hover { color: #f87171; }
+        
+        .mission-timer { display: block; text-align: center; font-size: 0.8rem; color: #94a3b8; margin: 10px 0; font-weight: bold; }
+        
+        .poster-actions { display: flex; gap: 5px; justify-content: space-between; }
+        .btn-cyan { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); }
+        .btn-red { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .btn-red:hover { background: rgba(239, 68, 68, 0.1); }
+        
+        /* SANCHEZ */
+        .sanchez-card { border-color: #00f2ff; }
+        .sanchez-header-top { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f2ff; background: rgba(0, 242, 255, 0.05); }
+        .sanchez-header-top h3 { color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); }
+        .resenha-item-card { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 4px; border-left: 3px solid #00f2ff; }
+        .resenha-item-card h4 { margin: 0 0 10px 0; color: #e2e8f0; font-size: 1rem; }
+        
+        /* SESSÕES */
+        .sessao-card { background: #1e293b; border: 1px solid #fbbf24; padding: 15px; border-radius: 4px; position: relative; }
+        .sessao-status { position: absolute; top: -10px; left: 10px; background: #fbbf24; color: #000; font-size: 0.6rem; font-weight: bold; padding: 2px 6px; border-radius: 2px; }
+        .sessao-title { margin: 10px 0 5px 0; color: #fff; font-size: 1.1rem; }
+        .sessao-info { font-size: 0.8rem; color: #94a3b8; display: flex; flex-direction: column; gap: 2px; }
+        .sessao-assets-count { font-size: 0.75rem; color: #cbd5e1; margin-top: 5px; font-style: italic; }
+        .btn-play-vtt { background: #fbbf24; color: #000; border: none; padding: 8px; font-weight: bold; cursor: pointer; flex: 2; transition: 0.2s; }
+        .btn-play-vtt:hover { background: #f59e0b; box-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
+        .empty-instancia { text-align: center; color: #475569; padding: 20px; font-style: italic; border: 2px dashed #334155; border-radius: 8px; }
 
-        .mission-poster { background: rgba(255,255,255,0.04); border: 1px solid #444; margin-bottom: 15px; padding: 18px; border-left: 4px solid #00f2ff; position: relative; }
-        .poster-rank-label-fixed { position: absolute; top: 12px; right: 18px; font-size: 32px; color: #ffcc00; opacity: 0.35; font-weight: bold; }
-        .mestre-tag { color: #ffcc00; font-size: 10px; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
-        .candidates-mini-box { margin-top: 8px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; }
-        .cand-row-master { display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-bottom: 2px; }
-        .btn-kick-x { background: transparent; border: none; color: #f44; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .btn-kick-x:hover { color: #fff; }
+        /* MODAIS GERAIS */
+        .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .ff-modal-scrollable { background: #0f172a; border: 1px solid #fbbf24; width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto; padding: 25px; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        .modal-title-ff { color: #fbbf24; text-align: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; letter-spacing: 2px; font-size: 1.5rem; }
+        .modal-input-group { margin-bottom: 15px; }
+        .modal-input-group label { display: block; color: #94a3b8; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; }
+        .modal-input-group input, .modal-input-group textarea, .modal-input-group select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 10px; font-family: 'Lato', sans-serif; border-radius: 4px; outline: none; }
+        .modal-input-group input:focus, .modal-input-group textarea:focus { border-color: #fbbf24; }
+        .tall-area-dark { min-height: 100px; resize: vertical; }
+        .row-double-ff { display: flex; gap: 15px; margin-bottom: 15px; }
+        .field-group { flex: 1; }
+        .field-group input, .field-group select { width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 4px; }
+        
+        .btn-group-ff { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-forjar-main { flex: 1; background: #fbbf24; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; letter-spacing: 1px; }
+        .btn-forjar-main:hover { background: #f59e0b; }
+        .btn-cancelar-main { flex: 1; background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; }
+        .btn-cancelar-main:hover { border-color: #fff; color: #fff; }
 
-        /* VAGAS VISUAL */
-        .vagas-container { margin: 10px 0; }
-        .vagas-labels { display: flex; justify-content: space-between; font-size: 10px; color: #ccc; margin-bottom: 2px; font-weight: bold; }
-        .vagas-track { width: 100%; height: 6px; background: #111; border: 1px solid #444; border-radius: 3px; overflow: hidden; }
-        .vagas-fill { height: 100%; transition: width 0.3s; }
+        .ff-add-btn { background: transparent; border: 1px dashed #fbbf24; color: #fbbf24; padding: 5px 15px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: 0.2s; }
+        .ff-add-btn:hover { background: rgba(251, 191, 36, 0.1); }
+        .ff-add-btn-gold-small { background: transparent; border: 1px dashed #00f2ff; color: #00f2ff; padding: 5px 10px; cursor: pointer; font-size: 0.7rem; font-weight: bold; }
+        .ff-add-btn-gold-small:hover { background: rgba(0, 242, 255, 0.1); }
 
-        .sanchez-card { position: relative; overflow: hidden; }
-        .sanchez-header-top { position: relative; z-index: 1; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0; }
-        .sanchez-header-top.no-border { border-bottom: none; }
-        .resenha-item-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 15px; margin-top: 12px; border-radius: 4px; }
-        .sessao-card { background: linear-gradient(135deg, rgba(20,20,50,0.9), rgba(0,0,20,0.9)); border: 1px solid #00f2ff; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,242,255,0.1); }
-        .sessao-status { font-size: 10px; color: #f44; font-weight: bold; margin-bottom: 8px; animation: pulse 2s infinite; }
-        .sessao-title { color: #fff; font-size: 18px; margin: 0 0 10px 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
-        .sessao-info { display: flex; justify-content: space-between; font-size: 12px; color: #aaa; margin-bottom: 10px; }
-        .sessao-assets-count { font-size: 11px; color: #ffcc00; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 3px; display: inline-block; }
-        .btn-play-vtt { background: #00f2ff; color: #000; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; flex: 1; margin-right: 10px; transition: 0.3s; }
-        .btn-play-vtt:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-        .upload-section-box { border: 1px dashed #444; padding: 15px; margin: 20px 0; background: rgba(0,0,0,0.3); }
-        .upload-section-title { color: #00f2ff; font-size: 12px; margin-bottom: 15px; border-bottom: 1px solid #00f2ff; padding-bottom: 5px; display: inline-block; }
-        .ff-select-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; }
-        .ff-input-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; color-scheme: dark; }
-        .link-import-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        /* UPLOAD SECTION (SESSÃO) */
+        .upload-section-box { border: 1px solid #334155; padding: 15px; border-radius: 4px; margin-top: 20px; background: rgba(0,0,0,0.2); }
+        .upload-section-title { font-size: 0.9rem; color: #fbbf24; margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+        .link-import-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .ff-input-dark { flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
+        .ff-select-dark { background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
         .small-select { width: 120px; }
-        .assets-lists { display: flex; flex-direction: column; gap: 10px; }
-        .asset-group { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; }
-        .asset-group label { display: block; color: #ffcc00; font-size: 10px; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #333; }
-        .asset-item { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #ddd; margin-bottom: 4px; }
-        .truncate-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
-        .btn-remove-x { background: transparent; border: none; color: #f44; font-weight: bold; cursor: pointer; font-size: 14px; }
-        .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.94); z-index: 99999; display: flex; align-items: center; justify-content: center; }
-        .ff-modal-scrollable { width: 550px; max-height: 90vh; overflow-y: auto; background: #000c1d; border: 2px solid #ffcc00; padding: 35px; box-shadow: 0 0 60px rgba(0,0,0,0.9); }
-        .modal-title-ff { color: #fff; font-size: 22px; border-bottom: 1px solid #ffcc00; padding-bottom: 10px; margin-bottom: 20px; letter-spacing: 2px; }
-        .modal-input-group { margin-bottom: 20px; }
-        .modal-input-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
-        .modal-input-group input { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; outline: none; font-family: 'serif'; font-size: 14px; }
-        .row-double-ff { display: flex; gap: 20px; margin-bottom: 20px; }
-        .field-group { flex: 1; display: flex; flex-direction: column; }
-        .field-group label { color: #ffcc00; font-size: 11px; display: block; margin-bottom: 8px; font-weight: bold; }
-        .field-group input, .field-group select { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; font-family: 'serif'; outline: none; }
-        .tall-area-dark { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 12px; height: 110px; resize: none; font-family: 'serif'; outline: none; }
-        .tall-area-ff-dark { width: 100%; background: #000; border: 1px solid #ffcc00; color: #fff; padding: 15px; height: 250px; resize: none; font-family: 'serif'; outline: none; font-size: 16px; border-radius: 4px; }
-        .detail-view-main { width: 600px; background: #000814; border: 1px solid #ffcc00; padding: 0; box-shadow: 0 0 40px rgba(255, 204, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; }
-        .detail-header-modern { background: linear-gradient(90deg, #1a1a1a 0%, #000 100%); padding: 25px 30px; display: flex; align-items: center; border-bottom: 1px solid #333; gap: 20px; }
-        .detail-rank-badge { font-size: 32px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); border: 2px solid #ffcc00; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.5); }
-        .detail-title-col h2 { margin: 0; font-size: 24px; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
-        .detail-narrator { color: #00f2ff; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 4px; display: block; }
-        .detail-body-grid { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
-        .detail-info-row { display: flex; gap: 25px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 15px; }
-        .info-item { flex: 1; }
-        .info-item label { color: #ffcc00; font-size: 10px; display: block; margin-bottom: 5px; font-weight: bold; opacity: 0.8; }
-        .info-item span { color: #fff; font-size: 14px; font-weight: bold; letter-spacing: 0.5px; }
-        .detail-section { margin-bottom: 5px; }
-        .section-label { color: #ffcc00; font-size: 11px; font-weight: bold; display: block; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
-        .section-text { font-size: 15px; line-height: 1.5; color: #ddd; margin: 0; white-space: pre-wrap; }
-        .reward-section { margin-top: 10px; background: rgba(255,204,0,0.05); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,204,0,0.2); }
-        .gil-display-row { display: flex; align-items: center; gap: 10px; font-size: 18px; color: #ffcc00; font-weight: bold; margin-bottom: 8px; }
-        .extra-rewards-list { margin-top: 8px; padding-left: 5px; }
-        .reward-item { color: #aaa; font-size: 14px; margin-bottom: 4px; font-style: italic; }
-        .ff-final-close-btn { width: 100%; background: #111; color: #fff; border: none; border-top: 1px solid #333; padding: 20px; font-weight: bold; cursor: pointer; font-size: 13px; text-transform: uppercase; transition: 0.2s; }
-        .ff-final-close-btn:hover { background: #222; color: #ffcc00; }
-        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; }
-        .papiro-real-container { width: 1000px; height: 800px; max-width: 95vw; max-height: 95vh; background-size: 100% 100%; background-repeat: no-repeat; padding: 110px 160px; color: #3b2b1a; position: relative; display: flex; flex-direction: column; }
-        .sanchez-oval-view-no-border { width: 110px; height: 110px; float: right; border-radius: 50%; background-size: cover; margin-left: 20px; mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%); opacity: 0.9; }
-        .papiro-title-real { border-bottom: 2px solid #3b2b1a; padding-bottom: 5px; margin-top: 0; font-size: 32px; font-weight: bold; }
-        .papiro-mestre-sub { font-size: 14px; font-style: italic; opacity: 0.8; margin-top: 5px; }
-        .papiro-body-real { margin-top: 25px; flex: 1; overflow-y: auto; line-height: 1.6; font-size: 18px; padding-right: 10px; scrollbar-width: none; -ms-overflow-style: none; }
-        .papiro-body-real::-webkit-scrollbar { display: none; }
-        .papiro-dest-list { margin-top: 15px; font-size: 14px; border-top: 1px solid rgba(59, 43, 26, 0.3); padding-top: 10px; }
-        .papiro-close-btn { position: absolute; bottom: 45px; right: 110px; background: #3b2b1a; color: #f4e4bc; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; font-size: 13px; border-radius: 2px; }
-        .ff-add-btn { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 20px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .ff-add-btn-gold-small { background: transparent; border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 15px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.3s; }
-        .ff-add-btn-gold-small:hover { background: #ffcc00; color: #000; box-shadow: 0 0 15px #ffcc00; }
-        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; margin-right: 10px; font-weight: bold; }
-        .btn-red { border: 1px solid #f44; color: #f44; padding: 6px 15px; background: transparent; cursor: pointer; font-size: 11px; font-weight: bold; }
-        .btn-group-ff { display: flex; gap: 20px; margin-top: 25px; }
-        .btn-forjar-main { flex: 1; background: #ffcc00; color: #000; border: none; padding: 14px; font-weight: bold; cursor: pointer; font-size: 14px; text-transform: uppercase; }
-        /* CORREÇÃO DO CSS: Renomeado de btn-cancel-main para btn-cancelar-main para bater com o JSX */
-        .btn-cancelar-main { flex: 1; background: #000; color: #fff; border: 1px solid #fff; padding: 14px; cursor: pointer; text-align: center; font-size: 14px; text-transform: uppercase; }
-        .player-selector-box-fixed { margin: 25px 0; border-top: 1px solid #333; padding-top: 15px; }
-        .destinatarios-grid-fixed { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-        .chip-label-ff { background: rgba(0, 10, 30, 0.8); border: 1px solid #ffcc00; color: #ffcc00; padding: 8px 18px; border-radius: 4px; font-size: 12px; cursor: pointer; display: inline-block; }
-        .mission-timer { font-size: 12px; color: #00f2ff; display: block; margin-top: 10px; font-weight: bold; letter-spacing: 1px; }
-        .fade-in { animation: fadeIn 1s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .assets-lists { display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; }
+        .asset-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; }
+        .truncate-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
+        .btn-remove-x { background: transparent; border: none; color: #f44; cursor: pointer; font-weight: bold; }
+
+        /* SELEÇÃO DE JOGADORES */
+        .player-selector-box-fixed { margin: 15px 0; }
+        .destinatarios-grid-fixed { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 150px; overflow-y: auto; background: #020617; padding: 10px; border: 1px solid #334155; border-radius: 4px; }
+        .chip-label-ff { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #94a3b8; cursor: pointer; padding: 5px; border: 1px solid transparent; border-radius: 4px; transition: 0.2s; }
+        .chip-label-ff:hover { background: rgba(255,255,255,0.05); }
+        .chip-label-ff input { width: auto; margin: 0; }
+
+        /* PAPIRO REAL (CARTA) */
+        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        .papiro-real-container { width: 600px; height: 800px; max-height: 90vh; background-size: 100% 100%; position: relative; padding: 80px 60px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; color: #3e2723; font-family: 'Cinzel', serif; text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
+        .sanchez-oval-view-no-border { width: 80px; height: 80px; border-radius: 50%; background-size: cover; border: 4px solid #8d6e63; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .papiro-title-real { font-size: 2rem; margin: 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; }
+        .papiro-mestre-sub { font-size: 0.9rem; font-style: italic; color: #5d4037; margin-bottom: 30px; }
+        .papiro-body-real { font-size: 1.1rem; line-height: 1.6; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 10px; font-family: 'Lato', serif; font-weight: 500; }
+        .papiro-close-btn { margin-top: 20px; background: #3e2723; color: #d7ccc8; border: 2px solid #5d4037; padding: 10px 30px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; }
+        .papiro-close-btn:hover { background: #5d4037; color: #fff; }
+
+        /* DETALHES MISSÃO (MODERN DARK) */
+        .detail-view-main { width: 800px; height: 600px; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }
+        .detail-header-modern { background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-bottom: 1px solid #334155; display: flex; gap: 20px; align-items: center; }
+        .detail-rank-badge { font-size: 3rem; font-weight: 900; color: rgba(255,255,255,0.1); text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+        .detail-rank-badge.rank-S, .detail-rank-badge.rank-SS { color: #fbbf24; opacity: 1; }
+        .detail-title-col h2 { margin: 0; font-size: 2rem; color: #f1f5f9; letter-spacing: 2px; }
+        .detail-narrator { color: #00f2ff; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        .detail-body-grid { flex: 1; overflow-y: auto; padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .detail-info-row { grid-column: 1 / -1; display: flex; gap: 40px; border-bottom: 1px solid #334155; padding-bottom: 20px; }
+        .info-item label { color: #fbbf24; font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 5px; }
+        .info-item span { color: #fff; font-size: 1.1rem; }
+        .detail-section { margin-bottom: 10px; }
+        .section-label { display: block; color: #94a3b8; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px; border-left: 3px solid #fbbf24; padding-left: 8px; }
+        .section-text { color: #cbd5e1; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; }
+        .reward-section { grid-column: 1 / -1; background: rgba(251, 191, 36, 0.05); padding: 15px; border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 6px; }
+        .reward-content-box { display: flex; justify-content: space-between; align-items: center; }
+        .gil-display-row { font-size: 1.5rem; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .gil-value { color: #fcd34d; }
+        .extra-rewards-list { text-align: right; color: #fbbf24; font-size: 0.9rem; font-style: italic; }
+        .ff-final-close-btn { width: 100%; padding: 20px; background: #020617; color: #fff; border: none; border-top: 1px solid #334155; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 2px; }
+        .ff-final-close-btn:hover { background: #fbbf24; color: #000; }
+
+        /* LIGHTBOX */
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
@@ -715,11 +698,10 @@ export default function MestrePage() {
         .fichas-trigger-btn img { width: 70%; height: 70%; object-fit: contain; }
 
         /* LISTA DE FICHAS */
-        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; width: 100%; }
-        .ficha-list-item:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
-        .ficha-row-name { display: flex; flex-direction: column; flex: 1; margin-right: 15px; }
-        .ficha-row-name strong { color: #fff; font-size: 16px; }
-        .ficha-row-name small { color: #aaa; font-size: 12px; }
+        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
+        .ficha-row-name strong { display: block; color: #fff; font-size: 1.1rem; }
+        .ficha-row-name small { color: #94a3b8; }
+        .btn-cyan { padding: 8px 15px; font-size: 0.8rem; }
       `}</style>
     </div>
   );
