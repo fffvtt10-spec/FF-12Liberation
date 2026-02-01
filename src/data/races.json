@@ -85,8 +85,8 @@
         "effect": "Não sofrem dano ao cair de qualquer altura nem de impactos ascendentes."
       },
       "base_classes": [
-        "Monge",
-        "Guerreiro"
+        "Raptora",
+        "Rastreadora"
       ]
     },
     {
