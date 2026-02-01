@@ -1,228 +1,300 @@
-import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove, updateDoc } from "firebase/firestore";
+import React, { useState, useEffect, useRef } from 'react';
+import { db, auth } from '../firebase';
+import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { useNavigate } from 'react-router-dom'; 
-import { backgroundMusic } from './LandingPage'; 
-import fundoMestre from '../assets/fundo-mestre.jpg'; 
-import sanchezImg from '../assets/sanchez.jpeg'; 
-import papiroImg from '../assets/papiro.png'; 
+import { useNavigate } from 'react-router-dom';
+import fundoMestre from '../assets/fundo-mestre.jpg';
 import chocoboGif from '../assets/chocobo-loading.gif';
-import Bazar from '../components/Bazar'; 
-import Forja from '../components/Forja'; 
-import Ficha from '../components/Ficha'; 
-import fichaIcon from '../assets/ficha-icon.png'; 
+import Ficha from '../components/Ficha';
+import Bazar from '../components/Bazar';
+import Forja from '../components/Forja';
+import Tabletop from '../components/Tabletop'; 
+import SceneryViewer from '../components/SceneryViewer'; 
+import NPCViewer from '../components/NPCViewer'; 
+import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
-const Timer = ({ expiry }) => {
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = new Date(expiry).getTime() - now;
-      if (distance < 0) { 
-        setTimeLeft("EXPIRADA"); 
-        clearInterval(interval); 
-      } else {
-        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        setTimeLeft(`${days}d ${hours}h ${mins}m`);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [expiry]);
-  return <span className="mission-timer">⏳ {timeLeft}</span>;
-};
+// --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
 
-export default function MestrePage() {
+// Mapa Dobrável
+const IconTabletop = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+    <line x1="8" y1="2" x2="8" y2="18" />
+    <line x1="16" y1="6" x2="16" y2="22" />
+  </svg>
+);
+
+// D20 Estilizado
+const IconDice = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" />
+    <path d="M12 22V12" />
+  </svg>
+);
+
+// Quadro/Paisagem
+const IconScenery = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+
+// Caveira/Monstro
+const IconMonsters = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2c-4 0-8 3-8 8 0 4 3 7 5 7.5V21h6v-3.5c2-.5 5-3.5 5-7.5 0-5-4-8-8-8z" />
+    <path d="M9 10h.01" />
+    <path d="M15 10h.01" />
+    <path d="M10 14h4" />
+  </svg>
+);
+
+// Silhueta de Pessoa
+const IconNPC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+// Peão de Xadrez (Jogador)
+const IconPlayers = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2a3 3 0 0 1 3 3c0 2-3 3-3 3s-3-1-3-3a3 3 0 0 1 3-3z" />
+    <path d="M15 9c1 1 2.5 2 2.5 4 0 2-2.5 4-2.5 4H9s-2.5-2-2.5-4c0-2 1.5-3 2.5-4" />
+    <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+    <line x1="7" y1="22" x2="17" y2="22" />
+  </svg>
+);
+
+// Espadas Cruzadas
+const IconCombat = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+    <path d="M13 19l6-6" />
+    <path d="M16 16l4 4" />
+    <path d="M19 21l2-2" />
+  </svg>
+);
+
+export default function MestreVTTPage() {
   const navigate = useNavigate();
   
-  const [currentUser, setCurrentUser] = useState(null);
-  const [missoes, setMissoes] = useState([]);
-  const [resenhas, setResenhas] = useState([]); 
-  const [sessoes, setSessoes] = useState([]); 
-  const [personagensDb, setPersonagensDb] = useState([]);
+  // Estados Principais
+  const [sessaoAtiva, setSessaoAtiva] = useState(null);
+  const [loading, setLoading] = useState(true); 
+  const [personagensData, setPersonagensData] = useState([]);
+  const [connectedPlayers, setConnectedPlayers] = useState([]);
+  const [selectedFicha, setSelectedFicha] = useState(null);
   
-  // Loading Control
-  const [loading, setLoading] = useState(true);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-
   // Modais
-  const [showModal, setShowModal] = useState(false); 
-  const [showResenhaModal, setShowResenhaModal] = useState(false); 
-  const [showSessionModal, setShowSessionModal] = useState(false); 
-  const [showFichasList, setShowFichasList] = useState(false); 
-  const [selectedFicha, setSelectedFicha] = useState(null); 
+  const [showMapManager, setShowMapManager] = useState(false);
+  const [showSceneryManager, setShowSceneryManager] = useState(false); 
+  const [showNPCManager, setShowNPCManager] = useState(false); 
+  const [showMonsterManager, setShowMonsterManager] = useState(false); 
+  const [showPlayerManager, setShowPlayerManager] = useState(false);   
+  const [showCombatTracker, setShowCombatTracker] = useState(false);
   
-  // Visualizações
-  const [showDetails, setShowDetails] = useState(null); 
-  const [viewResenha, setViewResenha] = useState(null); 
-  const [viewImage, setViewImage] = useState(null); 
-  const [viewMembers, setViewMembers] = useState(null); 
+  const [viewMonsterDetails, setViewMonsterDetails] = useState(null);
 
-  // Forms
-  const [resenha, setResenha] = useState("");
-  const [tituloResenha, setTituloResenha] = useState("");
-  const [destinatarios, setDestinatarios] = useState([]);
-  const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
-  const [form, setForm] = useState({
-    nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
+  // Estados Tracker Drag
+  const [trackerPos, setTrackerPos] = useState({ x: 280, y: 100 });
+  const [isDraggingTracker, setIsDraggingTracker] = useState(false);
+  const [dragOffsetTracker, setDragOffsetTracker] = useState({ x: 0, y: 0 });
+
+  // Estados Criação e Edição
+  const [editingToken, setEditingToken] = useState(null);
+  const [monsterForm, setMonsterForm] = useState({
+      name: '', img: '', stars: 1, difficultyQ: false, 
+      hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10,
+      xp: 0, drops: '', tips: '', description: '', visibleBars: false
   });
+  const [bestiary, setBestiary] = useState([]);
+  const [creatingMonsterStep, setCreatingMonsterStep] = useState('list'); 
+
+  const [allCharacters, setAllCharacters] = useState([]);
+  const [showDiceSelector, setShowDiceSelector] = useState(false);
+  const [rollResult, setRollResult] = useState(null); 
+  const dismissedRollTimestamp = useRef(0);
   
-  const [sessionForm, setSessionForm] = useState({
-    missaoId: '', 
-    dataInicio: '', 
-    mapas: [],      
-    cenarios: [],   
-    monstros: [],   
-    npcs: [],       
-    jogadores: []   
-  });
-  const [tempLink, setTempLink] = useState("");
-  const [tempType, setTempType] = useState("mapas"); 
+  const sessaoRef = useRef(null);
 
-  const [mestreIdentidade, setMestreIdentidade] = useState(() => {
-    return localStorage.getItem('mestreAssinatura') || "Narrador";
-  });
+  useEffect(() => { sessaoRef.current = sessaoAtiva; }, [sessaoAtiva]);
 
-  useEffect(() => {
-    localStorage.setItem('mestreAssinatura', mestreIdentidade);
-  }, [mestreIdentidade]);
-
-  // --- 1. MINIMUM TIME LOADING LOGIC ---
+  // --- 1. MINIMUM TIME LOADING ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
-    }, 2000); // 2 Segundos Mínimos
+    }, 2000); 
     return () => clearTimeout(timer);
   }, []);
 
+  // Check Loading State
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
   // --- 2. AUTH & DATA ---
   useEffect(() => {
-    if (backgroundMusic) backgroundMusic.pause();
-
-    const unsub = onAuthStateChanged(auth, (user) => {
+    let unsubSession = () => {};
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
-            setCurrentUser(user);
-            const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
-            const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
-            const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
-            const qC = query(collection(db, "characters"));
-
-            const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            const unsubS = onSnapshot(qS, (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            const unsubC = onSnapshot(qC, (snap) => {
-                setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                setLoading(false); 
+            const q = query(collection(db, "sessoes"), where("mestreId", "==", user.uid));
+            unsubSession = onSnapshot(q, (snap) => {
+              const sessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              const ativa = sessoes.find(s => {
+                  const agora = new Date();
+                  const fim = new Date(s.expiraEm);
+                  return agora <= fim; 
+              });
+              if (ativa) {
+                setSessaoAtiva(ativa);
+                setConnectedPlayers(ativa.connected_players || []); 
+                if (ativa.latest_roll) {
+                     const roll = ativa.latest_roll;
+                     if (roll.timestamp > dismissedRollTimestamp.current) {
+                        setRollResult(prev => { if (!prev || prev.timestamp !== roll.timestamp) return roll; return prev; });
+                     }
+                }
+              }
+              setLoading(false); 
             });
+            const qBestiary = query(collection(db, "bestiary"), where("mestreId", "==", user.uid));
+            onSnapshot(qBestiary, (snap) => setBestiary(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+        } else { setLoading(false); navigate('/login'); }
+    });
+    return () => { unsubscribeAuth(); unsubSession(); };
+  }, [navigate]); 
 
-            return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
-        } else {
-            setLoading(false);
-            navigate('/login'); 
+  // Online Check
+  useEffect(() => {
+    if (sessaoAtiva?.id) {
+        updateDoc(doc(db, "sessoes", sessaoAtiva.id), { dm_online: true }).catch(console.error);
+        return () => updateDoc(doc(db, "sessoes", sessaoAtiva.id), { dm_online: false }).catch(console.error);
+    }
+  }, [sessaoAtiva?.id]); 
+
+  // Data Characters
+  useEffect(() => {
+    const qAll = query(collection(db, "characters"));
+    const unsubAll = onSnapshot(qAll, (snap) => {
+        const allChars = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllCharacters(allChars);
+        if (sessaoAtiva && sessaoAtiva.participantes) {
+            const sessionChars = allChars.filter(c => sessaoAtiva.participantes.includes(c.name));
+            setPersonagensData(sessionChars);
         }
     });
+    return () => unsubAll();
+  }, [sessaoAtiva?.participantes]); 
 
-    return () => unsub();
-  }, [navigate]);
-
-  useEffect(() => {
-      if (selectedFicha) {
-          const updated = personagensDb.find(p => p.id === selectedFicha.id);
-          if (updated) setSelectedFicha(updated);
-      }
-  }, [personagensDb]);
-
-  // --- HANDLERS ---
-  const handleCreateMission = async (e) => {
-    e.preventDefault();
-    if (!currentUser) return;
-    try {
-      const msToAdd = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000 + 
-                      (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000 + 
-                      (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
-      await addDoc(collection(db, "missoes"), {
-        ...form, mestreNome: mestreIdentidade, mestreId: currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
-      });
-      setShowModal(false);
-      setForm({ nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
-    } catch (err) { alert("Erro ao forjar cartaz: " + err.message); }
-  };
-
-  const publicarResenha = async () => {
-    if (!tituloResenha || !resenha || !currentUser) return alert("Preencha título e conteúdo!");
-    try {
-      const expiraEm = new Date(); expiraEm.setDate(expiraEm.getDate() + 7); 
-      await addDoc(collection(db, "resenhas"), {
-        titulo: tituloResenha, conteudo: resenha, mestre: mestreIdentidade, mestreId: currentUser.uid, destinatarios, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
-      });
-      setShowResenhaModal(false); setResenha(""); setTituloResenha(""); setDestinatarios([]);
-    } catch (e) { alert("Erro ao publicar."); }
-  };
-
-  const handleRemoveCandidate = async (missaoId, candidate) => {
-      if(window.confirm(`Remover ${candidate.nome} da missão?`)) {
-          const missaoRef = doc(db, "missoes", missaoId);
-          await updateDoc(missaoRef, {
-              candidatos: arrayRemove(candidate)
-          });
-      }
-  };
-
-  const handleAddAsset = () => {
-      if (!tempLink) return;
-      setSessionForm(prev => ({
-          ...prev,
-          [tempType]: [...prev[tempType], tempLink]
-      }));
-      setTempLink(""); 
-  };
-
-  const handleRemoveAsset = (type, index) => {
-      setSessionForm(prev => ({
-          ...prev,
-          [type]: prev[type].filter((_, i) => i !== index)
-      }));
-  };
-
-  const criarSessao = async (e) => {
-      e.preventDefault();
-      if (!sessionForm.missaoId || !sessionForm.dataInicio || !currentUser) return alert("Selecione a missão e o horário!");
+  // Monster/Player Handlers
+  const handleSaveMonster = async () => {
       try {
-        const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
-        const inicio = new Date(sessionForm.dataInicio);
-        const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); 
-        await addDoc(collection(db, "sessoes"), {
-            missaoId: sessionForm.missaoId,
-            missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
-            mestreId: currentUser.uid,
-            dataInicio: sessionForm.dataInicio,
-            expiraEm: fim.toISOString(),
-            participantes: sessaoDestinatarios, 
-            mapas: sessionForm.mapas,
-            cenarios: sessionForm.cenarios,
-            monstros: sessionForm.monstros,
-            npcs: sessionForm.npcs,
-            jogadores: sessionForm.jogadores,
-            connected_players: [],
-            dm_online: false,
-            createdAt: serverTimestamp()
-        });
-        setShowSessionModal(false);
-        setSessionForm({ missaoId: '', dataInicio: '', mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
-        setSessaoDestinatarios([]);
-        alert("Sessão criada com sucesso!");
-      } catch (err) {
-          alert("Erro ao criar sessão: " + err.message);
-      }
+          await addDoc(collection(db, "bestiary"), { ...monsterForm, mestreId: auth.currentUser.uid, createdAt: new Date().toISOString() });
+          setCreatingMonsterStep('list');
+          setMonsterForm({ name: '', img: '', stars: 1, difficultyQ: false, hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10, xp: 0, drops: '', tips: '', description: '', visibleBars: false });
+      } catch (e) { alert("Erro: " + e.message); }
   };
 
-  const enterVTT = (sessao) => {
-      navigate('/mestre-vtt');
+  const handleDeployMonster = async (monster) => {
+      if(!sessaoAtiva) return;
+      const newToken = {
+          id: `enemy_${Date.now()}`,
+          type: 'enemy',
+          name: monster.name,
+          img: monster.img,
+          x: 0, y: 0, size: 1,
+          visible: true, 
+          visibleBars: monster.visibleBars,
+          stats: { hp: { current: monster.hpCurrent, max: monster.hpMax }, mp: { current: monster.mpCurrent, max: monster.mpMax } },
+          details: { ...monster } 
+      };
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: [...(sessaoAtiva.tokens||[]), newToken] });
+      setShowMonsterManager(false); 
   };
 
-  // --- TELA DE CARREGAMENTO (PADRONIZADA 2S) ---
+  const handleDeployPlayer = async (char) => {
+      if(!sessaoAtiva) return;
+      if(sessaoAtiva.tokens?.find(t => t.uid === char.uid)) return alert("Jogador já está no mapa!");
+      const newToken = {
+          id: `player_${char.uid}`, type: 'player', uid: char.uid, name: char.name,
+          img: char.character_sheet?.imgUrl || '', x: 0, y: 0, size: 1, visible: true, controlledBy: char.uid 
+      };
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: [...(sessaoAtiva.tokens||[]), newToken] });
+      setShowPlayerManager(false); 
+  };
+
+  // Combat Tracker Handlers
+  const handleRemoveToken = async (tokenId) => {
+      const updatedTokens = sessaoAtiva.tokens.filter(t => t.id !== tokenId);
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
+  };
+
+  const handleUpdateTokenInTracker = async (token, updates) => {
+      const updatedTokens = sessaoAtiva.tokens.map(t => t.id === token.id ? { ...t, ...updates } : t);
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
+  };
+
+  const handleUpdateStatsInTracker = async (token, statType, value) => {
+      if (token.type !== 'enemy') return; 
+      const updatedTokens = sessaoAtiva.tokens.map(t => {
+          if (t.id === token.id) {
+              return { ...t, stats: { ...t.stats, [statType]: { ...t.stats[statType], current: Number(value) } } };
+          }
+          return t;
+      });
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
+  };
+
+  const onDragStart = (e, index) => { e.dataTransfer.setData("dragIndex", index); };
+  const onDrop = async (e, dropIndex) => {
+      const dragIndex = e.dataTransfer.getData("dragIndex");
+      if (dragIndex === "") return;
+      const newTokens = [...sessaoAtiva.tokens];
+      const [draggedItem] = newTokens.splice(dragIndex, 1);
+      newTokens.splice(dropIndex, 0, draggedItem);
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: newTokens });
+  };
+
+  const handleTrackerMouseDown = (e) => {
+      setIsDraggingTracker(true);
+      setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
+  };
+  const handleWindowMouseMove = (e) => {
+      if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
+  };
+  const handleWindowMouseUp = () => { setIsDraggingTracker(false); };
+
+  // Token Edit Logic
+  const handleUpdateTokenStats = async () => {
+      if(!editingToken || !sessaoAtiva) return;
+      const updatedTokens = sessaoAtiva.tokens.map(t => {
+          if(t.id === editingToken.id) {
+              let newToken = { ...t };
+              if (editingToken.stats) {
+                  newToken.stats = {
+                      hp: { ...t.stats?.hp, current: editingToken.stats.hp.current },
+                      mp: { ...t.stats?.mp, current: editingToken.stats.mp.current }
+                  };
+              }
+              newToken.imgX = editingToken.imgX;
+              newToken.imgY = editingToken.imgY;
+              return newToken;
+          }
+          return t;
+      });
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
+      setEditingToken(null);
+  };
+
+  const adjustImageOffset = (axis, val) => {
+      if(!editingToken) return;
+      const currentVal = editingToken[axis] !== undefined ? editingToken[axis] : 50;
+      setEditingToken({ ...editingToken, [axis]: currentVal + val });
+  };
+
+  // --- LOADING SCREEN (PADRONIZADA) ---
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -231,16 +303,16 @@ export default function MestrePage() {
         background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', 
         color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
       }}>
-        <img src={chocoboGif} alt="Carregando..." style={{ width: '120px', marginBottom: '20px' }} />
+        <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
         <p style={{ 
-          fontSize: '18px', letterSpacing: '4px', textTransform: 'uppercase',
+          fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
           animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
         <style>{`
           @keyframes pulseText { 
-            0% { opacity: 0.4; transform: scale(0.98); } 
-            50% { opacity: 1; transform: scale(1.02); } 
-            100% { opacity: 0.4; transform: scale(0.98); } 
+            0% { opacity: 0.3; } 
+            50% { opacity: 1; } 
+            100% { opacity: 0.3; } 
           }
         `}</style>
       </div>
@@ -248,481 +320,432 @@ export default function MestrePage() {
   }
 
   return (
-    <div className="mestre-container">
-      <div className="mestre-bg-image-full" style={{backgroundImage: `url(${fundoMestre})`}}></div>
+    <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
+      <div className="mestre-bg-layer" style={{ backgroundImage: `url(${fundoMestre})` }} />
       
-      <div className="mestre-content">
-        <div className="top-bar-flex">
-            <h1 className="ff-title">HUB DO NARRADOR</h1>
-            
-            <div className="mestre-identity-box ff-card fade-in">
-                <label>ASSINATURA DO MESTRE:</label>
-                <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
-            </div>
-        </div>
-        
-        <div className="mestre-grid">
-          {/* COLUNA 1: MISSÕES */}
-          <div className="ff-card board-column">
-            <div className="card-header no-border">
-              <h3>QUADRO DE MISSÕES</h3>
-              <button className="ff-add-btn" onClick={() => setShowModal(true)}><span>+</span> ADICIONAR CARTAZ</button>
-            </div>
-            <div className="mission-scroll">
-              {missoes.map(m => {
-                const maxGroup = parseInt(m.grupo) || 0;
-                const currentGroup = m.candidatos ? m.candidatos.length : 0;
-                const fillPercent = maxGroup > 0 ? (currentGroup / maxGroup) * 100 : 0;
-                const isFull = currentGroup >= maxGroup && maxGroup > 0;
-
-                return (
-                    <div key={m.id} className={`mission-poster rank-${m.rank}`}>
-                    <div className="poster-rank-label-fixed">{m.rank}</div>
-                    <span className="mestre-tag">Narrador: {m.mestreNome}</span>
-                    <h4>{m.nome}</h4>
-                    <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
-                    
-                    <div className="vagas-container">
-                        <div className="vagas-labels">
-                            <span>JOGADORES:</span>
-                            <span style={{color: isFull ? '#f44' : '#0f0'}}>{currentGroup} / {maxGroup}</span>
-                        </div>
-                        <div className="vagas-track">
-                            <div className="vagas-fill" style={{width: `${fillPercent}%`, background: isFull ? '#f44' : '#00f2ff'}}></div>
-                        </div>
-                    </div>
-
-                    {m.candidatos && m.candidatos.length > 0 && (
-                        <div className="candidates-mini-box">
-                        <strong>Candidatos:</strong>
-                        {m.candidatos.map(c => (
-                            <div key={c.uid} className="cand-row-master">
-                                <span style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>
-                                    {c.isLeader && '👑'} {c.nome} ({c.classe})
-                                </span>
-                                <button className="btn-kick-x" title="Remover Jogador" onClick={() => handleRemoveCandidate(m.id, c)}>×</button>
-                            </div>
-                        ))}
-                        </div>
-                    )}
-
-                    <Timer expiry={m.expiraEm} />
-                    <div className="poster-actions">
-                        <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
-                        <button className="btn-cyan" onClick={() => setShowDetails(m)}>DETALHES</button>
-                        <button className="btn-red" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
-                    </div>
-                    </div>
-                );
+      {/* SIDEBAR */}
+      <div className="dm-players-sidebar">
+          <h3 className="sidebar-title">AVENTUREIROS</h3>
+          <div className="players-list-scroll">
+              {personagensData.map(char => {
+                  const isOnline = connectedPlayers.includes(char.uid); 
+                  const bgImage = char.character_sheet?.imgUrl; 
+                  return (
+                      <div key={char.id} className={`mini-player-card ${isOnline ? 'online' : 'offline'}`} onClick={() => setSelectedFicha(char)} title="Ficha">
+                          <div className="mini-avatar">
+                              {bgImage ? <div className="avatar-img" style={{backgroundImage: `url(${bgImage})`}}></div> : <div className="avatar-placeholder">{char.name.charAt(0)}</div>}
+                              <div className={`status-dot ${isOnline ? 'green' : 'gray'}`}></div>
+                          </div>
+                          <div className="mini-info"><span className="p-name">{char.name}</span><span className="p-lvl">LVL {char.character_sheet?.basic_info?.level || 1}</span></div>
+                      </div>
+                  );
               })}
-            </div>
           </div>
-
-          {/* COLUNA 2: RESENHAS */}
-          <div className="ff-card sanchez-card board-column">
-            <div className="sanchez-header-top no-border">
-              <h3>RESENHA DO SANCHES</h3>
-              <button className="ff-add-btn-gold-small" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
-            </div>
-            <div className="mission-scroll">
-              {resenhas.map(r => (
-                <div key={r.id} className="resenha-item-card">
-                  <h4>{r.titulo}</h4>
-                  <Timer expiry={r.expiraEm} />
-                  <div className="poster-actions">
-                    <button className="btn-cyan" onClick={() => setViewResenha(r)}>VISUALIZAR</button>
-                    <button className="btn-red" onClick={() => deleteDoc(doc(db, "resenhas", r.id))}>EXCLUIR</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* COLUNA 3: SESSÕES */}
-          <div className="ff-card board-column">
-            <div className="card-header no-border">
-              <h3>SESSÕES DE JOGO</h3>
-              <button className="ff-add-btn small-btn" onClick={() => setShowSessionModal(true)}>INICIAR NOVA SESSÃO</button>
-            </div>
-            <div className="mission-scroll">
-               {sessoes.length === 0 ? (
-                   <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
-               ) : (
-                   sessoes.map(s => (
-                       <div key={s.id} className="sessao-card">
-                           <div className="sessao-status">🔴 AO VIVO / AGENDADA</div>
-                           <h4 className="sessao-title">{s.missaoNome}</h4>
-                           <div className="sessao-info">
-                               <span>📅 {new Date(s.dataInicio).toLocaleString()}</span>
-                               <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
-                           </div>
-                           <div className="sessao-assets-count">
-                               🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
-                           </div>
-                           <div className="poster-actions" style={{marginTop: '15px'}}>
-                               <button className="btn-cyan" onClick={() => setViewMembers(s)}>👥 MEMBROS</button>
-                               <button className="btn-play-vtt" onClick={() => enterVTT(s)}>▶ ACESSAR VTT</button>
-                               <button className="btn-red" onClick={() => deleteDoc(doc(db, "sessoes", s.id))}>CANCELAR</button>
-                           </div>
-                       </div>
-                   ))
-               )}
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* BOTÃO FLUTUANTE DE FICHAS */}
-      <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
-          <img src={fichaIcon} alt="Fichas" />
-      </button>
+      <div className="session-status-top">
+          <div className="status-indicator active"></div>
+          <div className="status-info"><h2>SESSÃO ATIVA: {sessaoAtiva.missaoNome}</h2><p>Mestre Online • {connectedPlayers.length} Jogadores Conectados</p></div>
+      </div>
 
-      {/* BOTÕES FLUTUANTES DE SISTEMA */}
-      <Bazar isMestre={true} />
-      <Forja />
+      {/* --- COMPONENTS --- */}
+      <Tabletop 
+        sessaoData={sessaoAtiva} isMaster={true} showManager={showMapManager}
+        onCloseManager={() => setShowMapManager(false)} personagensData={personagensData}
+        onEditToken={(token) => setEditingToken(JSON.parse(JSON.stringify(token)))}
+      />
+      <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} />
+      <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showNPCManager} onCloseManager={() => setShowNPCManager(false)} />
+      {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
+      {showDiceSelector && <DiceSelector sessaoId={sessaoAtiva.id} playerName="MESTRE" onClose={() => setShowDiceSelector(false)} />}
 
-      {/* MODAL DE LISTA DE FICHAS */}
-      {showFichasList && (
-          <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
-              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()}>
-                  <h3 className="modal-title-ff">PERSONAGENS REGISTRADOS</h3>
-                  <div className="destinatarios-grid-fixed">
-                      {personagensDb.map(p => (
-                          <div key={p.id} className="ficha-list-item">
-                              <div className="ficha-row-name">
-                                  <strong>{p.name}</strong> 
-                                  <small>{p.race} // {p.class}</small>
+      {/* --- COMBAT TRACKER --- */}
+      {showCombatTracker && (
+          <div 
+            className="combat-tracker-panel fade-in"
+            style={{ top: trackerPos.y, left: trackerPos.x, zIndex: 1000 }}
+          >
+              <div 
+                className="tracker-header" 
+                onMouseDown={handleTrackerMouseDown}
+                style={{cursor: 'grab'}}
+              >
+                  <h3 className="tracker-title">COMBATE</h3>
+              </div>
+              <div className="tracker-list">
+                  {sessaoAtiva.tokens?.map((token, index) => {
+                      let hpVal = 0, hpMax = 0, mpVal = 0, mpMax = 0, imgUrl = token.img;
+                      
+                      if(token.type === 'player') {
+                          const p = personagensData.find(pd => pd.uid === token.uid);
+                          if(p) {
+                              hpVal = p.character_sheet?.status?.hp?.current || 0;
+                              hpMax = p.character_sheet?.status?.hp?.max || 0;
+                              mpVal = p.character_sheet?.status?.mp?.current || 0;
+                              mpMax = p.character_sheet?.status?.mp?.max || 0;
+                              if(p.character_sheet?.imgUrl) imgUrl = p.character_sheet.imgUrl;
+                          }
+                      } else {
+                          hpVal = token.stats.hp.current; hpMax = token.stats.hp.max;
+                          mpVal = token.stats.mp.current; mpMax = token.stats.mp.max;
+                      }
+
+                      const isVisible = token.visible !== false;
+
+                      return (
+                          <div 
+                            key={token.id} 
+                            className="tracker-item"
+                            draggable
+                            onDragStart={(e) => onDragStart(e, index)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => onDrop(e, index)}
+                          >
+                              <div className="t-col-img">
+                                  <div className="t-index">{index + 1}</div>
+                                  <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`, opacity: isVisible ? 1 : 0.5}}></div>
                               </div>
-                              <button className="btn-cyan" onClick={() => { setSelectedFicha(p); setShowFichasList(false); }}>ABRIR FICHA ➔</button>
+                              
+                              <div className="t-col-info">
+                                  <div className="t-name">{token.name}</div>
+                                  <div className="t-stats-row">
+                                      <div className="t-stat hp">
+                                          <label>HP</label>
+                                          {token.type === 'enemy' ? (
+                                              <input type="number" value={hpVal} onChange={(e) => handleUpdateStatsInTracker(token, 'hp', e.target.value)} />
+                                          ) : <span>{hpVal}</span>}
+                                          <small>/{hpMax}</small>
+                                      </div>
+                                      <div className="t-stat mp">
+                                          <label>MP</label>
+                                          {token.type === 'enemy' ? (
+                                              <input type="number" value={mpVal} onChange={(e) => handleUpdateStatsInTracker(token, 'mp', e.target.value)} />
+                                          ) : <span>{mpVal}</span>}
+                                          <small>/{mpMax}</small>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div className="t-col-actions">
+                                  <div className="img-adj-grid">
+                                      <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)-10 })}>▲</button>
+                                      <div style={{display:'flex'}}>
+                                        <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)-10 })}>◄</button>
+                                        <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)+10 })}>►</button>
+                                      </div>
+                                      <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
+                                  </div>
+                                  <div className="act-btns">
+                                      <button 
+                                        className="btn-icon-sm" 
+                                        title={isVisible ? "Ocultar" : "Mostrar"} 
+                                        onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })}
+                                        style={{color: isVisible ? '#ffcc00' : '#666'}}
+                                      >
+                                          {isVisible ? '👁️' : '🙈'}
+                                      </button>
+
+                                      {token.type === 'enemy' && (
+                                          <button className="btn-icon-sm" title="Detalhes" onClick={() => setViewMonsterDetails({ ...token.details, img: token.img })}>📜</button>
+                                      )}
+                                      
+                                      <button className="btn-icon-sm delete" title="Remover" onClick={() => handleRemoveToken(token.id)}>✕</button>
+                                  </div>
+                              </div>
+                          </div>
+                      );
+                  })}
+                  {(!sessaoAtiva.tokens || sessaoAtiva.tokens.length === 0) && <div className="empty-tracker">Mesa Vazia</div>}
+              </div>
+          </div>
+      )}
+
+      {viewMonsterDetails && (
+          <div className="ff-modal-overlay-flex" onClick={() => setViewMonsterDetails(null)}>
+              <div className="monster-detail-card" onClick={e => e.stopPropagation()}>
+                  <div className="md-header">
+                      <div className="md-title-row">
+                          <h2>{viewMonsterDetails.name}</h2>
+                          <div className="md-stars">
+                              {[...Array(viewMonsterDetails.stars || 1)].map((_,i) => <span key={i}>★</span>)}
+                              {viewMonsterDetails.difficultyQ && <span className="md-boss-mark">?</span>}
+                          </div>
+                      </div>
+                      <div className="md-sub">XP: {viewMonsterDetails.xp}</div>
+                  </div>
+                  <div className="md-body">
+                      <div className="md-img-col">
+                          <div className="md-portrait" style={{backgroundImage: `url(${viewMonsterDetails.img})`}}></div>
+                      </div>
+                      <div className="md-info-col custom-scrollbar">
+                          <div className="md-block">
+                              <label>DESCRIÇÃO</label>
+                              <p>{viewMonsterDetails.description || "Sem descrição."}</p>
+                          </div>
+                          {viewMonsterDetails.drops && (
+                              <div className="md-block">
+                                  <label>DROPS & ITENS</label>
+                                  <p>{viewMonsterDetails.drops}</p>
+                              </div>
+                          )}
+                          {viewMonsterDetails.tips && (
+                              <div className="md-block tips">
+                                  <label>DICAS DO SANCHEZ (GM)</label>
+                                  <p>{viewMonsterDetails.tips}</p>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+                  <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
+              </div>
+          </div>
+      )}
+
+      {/* DOCK FERRAMENTAS - Z-INDEX 2000 */}
+      <div className="dm-tools-dock">
+          <div className="tool-group"><Bazar isMestre={true} vttDock={true} /><div className="tool-label">BAZAR</div></div>
+          <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Rastreador de Combate"><IconCombat /></button><div className="tool-label">COMBATE</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowDiceSelector(true)}><IconDice /></button><div className="tool-label">DADOS</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowSceneryManager(true)}><IconScenery /></button><div className="tool-label">CENÁRIOS</div></div>
+          
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMonsterManager(true)}><IconMonsters /></button><div className="tool-label">MONSTROS</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowNPCManager(true)}><IconNPC /></button><div className="tool-label">NPCS</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowPlayerManager(true)}><IconPlayers /></button><div className="tool-label">JOGADORES</div></div>
+      </div>
+
+      {selectedFicha && <Ficha characterData={selectedFicha} isMaster={true} onClose={() => setSelectedFicha(null)} />}
+
+      {/* --- MODAL DE BESTIÁRIO (CSS CORRIGIDO) --- */}
+      {showMonsterManager && (
+          <div className="modal-overlay-custom" onClick={() => setShowMonsterManager(false)}>
+              <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
+                  <div className="modal-header-c"><h3>BESTIÁRIO</h3><button className="close-c" onClick={() => setShowMonsterManager(false)}>✕</button></div>
+                  {creatingMonsterStep === 'list' ? (
+                      <div className="monster-list-view">
+                          <button className="btn-create-monster" onClick={() => setCreatingMonsterStep('create')}>+ CRIAR NOVA AMEAÇA</button>
+                          <div className="bestiary-grid">
+                              {bestiary.map(mon => (
+                                  <div key={mon.id} className="monster-card-db">
+                                      <div className="m-thumb" style={{backgroundImage: `url(${mon.img})`}}></div>
+                                      <div className="m-info"><strong>{mon.name}</strong><small>HP: {mon.hpMax}</small></div>
+                                      <div className="m-actions"><button className="btn-deploy" onClick={() => handleDeployMonster(mon)}>INSERIR</button></div>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  ) : (
+                      <div className="monster-create-view">
+                          <div className="create-row">
+                              <div className="img-upload-box"><div className="preview-img" style={{backgroundImage: `url(${monsterForm.img})`}}></div><input placeholder="Link Imagem..." value={monsterForm.img} onChange={e => setMonsterForm({...monsterForm, img: e.target.value})} /></div>
+                              <div className="details-inputs">
+                                  <input className="input-title" placeholder="Nome" value={monsterForm.name} onChange={e => setMonsterForm({...monsterForm, name: e.target.value})} />
+                                  <div className="stats-row-c">
+                                      <div><label>HP Max</label><input type="number" value={monsterForm.hpMax} onChange={e => setMonsterForm({...monsterForm, hpMax: Number(e.target.value), hpCurrent: Number(e.target.value)})} /></div>
+                                      <div><label>MP Max</label><input type="number" value={monsterForm.mpMax} onChange={e => setMonsterForm({...monsterForm, mpMax: Number(e.target.value), mpCurrent: Number(e.target.value)})} /></div>
+                                  </div>
+                                  <div className="toggle-row"><input type="checkbox" checked={monsterForm.visibleBars} onChange={e => setMonsterForm({...monsterForm, visibleBars: e.target.checked})} /><label>Barras visíveis?</label></div>
+                              </div>
+                          </div>
+                          <div className="text-areas-row" style={{flexDirection:'column', height:'auto'}}>
+                              <textarea style={{height:'60px'}} placeholder="Descrição (Lore)..." value={monsterForm.description} onChange={e => setMonsterForm({...monsterForm, description: e.target.value})} />
+                              <textarea style={{height:'60px'}} placeholder="Drops (Use Enter para tópicos)" value={monsterForm.drops} onChange={(e) => setMonsterForm({...monsterForm, drops: e.target.value})} />
+                              <textarea style={{height:'60px'}} placeholder="Dicas do Sanchez (Secreto)" value={monsterForm.tips} onChange={e => setMonsterForm({...monsterForm, tips: e.target.value})} />
+                          </div>
+                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {/* --- MODAL INSERIR JOGADOR (CSS CORRIGIDO) --- */}
+      {showPlayerManager && (
+          <div className="modal-overlay-custom" onClick={() => setShowPlayerManager(false)}>
+              <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+                  <div className="modal-header-c"><h3>INSERIR JOGADOR</h3><button className="close-c" onClick={() => setShowPlayerManager(false)}>✕</button></div>
+                  <div className="player-select-grid">
+                      {allCharacters.map(char => (
+                          <div key={char.id} className="char-select-card" onClick={() => handleDeployPlayer(char)}>
+                              <div className="c-avatar" style={{backgroundImage: `url(${char.character_sheet?.imgUrl})`}}></div><span>{char.name}</span>
                           </div>
                       ))}
                   </div>
-                  <button className="btn-cancelar-main" style={{marginTop:'20px'}} onClick={() => setShowFichasList(false)}>FECHAR</button>
               </div>
           </div>
       )}
 
-      {/* MODAL DA FICHA EM MODO MESTRE */}
-      {selectedFicha && (
-          <Ficha 
-            characterData={selectedFicha} 
-            isMaster={true} 
-            onClose={() => setSelectedFicha(null)} 
-          />
-      )}
-
-      {/* --- OUTROS MODAIS --- */}
-      {showModal && (
-        <div className="ff-modal-overlay-fixed">
-          <div className="ff-modal-scrollable ff-card">
-            <h3 className="modal-title-ff">NOVA MISSÃO</h3>
-            <form onSubmit={handleCreateMission}>
-              <div className="modal-input-group"><label>NOME DA MISSÃO</label><input placeholder="Título..." value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} required /></div>
-              <div className="modal-input-group"><label>LOCAL</label><input placeholder="Onde ocorre..." value={form.local} onChange={e=>setForm({...form, local: e.target.value})} /></div>
-              <div className="modal-input-group"><label>CONTRATANTE</label><input placeholder="Quem paga..." value={form.contratante} onChange={e=>setForm({...form, contratante: e.target.value})} /></div>
-              <div className="modal-input-group"><label>DESCRIÇÃO DA MISSÃO</label><textarea className="tall-area-dark" placeholder="Detalhes da história e contexto..." value={form.descricaoMissao} onChange={e=>setForm({...form, descricaoMissao: e.target.value})} /></div>
-              <div className="modal-input-group"><label>OBJETIVOS DA MISSÃO</label><textarea className="tall-area-dark" placeholder="O que deve ser feito passo a passo..." value={form.objetivosMissao} onChange={e=>setForm({...form, objetivosMissao: e.target.value})} /></div>
-              <div className="modal-input-group"><label>REQUISITOS DA MISSÃO</label><textarea className="tall-area-dark" placeholder="O que é necessário para aceitar..." value={form.requisitos} onChange={e=>setForm({...form, requisitos: e.target.value})} /></div>
-              <div className="row-double-ff">
-                <div className="field-group"><label>GRUPO MÁXIMO</label><input placeholder="Ex: 4" value={form.grupo} onChange={e=>setForm({...form, grupo: e.target.value})} /></div>
-                <div className="field-group"><label>RANK</label><select value={form.rank} onChange={e=>setForm({...form, rank: e.target.value})}>{['E','D','C','B','A','S','SS','SC'].map(r => <option key={r} value={r}>RANK {r}</option>)}</select></div>
-              </div>
-              <div className="modal-input-group"><label>RECOMPENSAS EXTRAS</label><textarea className="tall-area-dark" placeholder="Itens, especiarias..." value={form.recompensa} onChange={e=>setForm({...form, recompensa: e.target.value})} /></div>
-              <div className="row-double-ff">
-                <div className="field-group"><label>GIL</label><input type="text" className="gil-input" placeholder="Ex: 5000" value={form.gilRecompensa} onChange={e => setForm({...form, gilRecompensa: e.target.value.replace(/\D/g, '')})} /></div>
-                <div className="field-group"><label>DURAÇÃO</label><input placeholder="Ex: 1d 10h" value={form.duracao} onChange={e=>setForm({...form, duracao: e.target.value})} required /></div>
-              </div>
-              <div className="modal-input-group"><label>IMAGEM</label><input placeholder="Link Imgur..." value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} /></div>
-              <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">FORJAR MISSÃO</button><button type="button" className="btn-cancelar-main" onClick={() => setShowModal(false)}>FECHAR</button></div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showResenhaModal && (
-        <div className="ff-modal-overlay-fixed">
-          <div className="ff-modal-scrollable ff-card">
-            <h3 className="modal-title-ff">ESCREVER CRÔNICA</h3>
-            <div className="modal-input-group"><label>TÍTULO</label><input className="ff-modal-input-dark" value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} /></div>
-            <div className="modal-input-group"><label>CORPO</label><textarea className="tall-area-ff-dark" value={resenha} onChange={(e) => setResenha(e.target.value)} /></div>
-            <div className="player-selector-box-fixed"><label>DESTINATÁRIOS:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={destinatarios.includes(p.name)} onChange={() => destinatarios.includes(p.name) ? setDestinatarios(destinatarios.filter(x=>x!==p.name)) : setDestinatarios([...destinatarios, p.name])} /> {p.name}</label>))}</div></div>
-            <div className="btn-group-ff"><button className="btn-forjar-main" onClick={publicarResenha}>PUBLICAR</button><button className="btn-cancelar-main" onClick={() => setShowResenhaModal(false)}>FECHAR</button></div>
-          </div>
-        </div>
-      )}
-
-      {showSessionModal && (
-          <div className="ff-modal-overlay-fixed">
-              <div className="ff-modal-scrollable ff-card">
-                  <h3 className="modal-title-ff">CRIAR NOVA SESSÃO</h3>
-                  <form onSubmit={criarSessao}>
-                      <div className="modal-input-group"><label>SELECIONAR MISSÃO</label><select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required><option value="">-- Escolha --</option>{missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}</select></div>
-                      <div className="modal-input-group"><label>DATA E HORÁRIO</label><input type="datetime-local" className="ff-input-dark" value={sessionForm.dataInicio} onChange={e => setSessionForm({...sessionForm, dataInicio: e.target.value})} required /></div>
-                      <div className="player-selector-box-fixed"><label>JOGADORES:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={sessaoDestinatarios.includes(p.name)} onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} /> {p.name} ({p.class})</label>))}</div></div>
-                      
-                      <div className="upload-section-box">
-                          <h4 className="upload-section-title">IMPORTAR IMAGENS</h4>
-                          <div className="link-import-row">
-                              <input 
-                                className="ff-input-dark" 
-                                placeholder="Link da imagem..."
-                                value={tempLink} 
-                                onChange={e => setTempLink(e.target.value)} 
-                              />
-                              <select 
-                                className="ff-select-dark small-select" 
-                                value={tempType} 
-                                onChange={e => setTempType(e.target.value)}
-                              >
-                                <option value="mapas">Tabletop</option>
-                                <option value="cenarios">Cenário</option>
-                                <option value="npcs">NPCs</option>
-                              </select>
-                              <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
-                          </div>
-                          <div className="assets-lists">
-                              {sessionForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('mapas', i)}>×</button></div>))}
-                              {sessionForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenarios', i)}>×</button></div>))}
-                              {sessionForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('npcs', i)}>×</button></div>))}
-                          </div>
+      {/* --- MODAL DE EDIÇÃO DE TOKEN (REFINADO) --- */}
+      {editingToken && (
+          <div className="modal-overlay-custom" onClick={() => setEditingToken(null)}>
+              <div className="modal-box-custom refined-edit" onClick={e => e.stopPropagation()}>
+                  <h3 className="modal-edit-title">EDITAR: {editingToken.name}</h3>
+                  <div className="refined-stats-container">
+                      <div className="refined-stat-row">
+                          <span className="stat-label hp">HP</span>
+                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, hp: {...editingToken.stats.hp, current: editingToken.stats.hp.current - 1}}})}>-</button>
+                          <span className="stat-value">{editingToken.stats.hp.current} / {editingToken.stats.hp.max}</span>
+                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, hp: {...editingToken.stats.hp, current: editingToken.stats.hp.current + 1}}})}>+</button>
                       </div>
-                      <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">AGENDAR</button><button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button></div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      {viewMembers && (
-          <div className="ff-modal-overlay-fixed" onClick={() => setViewMembers(null)}>
-              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{height: 'auto', maxHeight: '500px'}}>
-                  <h3 className="modal-title-ff">MEMBROS ALOCADOS</h3>
-                  <div className="destinatarios-grid-fixed">{viewMembers.participantes?.map((nome, idx) => (<div key={idx} className="chip-label-ff" style={{cursor: 'default', color: '#fff', borderColor: '#00f2ff'}}>👤 {nome}</div>))}</div>
-                  <button className="btn-cancelar-main" style={{marginTop: '20px', width: '100%'}} onClick={() => setViewMembers(null)}>FECHAR</button>
-              </div>
-          </div>
-      )}
-
-      {showDetails && (
-        <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
-          <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
-            <div className="detail-header-modern"><div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div><div className="detail-title-col"><h2>{showDetails.nome}</h2><span className="detail-narrator">Narrador: {showDetails.mestreNome}</span></div></div>
-            <div className="detail-body-grid">
-              <div className="detail-info-row"><div className="info-item"><label>🌍 LOCAL</label><span>{showDetails.local || "Desconhecido"}</span></div><div className="info-item"><label>👤 CONTRATANTE</label><span>{showDetails.contratante || "Anônimo"}</span></div></div>
-              <div className="detail-section">
-                <label className="section-label">VAGAS</label>
-                <div style={{background: '#111', padding: '10px', borderRadius: '4px'}}>
-                  <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#aaa', marginBottom:'5px'}}>
-                    <span>STATUS DO GRUPO</span>
-                    <span>{showDetails.candidatos ? showDetails.candidatos.length : 0} / {showDetails.grupo || '?'}</span>
+                      <div className="refined-stat-row">
+                          <span className="stat-label mp">MP</span>
+                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, mp: {...editingToken.stats.mp, current: editingToken.stats.mp.current - 1}}})}>-</button>
+                          <span className="stat-value">{editingToken.stats.mp.current} / {editingToken.stats.mp.max}</span>
+                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, mp: {...editingToken.stats.mp, current: editingToken.stats.mp.current + 1}}})}>+</button>
+                      </div>
                   </div>
-                  <div style={{width: '100%', height: '6px', background: '#333', borderRadius:'3px'}}>
-                    <div style={{ width: `${Math.min(((showDetails.candidatos?.length || 0) / (parseInt(showDetails.grupo) || 1)) * 100, 100)}%`, height:'100%', background: (showDetails.candidatos?.length >= parseInt(showDetails.grupo)) ? '#f44' : '#00f2ff' }}></div>
+                  <div className="refined-image-control">
+                      <label>AJUSTAR ROSTO (POSIÇÃO)</label>
+                      <div className="d-pad-grid">
+                          <div></div><button onClick={() => adjustImageOffset('imgY', -10)}>▲</button><div></div>
+                          <button onClick={() => adjustImageOffset('imgX', -10)}>◄</button><div className="center-dot"></div><button onClick={() => adjustImageOffset('imgX', 10)}>►</button>
+                          <div></div><button onClick={() => adjustImageOffset('imgY', 10)}>▼</button><div></div>
+                      </div>
                   </div>
-                </div>
+                  <button className="btn-save-refined" onClick={handleUpdateTokenStats}>OK (SALVAR)</button>
               </div>
-              <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO</label><p className="section-text">{showDetails.descricaoMissao}</p></div>
-              <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS</label><p className="section-text">{showDetails.objetivosMissao}</p></div>
-              <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showDetails.requisitos}</p></div>
-              <div className="detail-section reward-section"><label className="section-label">💎 RECOMPENSAS</label><div className="reward-content-box"><div className="gil-display-row"><span className="gil-icon">💰</span> <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span></div>{showDetails.recompensa && (<div className="extra-rewards-list">{showDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div></div>
-            </div>
-            <button className="ff-final-close-btn" onClick={() => setShowDetails(null)}>FECHAR RELATÓRIO</button>
           </div>
-        </div>
-      )}
-
-      {viewImage && (
-        <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
-          <div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div>
-        </div>
-      )}
-
-      {viewResenha && (
-        <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
-          <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
-            <div className="sanchez-oval-view-no-border" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-            <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
-            <p className="papiro-mestre-sub">Narrador: {viewResenha.mestre}</p>
-            <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo }}></div>
-            <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
-          </div>
-        </div>
       )}
 
       <style>{`
-        /* --- ESTILOS PRINCIPAIS MESTRE --- */
-        .mestre-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #020617; font-family: 'Cinzel', serif; color: #e2e8f0; }
-        .mestre-bg-image-full { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.3; z-index: 0; animation: slowPan 60s infinite alternate; }
-        @keyframes slowPan { from { transform: scale(1.0); } to { transform: scale(1.1); } }
-        
-        .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
-        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .ff-title { font-size: 2rem; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); letter-spacing: 4px; margin: 0; }
-        .mestre-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); border: 1px solid #fbbf24; border-radius: 4px; }
-        .mestre-identity-box label { font-size: 0.8rem; color: #fbbf24; font-weight: bold; }
-        .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #555; color: #fff; font-family: 'Cinzel', serif; text-align: center; width: 150px; }
-        
-        .mestre-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
-        .board-column { display: flex; flex-direction: column; height: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; overflow: hidden; backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .card-header { padding: 15px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
-        .card-header h3 { margin: 0; color: #e2e8f0; font-size: 1rem; letter-spacing: 2px; }
-        .no-border { border-bottom: none !important; }
-        
-        .mission-scroll { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; scrollbar-width: thin; scrollbar-color: #fbbf24 #0f172a; }
-        .mission-scroll::-webkit-scrollbar { width: 6px; }
-        .mission-scroll::-webkit-scrollbar-thumb { background: #fbbf24; border-radius: 3px; }
-        
-        /* CARD MISSÃO */
-        .mission-poster { background: #1e293b; border: 1px solid #334155; padding: 15px; border-radius: 4px; position: relative; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .mission-poster:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-color: #fbbf24; }
-        .mission-poster h4 { margin: 25px 0 5px 0; color: #fbbf24; font-size: 1.1rem; text-transform: uppercase; }
-        .poster-rank-label-fixed { position: absolute; top: 10px; right: 10px; font-weight: 900; font-size: 1.5rem; opacity: 0.3; color: #fff; }
-        .mestre-tag { font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 5px; }
-        .gil-recompensa { font-size: 0.9rem; color: #fcd34d; font-weight: bold; margin-bottom: 10px; }
-        
-        .vagas-container { background: #0f172a; padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
-        .vagas-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #cbd5e1; margin-bottom: 4px; }
-        .vagas-track { height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
-        .vagas-fill { height: 100%; transition: width 0.3s ease; }
-        
-        .candidates-mini-box { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-bottom: 10px; font-size: 0.75rem; }
-        .cand-row-master { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-bottom: 2px; border-bottom: 1px dashed #334155; }
-        .btn-kick-x { background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 14px; }
-        .btn-kick-x:hover { color: #f87171; }
-        
-        .mission-timer { display: block; text-align: center; font-size: 0.8rem; color: #94a3b8; margin: 10px 0; font-weight: bold; }
-        
-        .poster-actions { display: flex; gap: 5px; justify-content: space-between; }
-        .btn-cyan { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.2s; font-weight: bold; }
-        .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); }
-        .btn-red { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; transition: 0.2s; font-weight: bold; }
-        .btn-red:hover { background: rgba(239, 68, 68, 0.1); }
-        
-        /* SANCHES */
-        .sanchez-card { border-color: #00f2ff; }
-        .sanchez-header-top { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f2ff; background: rgba(0, 242, 255, 0.05); }
-        .sanchez-header-top h3 { color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); }
-        .resenha-item-card { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 4px; border-left: 3px solid #00f2ff; }
-        .resenha-item-card h4 { margin: 0 0 10px 0; color: #e2e8f0; font-size: 1rem; }
-        
-        /* SESSÕES */
-        .sessao-card { background: #1e293b; border: 1px solid #fbbf24; padding: 15px; border-radius: 4px; position: relative; }
-        .sessao-status { position: absolute; top: -10px; left: 10px; background: #fbbf24; color: #000; font-size: 0.6rem; font-weight: bold; padding: 2px 6px; border-radius: 2px; }
-        .sessao-title { margin: 10px 0 5px 0; color: #fff; font-size: 1.1rem; }
-        .sessao-info { font-size: 0.8rem; color: #94a3b8; display: flex; flex-direction: column; gap: 2px; }
-        .sessao-assets-count { font-size: 0.75rem; color: #cbd5e1; margin-top: 5px; font-style: italic; }
-        .btn-play-vtt { background: #fbbf24; color: #000; border: none; padding: 8px; font-weight: bold; cursor: pointer; flex: 2; transition: 0.2s; }
-        .btn-play-vtt:hover { background: #f59e0b; box-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
-        .empty-instancia { text-align: center; color: #475569; padding: 20px; font-style: italic; border: 2px dashed #334155; border-radius: 8px; }
+        .mestre-vtt-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #000; font-family: 'Cinzel', serif; color: #fff; }
+        .mestre-bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.4; z-index: 0; }
+        .dm-players-sidebar { position: absolute; top: 20px; left: 20px; width: 200px; background: rgba(0, 10, 20, 0.95); border: 2px solid #ffcc00; border-radius: 8px; padding: 10px; z-index: 50; max-height: 80vh; display: flex; flex-direction: column; }
+        .sidebar-title { color: #ffcc00; font-size: 12px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; text-align: center; }
+        .players-list-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .mini-player-card { display: flex; align-items: center; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 4px; cursor: pointer; }
+        .mini-player-card.online { border-left: 3px solid #00f2ff; }
+        .mini-avatar { position: relative; margin-right: 8px; }
+        .avatar-img, .avatar-placeholder { width: 30px; height: 30px; border-radius: 50%; background-size: cover; border: 1px solid #fff; }
+        .avatar-placeholder { background: #222; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; position: absolute; bottom: 0; right: 0; border: 1px solid #000; }
+        .status-dot.green { background: #00f2ff; } .status-dot.gray { background: #666; }
+        .p-name { font-size: 11px; font-weight: bold; display: block; }
+        .p-lvl { font-size: 9px; color: #ffcc00; }
+
+        .session-status-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; padding: 5px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 40; }
+        .status-indicator { width: 10px; height: 10px; background: #00f2ff; border-radius: 50%; box-shadow: 0 0 10px #00f2ff; animation: pulse 2s infinite; }
+        .status-info h2 { margin: 0; font-size: 14px; color: #fff; }
+        .status-info p { margin: 0; font-size: 10px; color: #00f2ff; }
+
+        /* COMBAT TRACKER */
+        .combat-tracker-panel { position: absolute; width: 320px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
+        .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
+        .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
+        .tracker-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
+        .tracker-item:hover { border-color: #ffcc00; }
+        .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
+        .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
+        .t-img { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #777; box-shadow: 0 0 5px #000; }
+        .t-col-info { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+        .t-name { font-size: 13px; font-weight: bold; color: #eec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .t-stats-row { display: flex; gap: 5px; }
+        .t-stat { display: flex; align-items: center; font-size: 11px; background: #080808; padding: 2px 5px; border-radius: 3px; border: 1px solid #333; }
+        .t-stat label { margin-right: 4px; font-weight: bold; font-size: 9px; }
+        .t-stat.hp label { color: #f44; } .t-stat.mp label { color: #00f2ff; }
+        .t-stat input { width: 28px; background: transparent; border: none; color: #fff; text-align: center; padding: 0; font-size: 11px; font-weight: bold; }
+        .t-stat span { color: #fff; font-weight: bold; }
+        .t-stat small { color: #555; margin-left: 2px; font-size: 9px; }
+        .t-col-actions { display: flex; gap: 6px; align-items: center; }
+        .img-adj-grid { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+        .img-adj-grid button { width: 14px; height: 12px; font-size: 7px; padding: 0; line-height: 1; background: #222; border: 1px solid #555; color: #aaa; cursor: pointer; }
+        .img-adj-grid button:hover { background: #ffcc00; color: #000; }
+        .act-btns { display: flex; flex-direction: column; gap: 3px; }
+        .btn-icon-sm { background: #222; border: 1px solid #555; color: #ccc; width: 22px; height: 22px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 3px; }
+        .btn-icon-sm:hover { border-color: #ffcc00; color: #fff; }
+        .btn-icon-sm.delete:hover { background: #300; border-color: #f44; color: #f44; }
+        .empty-tracker { text-align: center; padding: 30px; color: #666; font-style: italic; font-size: 12px; font-family: 'serif'; }
+
+        /* MONSTER DETAIL */
+        .monster-detail-card { width: 500px; max-width: 95vw; background: #0d0d10 url('https://www.transparenttextures.com/patterns/dark-matter.png'); border: 2px solid #b8860b; box-shadow: 0 0 50px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+        .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; }
+        .md-title-row { display: flex; justify-content: space-between; align-items: center; }
+        .md-title-row h2 { margin: 0; font-family: 'Cinzel', serif; color: #ffcc00; font-size: 20px; letter-spacing: 2px; }
+        .md-stars { color: #ffd700; font-size: 14px; text-shadow: 0 0 5px #ffd700; }
+        .md-boss-mark { color: #f44; font-weight: bold; margin-left: 5px; font-size: 16px; }
+        .md-sub { font-size: 12px; color: #888; margin-top: 5px; font-style: italic; }
+        .md-body { display: flex; padding: 20px; gap: 20px; min-height: 250px; }
+        .md-img-col { width: 120px; flex-shrink: 0; }
+        .md-portrait { width: 120px; height: 120px; border: 2px solid #444; border-radius: 4px; background-size: cover; background-position: center; box-shadow: 0 0 15px #000; }
+        .md-info-col { flex: 1; overflow-y: auto; max-height: 400px; padding-right: 5px; }
+        .md-block { margin-bottom: 15px; }
+        .md-block label { display: block; color: #b8860b; font-size: 10px; font-weight: bold; border-bottom: 1px solid #333; margin-bottom: 5px; }
+        .md-block p { margin: 0; font-size: 13px; color: #ccc; line-height: 1.4; white-space: pre-wrap; }
+        .md-block.tips p { color: #00f2ff; font-style: italic; }
+        .md-close-btn { width: 100%; padding: 15px; background: #111; color: #fff; border: none; border-top: 1px solid #b8860b; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .md-close-btn:hover { background: #b8860b; color: #000; }
+
+        /* DOCK COM Z-INDEX ALTO (2000) */
+        .dm-tools-dock { position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 2000; align-items: flex-end; }
+        .tool-group { display: flex; align-items: center; gap: 10px; flex-direction: row-reverse; }
+        .tool-label { background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #ffcc00; opacity: 0; transition: 0.2s; pointer-events: none; transform: translateX(10px); }
+        .tool-group:hover .tool-label { opacity: 1; transform: translateX(0); }
+        .tool-btn-placeholder { width: 50px; height: 50px; border-radius: 50%; background: #111; border: 2px solid #555; color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; box-shadow: 0 0 10px #000; pointer-events: auto; }
+        .tool-btn-placeholder:hover { border-color: #ffcc00; color: #ffcc00; transform: scale(1.1); }
 
         /* MODAIS GERAIS */
-        .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .ff-modal-scrollable { background: #0f172a; border: 1px solid #fbbf24; width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto; padding: 25px; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
-        .modal-title-ff { color: #fbbf24; text-align: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; letter-spacing: 2px; font-size: 1.5rem; }
-        .modal-input-group { margin-bottom: 15px; }
-        .modal-input-group label { display: block; color: #94a3b8; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; }
-        .modal-input-group input, .modal-input-group textarea, .modal-input-group select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 10px; font-family: 'Lato', sans-serif; border-radius: 4px; outline: none; }
-        .modal-input-group input:focus, .modal-input-group textarea:focus { border-color: #fbbf24; }
-        .tall-area-dark { min-height: 100px; resize: vertical; }
-        .row-double-ff { display: flex; gap: 15px; margin-bottom: 15px; }
-        .field-group { flex: 1; }
-        .field-group input, .field-group select { width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 4px; }
+        .modal-overlay-custom { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .modal-box-custom { background: #080808; border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; width: 500px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+        .modal-box-custom.wide { width: 800px; }
+        .modal-header-c { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; align-items: center; }
+        .modal-header-c h3 { margin: 0; color: #ffcc00; }
+        .close-c { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
         
-        .btn-group-ff { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-forjar-main { flex: 1; background: #fbbf24; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; letter-spacing: 1px; }
-        .btn-forjar-main:hover { background: #f59e0b; }
-        .btn-cancelar-main { flex: 1; background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; }
-        .btn-cancelar-main:hover { border-color: #fff; color: #fff; }
-
-        .ff-add-btn { background: transparent; border: 1px dashed #fbbf24; color: #fbbf24; padding: 5px 15px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: 0.2s; }
-        .ff-add-btn:hover { background: rgba(251, 191, 36, 0.1); }
-        .ff-add-btn-gold-small { background: transparent; border: 1px dashed #00f2ff; color: #00f2ff; padding: 5px 10px; cursor: pointer; font-size: 0.7rem; font-weight: bold; }
-        .ff-add-btn-gold-small:hover { background: rgba(0, 242, 255, 0.1); }
-
-        /* UPLOAD SECTION (SESSÃO) */
-        .upload-section-box { border: 1px solid #334155; padding: 15px; border-radius: 4px; margin-top: 20px; background: rgba(0,0,0,0.2); }
-        .upload-section-title { font-size: 0.9rem; color: #fbbf24; margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 5px; }
-        .link-import-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .ff-input-dark { flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
-        .ff-select-dark { background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
-        .small-select { width: 120px; }
-        .assets-lists { display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; }
-        .asset-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; }
-        .truncate-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
-        .btn-remove-x { background: transparent; border: none; color: #f44; cursor: pointer; font-weight: bold; }
-
-        /* SELEÇÃO DE JOGADORES */
-        .player-selector-box-fixed { margin: 15px 0; }
-        .destinatarios-grid-fixed { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 150px; overflow-y: auto; background: #020617; padding: 10px; border: 1px solid #334155; border-radius: 4px; }
-        .chip-label-ff { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #94a3b8; cursor: pointer; padding: 5px; border: 1px solid transparent; border-radius: 4px; transition: 0.2s; }
-        .chip-label-ff:hover { background: rgba(255,255,255,0.05); }
-        .chip-label-ff input { width: auto; margin: 0; }
-
-        /* PAPIRO REAL (CORRIGIDO PARA ELIMINAR BORDA E AJUSTAR TEXTO) */
-        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-        .papiro-real-container { 
-            width: 850px; 
-            max-width: 95vw; 
-            height: 90vh; 
-            background-size: 100% 100%; 
-            background-repeat: no-repeat;
-            position: relative; 
-            /* AUMENTO DO PADDING PARA FUGIR DAS BORDAS DO DESENHO */
-            padding: 140px 100px 120px 100px; 
-            box-sizing: border-box; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            color: #3e2723; 
-            font-family: 'Cinzel', serif; 
-            text-shadow: none;
-            /* REMOVIDO box-shadow QUADRADO E TROCADO POR DROP-SHADOW NO PNG */
-            box-shadow: none; 
-            filter: drop-shadow(0 10px 30px rgba(0,0,0,0.8));
-        }
-        .sanchez-oval-view-no-border { width: 80px; height: 80px; border-radius: 50%; background-size: cover; border: 4px solid #8d6e63; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .papiro-title-real { font-size: 2rem; margin: 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; }
-        .papiro-mestre-sub { font-size: 0.9rem; font-style: italic; color: #5d4037; margin-bottom: 30px; }
-        .papiro-body-real { font-size: 1.1rem; line-height: 1.6; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 10px; font-family: 'Lato', serif; font-weight: 500; }
-        .papiro-close-btn { margin-top: 20px; background: #3e2723; color: #d7ccc8; border: 2px solid #5d4037; padding: 10px 30px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; }
-        .papiro-close-btn:hover { background: #5d4037; color: #fff; }
-
-        /* DETALHES MISSÃO (MODERN DARK) */
-        .detail-view-main { width: 800px; height: 600px; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }
-        .detail-header-modern { background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-bottom: 1px solid #334155; display: flex; gap: 20px; align-items: center; }
-        .detail-rank-badge { font-size: 3rem; font-weight: 900; color: rgba(255,255,255,0.1); text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
-        .detail-rank-badge.rank-S, .detail-rank-badge.rank-SS { color: #fbbf24; opacity: 1; }
-        .detail-title-col h2 { margin: 0; font-size: 2rem; color: #f1f5f9; letter-spacing: 2px; }
-        .detail-narrator { color: #00f2ff; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
-        .detail-body-grid { flex: 1; overflow-y: auto; padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        .detail-info-row { grid-column: 1 / -1; display: flex; gap: 40px; border-bottom: 1px solid #334155; padding-bottom: 20px; }
-        .info-item label { color: #fbbf24; font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 5px; }
-        .info-item span { color: #fff; font-size: 1.1rem; }
-        .detail-section { margin-bottom: 10px; }
-        .section-label { display: block; color: #94a3b8; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px; border-left: 3px solid #fbbf24; padding-left: 8px; }
-        .section-text { color: #cbd5e1; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; }
-        .reward-section { grid-column: 1 / -1; background: rgba(251, 191, 36, 0.05); padding: 15px; border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 6px; }
-        .reward-content-box { display: flex; justify-content: space-between; align-items: center; }
-        .gil-display-row { font-size: 1.5rem; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 10px; }
-        .gil-value { color: #fcd34d; }
-        .extra-rewards-list { text-align: right; color: #fbbf24; font-size: 0.9rem; font-style: italic; }
-        .ff-final-close-btn { width: 100%; padding: 20px; background: #020617; color: #fff; border: none; border-top: 1px solid #334155; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 2px; }
-        .ff-final-close-btn:hover { background: #fbbf24; color: #000; }
-
-        /* LIGHTBOX */
-        .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
-        .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
-        .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
+        /* ESTILOS REPARADOS PARA BESTIÁRIO E LISTA JOGADORES */
+        .monster-list-view { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        .btn-create-monster { background: #222; border: 1px dashed #ffcc00; color: #ffcc00; padding: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; text-align: center; width: 100%; }
+        .btn-create-monster:hover { background: rgba(255, 204, 0, 0.1); }
+        .bestiary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; width: 100%; }
+        .monster-card-db { display: flex; background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 10px; gap: 10px; align-items: center; }
+        .m-thumb { width: 50px; height: 50px; background-size: cover; border-radius: 4px; border: 1px solid #555; flex-shrink: 0; }
+        .m-info { flex: 1; display: flex; flex-direction: column; font-size: 12px; }
+        .m-info strong { color: #fff; font-size: 14px; }
+        .m-info small { color: #888; }
+        .btn-deploy { background: #00f2ff; color: #000; border: none; font-size: 10px; font-weight: bold; padding: 4px 8px; cursor: pointer; border-radius: 2px; }
         
-        /* BOTÃO FLUTUANTE DE FICHAS */
-        .fichas-trigger-btn { position: fixed; bottom: 30px; right: 190px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 9999; transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center; }
-        .fichas-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #00f2ff; }
-        .fichas-trigger-btn img { width: 70%; height: 70%; object-fit: contain; }
+        .player-select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .char-select-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; border-radius: 4px; }
+        .char-select-card:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
+        .c-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #fff; flex-shrink: 0; }
 
-        /* LISTA DE FICHAS */
-        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
-        .ficha-row-name strong { display: block; color: #fff; font-size: 1.1rem; }
-        .ficha-row-name small { color: #94a3b8; }
-        .btn-cyan { padding: 8px 15px; font-size: 0.8rem; }
+        /* REFINED EDIT MODAL (CORRIGIDO PARA NÃO CORTAR) */
+        .modal-box-custom.refined-edit { width: 450px; padding: 30px; overflow: visible; background: #0d0d10; border: 2px solid #ffcc00; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); max-height: none; height: auto; }
+        .modal-edit-title { text-align: center; color: #ffcc00; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; letter-spacing: 1px; }
+        .refined-stats-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
+        .refined-stat-row { display: flex; align-items: center; background: #1a1a1a; padding: 5px; border-radius: 4px; border: 1px solid #333; }
+        .stat-label { width: 40px; font-weight: bold; font-size: 14px; text-align: center; }
+        .stat-label.hp { color: #f44; } .stat-label.mp { color: #00f2ff; }
+        .btn-adj { width: 30px; height: 30px; background: #333; color: #fff; border: 1px solid #555; cursor: pointer; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-adj:hover { background: #fff; color: #000; }
+        .stat-value { flex: 1; text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+        .refined-image-control { text-align: center; margin: 20px 0; border-top: 1px solid #333; padding-top: 15px; }
+        .refined-image-control label { color: #888; font-size: 10px; letter-spacing: 1px; margin-bottom: 10px; display: block; }
+        .d-pad-grid { display: inline-grid; grid-template-columns: 30px 30px 30px; gap: 5px; justify-content: center; }
+        .d-pad-grid button { width: 30px; height: 30px; background: #222; border: 1px solid #555; color: #ffcc00; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+        .d-pad-grid button:hover { background: #ffcc00; color: #000; }
+        .center-dot { width: 6px; height: 6px; background: #555; border-radius: 50%; margin: auto; }
+        .btn-save-refined { width: 100%; padding: 15px; font-size: 14px; font-weight: bold; background: #ffcc00; color: #000; border: none; cursor: pointer; text-transform: uppercase; margin-top: 10px; transition: 0.2s; }
+        .btn-save-refined:hover { background: #fff; box-shadow: 0 0 20px #ffcc00; }
+
+        .monster-create-view .create-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .img-upload-box { width: 120px; display: flex; flex-direction: column; gap: 5px; }
+        .preview-img { width: 120px; height: 120px; background: #000; border: 1px solid #444; background-size: cover; }
+        .details-inputs { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .input-title { width: 100%; background: #111; border: 1px solid #444; padding: 8px; color: #ffcc00; font-weight: bold; }
+        .stats-row-c { display: flex; gap: 10px; }
+        .stats-row-c div { flex: 1; }
+        .stats-row-c input { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 5px; text-align: center; }
+        .actions-row-bottom { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-save-m { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+        .btn-cancel-m { background: #333; color: #fff; border: none; padding: 10px; cursor: pointer; }
+        
+        .toggle-row { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 12px; margin-top: 5px; }
+        .text-areas-row { display: flex; gap: 10px; }
+        .text-areas-row textarea { background: #111; border: 1px solid #444; color: #ccc; padding: 10px; resize: none; margin-bottom: 5px; }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
       `}</style>
     </div>
   );
