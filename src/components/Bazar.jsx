@@ -178,7 +178,7 @@ export default function Bazar({ isMestre, playerData, vttDock }) { // RECEBE vtt
         <div className="bazar-overlay-flex" onClick={() => setIsOpen(false)}>
           <div className="bazar-modal-centered" onClick={e => e.stopPropagation()}>
             <div className="bazar-header">
-              <h2>MERCADO NEGRO</h2>
+              <h2>BAZAR GENÉRICA</h2>
               <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
             </div>
 
