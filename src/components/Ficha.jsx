@@ -838,19 +838,37 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
         /* CELULAR (max-width: 768px) */
         @media (max-width: 768px) {
+            /* 1. O CONTAINER PRINCIPAL VIRA UMA JANELA ROLÁVEL GRANDE */
+            .ficha-container { 
+                width: 95% !important; 
+                height: 90vh !important; /* Ocupa quase toda a tela */
+                max-height: none !important; 
+                overflow-y: auto !important; /* Scroll aqui, na janela toda */
+                margin: 20px auto; /* Centraliza */
+                display: block; /* Garante que os elementos desçam */
+            }
+
             .ficha-header { justify-content: center; flex-direction: column; gap: 10px; }
             .header-left-group, .header-right-group { gap: 10px; }
             .header-info { width: 100%; order: -1; margin-bottom: 15px; }
             .xp-container { width: 90%; }
-            .hidemobile { display: none; } /* Oculta as classes no topo pra economizar espaço */
+            .hidemobile { display: none; } 
             
             .col-center-equip { transform: scale(0.85); margin-top: -30px; margin-bottom: 10px; }
-            .radar-wrapper { display: none; } /* Oculta gráfico em tela muito pequena */
+            .radar-wrapper { display: none; }
             
             .stat-row-simple { gap: 5px; }
             .s-box input { font-size: 14px; }
             
-            .skills-list { max-height: 400px; } /* Limita altura interna pra não ficar infinito */
+            /* 2. LIBERA O TAMANHO DAS LISTAS DE HABILIDADES/PASSIVAS */
+            .skills-list, .skills-col, .box-passivas { 
+                max-height: none !important; /* Remove o limite de altura */
+                height: auto !important;     /* Cresce conforme o texto */
+                overflow: visible !important; /* Tira o scroll interno ruim */
+                flex-shrink: 0; /* Impede que o flexbox esmague a caixa */
+                padding-bottom: 20px;
+            }
+            
             .save-fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 24px; }
         }
       `}</style>
