@@ -34,6 +34,16 @@ const Timer = ({ expiry }) => {
   return <span className="mission-timer">⏳ {timeLeft}</span>;
 };
 
+// Função auxiliar para formatar texto estilo WhatsApp
+const formatSanchezText = (text) => {
+  if (!text) return { __html: "" };
+  let formatted = text
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>') // Negrito
+    .replace(/_(.*?)_/g, '<em>$1</em>')           // Itálico
+    .replace(/\n/g, '<br />');                    // Quebra de linha
+  return { __html: formatted };
+};
+
 export default function MestrePage() {
   const navigate = useNavigate();
   
@@ -381,12 +391,12 @@ export default function MestrePage() {
       <Bazar isMestre={true} />
       <Forja />
 
-      {/* MODAL DE LISTA DE FICHAS */}
+      {/* MODAL DE LISTA DE FICHAS (EXPANDIDO) */}
       {showFichasList && (
           <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
-              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()}>
+              <div className="ff-modal-scrollable ff-card fichas-modal-container" onClick={e => e.stopPropagation()}>
                   <h3 className="modal-title-ff">PERSONAGENS REGISTRADOS</h3>
-                  <div className="destinatarios-grid-fixed">
+                  <div className="fichas-grid-large">
                       {personagensDb.map(p => (
                           <div key={p.id} className="ficha-list-item">
                               <div className="ficha-row-name">
@@ -536,14 +546,27 @@ export default function MestrePage() {
         </div>
       )}
 
+      {/* --- NOVO VISUALIZADOR DA RESENHA ESTILO FINAL FANTASY TACTICS --- */}
       {viewResenha && (
-        <div className="papiro-overlay-full" onClick={() => setViewResenha(null)}>
-          <div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}>
-            <div className="sanchez-oval-view-no-border" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-            <h2 className="papiro-title-real">{viewResenha.titulo}</h2>
-            <p className="papiro-mestre-sub">Narrador: {viewResenha.mestre}</p>
-            <div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo }}></div>
-            <button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button>
+        <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
+          <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
+             {/* Lado Esquerdo: Foto e Nome */}
+             <div className="fft-portrait-section">
+                <div className="fft-portrait-frame">
+                   <img src={sanchezImg} alt="Sanchez" />
+                </div>
+                <div className="fft-name-plate">
+                   SANCHEZ
+                </div>
+             </div>
+
+             {/* Lado Direito: Conteúdo */}
+             <div className="fft-content-section">
+                <h2 className="fft-title">{viewResenha.titulo}</h2>
+                <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
+             </div>
+
+             <button className="fft-close-btn" onClick={() => setViewResenha(null)}>X</button>
           </div>
         </div>
       )}
@@ -617,6 +640,11 @@ export default function MestrePage() {
         /* MODAIS GERAIS */
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .ff-modal-scrollable { background: #0f172a; border: 1px solid #fbbf24; width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto; padding: 25px; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        
+        /* NOVO: CLASSE ESPECÍFICA PARA MODAL DE FICHAS MAIOR */
+        .fichas-modal-container { width: 900px; max-width: 95vw; }
+        .fichas-grid-large { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-height: 60vh; overflow-y: auto; background: #020617; padding: 15px; border: 1px solid #334155; border-radius: 4px; }
+
         .modal-title-ff { color: #fbbf24; text-align: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; letter-spacing: 2px; font-size: 1.5rem; }
         .modal-input-group { margin-bottom: 15px; }
         .modal-input-group label { display: block; color: #94a3b8; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; }
@@ -657,17 +685,119 @@ export default function MestrePage() {
         .chip-label-ff:hover { background: rgba(255,255,255,0.05); }
         .chip-label-ff input { width: auto; margin: 0; }
 
-        /* PAPIRO REAL (FIXED & IMPROVED) */
-        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-        .papiro-real-container { width: 800px; max-width: 95vw; height: 85vh; background-size: 100% 100%; position: relative; padding: 100px 90px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; color: #3e2723; font-family: 'Cinzel', serif; text-shadow: 0 1px 0 rgba(255,255,255,0.5); }
-        .sanchez-oval-view-no-border { width: 80px; height: 80px; border-radius: 50%; background-size: cover; border: 4px solid #8d6e63; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .papiro-title-real { font-size: 2.5rem; margin: 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; }
-        .papiro-mestre-sub { font-size: 0.9rem; font-style: italic; color: #5d4037; margin-bottom: 30px; }
-        .papiro-body-real { font-size: 1.2rem; line-height: 1.8; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 15px; font-family: 'Lato', serif; font-weight: 600; }
-        .papiro-close-btn { margin-top: 20px; background: transparent; color: #d7ccc8; border: 2px solid #5d4037; color: #5d4037; padding: 10px 40px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; font-size: 1.1rem; }
-        .papiro-close-btn:hover { background: #5d4037; color: #fff; }
-        .papiro-body-real::-webkit-scrollbar { width: 8px; }
-        .papiro-body-real::-webkit-scrollbar-thumb { background: #8d6e63; border-radius: 4px; }
+        /* --- FINAL FANTASY TACTICS MODAL STYLE --- */
+        .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        
+        .fft-dialog-box {
+          position: relative;
+          width: 800px;
+          max-width: 95vw;
+          height: 450px;
+          background: linear-gradient(180deg, #001a4d 0%, #000022 100%);
+          border: 4px solid #b8860b;
+          border-radius: 8px;
+          box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: flex-start;
+          padding: 30px;
+          gap: 20px;
+          color: #fff;
+          font-family: 'Cinzel', serif;
+        }
+
+        .fft-portrait-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          width: 150px;
+          flex-shrink: 0;
+        }
+
+        .fft-portrait-frame {
+          width: 140px;
+          height: 180px;
+          border: 3px solid #b8860b;
+          background: #000;
+          overflow: hidden;
+          box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .fft-portrait-frame img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .fft-name-plate {
+          width: 100%;
+          background: linear-gradient(90deg, #b8860b, #8a6e14);
+          color: #000;
+          text-align: center;
+          font-weight: bold;
+          padding: 5px 0;
+          font-size: 0.9rem;
+          border: 1px solid #ffd700;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          letter-spacing: 1px;
+        }
+
+        .fft-content-section {
+          flex: 1;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .fft-title {
+          margin: 0 0 15px 0;
+          font-size: 1.8rem;
+          color: #00f2ff;
+          text-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
+          border-bottom: 1px solid #b8860b;
+          padding-bottom: 10px;
+          letter-spacing: 1px;
+        }
+
+        .fft-scroll-text {
+          flex: 1;
+          overflow-y: auto;
+          font-family: 'Lato', sans-serif;
+          font-size: 1.1rem;
+          line-height: 1.6;
+          color: #e0e0e0;
+          padding-right: 10px;
+          /* Barra invisível mas funcional */
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none;  /* IE 10+ */
+        }
+        .fft-scroll-text::-webkit-scrollbar { 
+          display: none; /* Chrome/Safari */
+        }
+
+        .fft-close-btn {
+          position: absolute;
+          top: -15px;
+          right: -15px;
+          width: 40px;
+          height: 40px;
+          background: #b8860b;
+          color: #000;
+          font-weight: bold;
+          border: 2px solid #fff;
+          border-radius: 50%;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: sans-serif;
+          box-shadow: 0 0 10px #000;
+          transition: 0.2s;
+        }
+        .fft-close-btn:hover {
+          background: #ffd700;
+          transform: scale(1.1);
+        }
 
         /* DETALHES MISSÃO (MODERN DARK) */
         .detail-view-main { width: 800px; height: 600px; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }

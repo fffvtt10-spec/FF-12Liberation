@@ -54,6 +54,16 @@ const BookIcon = () => (
   </svg>
 );
 
+// Função auxiliar para formatar texto estilo WhatsApp
+const formatSanchezText = (text) => {
+    if (!text) return { __html: "" };
+    let formatted = text
+      .replace(/\*(.*?)\*/g, '<strong>$1</strong>') // Negrito
+      .replace(/_(.*?)_/g, '<em>$1</em>')           // Itálico
+      .replace(/\n/g, '<br />');                    // Quebra de linha
+    return { __html: formatted };
+  };
+
 export default function JogadorVttPage() {
   const navigate = useNavigate();
   const [personagem, setPersonagem] = useState(null);
@@ -393,7 +403,32 @@ export default function JogadorVttPage() {
         {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
         {viewImage && (<div className="ff-modal-overlay-flex" style={{zIndex: 100001}} onClick={() => setViewImage(null)}><div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div></div>)}
         {showResenhasList && (<div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}><div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-row"><h3 className="modal-title-ff">RESENHAS</h3><button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button></div><div className="resenhas-list-container">{resenhas.map(r => (<div key={r.id} className="resenha-row-player" onClick={() => { setViewResenha(r); setShowResenhasList(false); }}><h4>{r.titulo}</h4></div>))}</div></div></div>)}
-        {viewResenha && (<div className="papiro-overlay-full" onClick={() => setViewResenha(null)}><div className="papiro-real-container" style={{backgroundImage: `url(${papiroImg})`}} onClick={e=>e.stopPropagation()}><h2 className="papiro-title-real">{viewResenha.titulo}</h2><div className="papiro-body-real" dangerouslySetInnerHTML={{ __html: viewResenha.conteudo }}></div><button className="papiro-close-btn" onClick={() => setViewResenha(null)}>FECHAR</button></div></div>)}
+        
+        {/* --- NOVO VISUALIZADOR DA RESENHA ESTILO FINAL FANTASY TACTICS --- */}
+        {viewResenha && (
+            <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
+            <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
+                {/* Lado Esquerdo: Foto e Nome */}
+                <div className="fft-portrait-section">
+                    <div className="fft-portrait-frame">
+                    <img src={sanchezImg} alt="Sanchez" />
+                    </div>
+                    <div className="fft-name-plate">
+                    SANCHEZ
+                    </div>
+                </div>
+
+                {/* Lado Direito: Conteúdo */}
+                <div className="fft-content-section">
+                    <h2 className="fft-title">{viewResenha.titulo}</h2>
+                    <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
+                </div>
+
+                <button className="fft-close-btn" onClick={() => setViewResenha(null)}>X</button>
+            </div>
+            </div>
+        )}
+        
         {showFicha && personagem && <Ficha characterData={personagem} isMaster={false} onClose={() => setShowFicha(false)} />}
 
       </div>
@@ -568,34 +603,119 @@ export default function JogadorVttPage() {
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 15px; background: transparent; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
         .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
 
-        /* PAPIRO REAL (CORRIGIDO PARA ELIMINAR BORDA E AJUSTAR TEXTO) */
-        .papiro-overlay-full { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .papiro-real-container { 
-            width: 850px; 
-            max-width: 95vw; 
-            height: 90vh; 
-            background-size: 100% 100%; 
-            background-repeat: no-repeat;
-            position: relative; 
-            /* AUMENTO DO PADDING PARA FUGIR DAS BORDAS DO DESENHO */
-            padding: 140px 100px 120px 100px; 
-            box-sizing: border-box; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            color: #3e2723; 
-            font-family: 'Cinzel', serif; 
-            text-shadow: none; 
-            /* REMOVIDO box-shadow QUADRADO E TROCADO POR DROP-SHADOW NO PNG */
-            box-shadow: none; 
-            filter: drop-shadow(0 10px 30px rgba(0,0,0,0.8));
+        /* --- FINAL FANTASY TACTICS MODAL STYLE --- */
+        .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        
+        .fft-dialog-box {
+          position: relative;
+          width: 800px;
+          max-width: 95vw;
+          height: 450px;
+          background: linear-gradient(180deg, #001a4d 0%, #000022 100%);
+          border: 4px solid #b8860b;
+          border-radius: 8px;
+          box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: flex-start;
+          padding: 30px;
+          gap: 20px;
+          color: #fff;
+          font-family: 'Cinzel', serif;
         }
-        .papiro-title-real { font-size: 2.5rem; margin: 0 0 20px 0; border-bottom: 2px solid #5d4037; padding-bottom: 10px; width: 100%; text-align: center; color: #3e2723; }
-        .papiro-body-real { font-size: 1.2rem; line-height: 1.8; text-align: justify; overflow-y: auto; width: 100%; flex: 1; padding-right: 15px; font-family: 'Lato', serif; font-weight: 600; color: #3e2723; }
-        .papiro-close-btn { margin-top: 20px; background: transparent; color: #5d4037; border: 2px solid #5d4037; padding: 10px 40px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; font-size: 1.1rem; }
-        .papiro-close-btn:hover { background: #5d4037; color: #d7ccc8; }
-        .papiro-body-real::-webkit-scrollbar { width: 8px; }
-        .papiro-body-real::-webkit-scrollbar-thumb { background: #8d6e63; border-radius: 4px; }
+
+        .fft-portrait-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          width: 150px;
+          flex-shrink: 0;
+        }
+
+        .fft-portrait-frame {
+          width: 140px;
+          height: 180px;
+          border: 3px solid #b8860b;
+          background: #000;
+          overflow: hidden;
+          box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .fft-portrait-frame img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .fft-name-plate {
+          width: 100%;
+          background: linear-gradient(90deg, #b8860b, #8a6e14);
+          color: #000;
+          text-align: center;
+          font-weight: bold;
+          padding: 5px 0;
+          font-size: 0.9rem;
+          border: 1px solid #ffd700;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          letter-spacing: 1px;
+        }
+
+        .fft-content-section {
+          flex: 1;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .fft-title {
+          margin: 0 0 15px 0;
+          font-size: 1.8rem;
+          color: #00f2ff;
+          text-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
+          border-bottom: 1px solid #b8860b;
+          padding-bottom: 10px;
+          letter-spacing: 1px;
+        }
+
+        .fft-scroll-text {
+          flex: 1;
+          overflow-y: auto;
+          font-family: 'Lato', sans-serif;
+          font-size: 1.1rem;
+          line-height: 1.6;
+          color: #e0e0e0;
+          padding-right: 10px;
+          /* Barra invisível mas funcional */
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none;  /* IE 10+ */
+        }
+        .fft-scroll-text::-webkit-scrollbar { 
+          display: none; /* Chrome/Safari */
+        }
+
+        .fft-close-btn {
+          position: absolute;
+          top: -15px;
+          right: -15px;
+          width: 40px;
+          height: 40px;
+          background: #b8860b;
+          color: #000;
+          font-weight: bold;
+          border: 2px solid #fff;
+          border-radius: 50%;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: sans-serif;
+          box-shadow: 0 0 10px #000;
+          transition: 0.2s;
+        }
+        .fft-close-btn:hover {
+          background: #ffd700;
+          transform: scale(1.1);
+        }
       `}</style>
     </div>
   );
