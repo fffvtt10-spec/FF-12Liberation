@@ -79,6 +79,14 @@ const IconCombat = () => (
   </svg>
 );
 
+// Livro
+const IconBook = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+);
+
 export default function MestreVTTPage() {
   const navigate = useNavigate();
   
@@ -508,6 +516,7 @@ export default function MestreVTTPage() {
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Rastreador de Combate"><IconCombat /></button><div className="tool-label">COMBATE</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowDiceSelector(true)}><IconDice /></button><div className="tool-label">DADOS</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank')}><IconBook /></button><div className="tool-label">LIVRO</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowSceneryManager(true)}><IconScenery /></button><div className="tool-label">CENÁRIOS</div></div>
           
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMonsterManager(true)}><IconMonsters /></button><div className="tool-label">MONSTROS</div></div>

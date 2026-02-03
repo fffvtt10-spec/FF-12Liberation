@@ -47,6 +47,13 @@ const CombatIcon = () => (
     </svg>
 );
 
+const BookIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+);
+
 export default function JogadorVttPage() {
   const navigate = useNavigate();
   const [personagem, setPersonagem] = useState(null);
@@ -194,6 +201,10 @@ export default function JogadorVttPage() {
 
   const enterVTT = (sessao) => { setCurrentVttSession(sessao); setHasJoinedSession(true); setVttStatus(new Date() >= new Date(sessao.dataInicio) ? 'connected' : 'waiting'); };
   const handleOpenSanchez = () => { setShowResenhasList(true); localStorage.setItem('sanchez_last_read_count', resenhas.length.toString()); setUnreadResenhas(0); };
+  
+  const handleOpenBook = () => {
+    window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
+  };
 
   // --- DRAG WINDOW LOGIC ---
   const handleTrackerMouseDown = (e) => {
@@ -374,6 +385,7 @@ export default function JogadorVttPage() {
         {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
         {vttStatus === 'connected' && <button className="floating-dice-btn" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
         {resenhas.length > 0 && <button className="floating-sanchez-btn" onClick={handleOpenSanchez} title="Resenhas"><div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
+        <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
 
         <Bazar isMestre={false} playerData={personagem} /> 
         
@@ -409,6 +421,9 @@ export default function JogadorVttPage() {
 
         .floating-sanchez-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-sanchez-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
+
+        .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-book-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
 
         .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
         .floating-sanchez-btn:hover .sanchez-icon-face { opacity: 1; }
