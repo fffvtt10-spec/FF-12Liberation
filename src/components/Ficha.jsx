@@ -810,9 +810,50 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         }
 
         .ab-input { background: transparent; border: none; color: #fff; font-weight: bold; flex: 1; font-size: 12px; }
-        .level-up-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; animation: fadeOverlay 4s forwards; pointer-events: none; }
-        .levelup-text { font-size: 80px; color: #ffcc00; text-shadow: 0 0 50px #ffcc00, 0 0 20px #fff; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); letter-spacing: 5px; }
-        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        /* --- LEVEL UP STYLE (FFT) --- */
+        .level-up-overlay { 
+            position: fixed; /* Mudei para FIXED para ignorar o scroll do modal */
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background: rgba(0,0,0,0.7); 
+            z-index: 999999; /* Z-index bem alto para ficar acima de tudo */
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            pointer-events: none; 
+            animation: fadeOverlay 4s forwards;
+        }
+
+        .levelup-text { 
+            font-family: 'Cinzel', serif;
+            font-size: 100px; 
+            font-weight: bold;
+            color: #ffcc00; 
+            text-transform: uppercase;
+            letter-spacing: 10px;
+            /* Shadow estilo FFT: Borda preta dura + Brilho dourado */
+            text-shadow: 
+                3px 3px 0 #000,
+                -1px -1px 0 #000,  
+                1px -1px 0 #000,
+                -1px 1px 0 #000,
+                1px 1px 0 #000,
+                0 0 20px #ffcc00,
+                0 0 40px #ffcc00;
+            animation: fftFloatUp 4s ease-out forwards;
+        }
+
+        @keyframes fftFloatUp {
+            0% { opacity: 0; transform: translateY(50px) scale(0.5); }
+            10% { opacity: 1; transform: translateY(0) scale(1.2); }
+            20% { transform: translateY(0) scale(1); }
+            80% { opacity: 1; transform: translateY(-20px); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+
         @keyframes fadeOverlay { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -870,6 +911,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             }
             
             .save-fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 24px; }
+            
+            .levelup-text { font-size: 50px; } /* Ajuste de fonte no mobile */
         }
       `}</style>
     </div>
