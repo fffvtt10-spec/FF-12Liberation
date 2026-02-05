@@ -462,9 +462,50 @@ ${this.customData.serverResponse}`:this.message=this._baseMessage}}var hi;(funct
         }
 
         .ab-input { background: transparent; border: none; color: #fff; font-weight: bold; flex: 1; font-size: 12px; }
-        .level-up-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; animation: fadeOverlay 4s forwards; pointer-events: none; }
-        .levelup-text { font-size: 80px; color: #ffcc00; text-shadow: 0 0 50px #ffcc00, 0 0 20px #fff; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); letter-spacing: 5px; }
-        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        /* --- LEVEL UP STYLE (FFT) --- */
+        .level-up-overlay { 
+            position: fixed; /* Mudei para FIXED para ignorar o scroll do modal */
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background: rgba(0,0,0,0.7); 
+            z-index: 999999; /* Z-index bem alto para ficar acima de tudo */
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            pointer-events: none; 
+            animation: fadeOverlay 4s forwards;
+        }
+
+        .levelup-text { 
+            font-family: 'Cinzel', serif;
+            font-size: 100px; 
+            font-weight: bold;
+            color: #ffcc00; 
+            text-transform: uppercase;
+            letter-spacing: 10px;
+            /* Shadow estilo FFT: Borda preta dura + Brilho dourado */
+            text-shadow: 
+                3px 3px 0 #000,
+                -1px -1px 0 #000,  
+                1px -1px 0 #000,
+                -1px 1px 0 #000,
+                1px 1px 0 #000,
+                0 0 20px #ffcc00,
+                0 0 40px #ffcc00;
+            animation: fftFloatUp 4s ease-out forwards;
+        }
+
+        @keyframes fftFloatUp {
+            0% { opacity: 0; transform: translateY(50px) scale(0.5); }
+            10% { opacity: 1; transform: translateY(0) scale(1.2); }
+            20% { transform: translateY(0) scale(1); }
+            80% { opacity: 1; transform: translateY(-20px); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+
         @keyframes fadeOverlay { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -522,6 +563,8 @@ ${this.customData.serverResponse}`:this.message=this._baseMessage}}var hi;(funct
             }
             
             .save-fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 24px; }
+            
+            .levelup-text { font-size: 50px; } /* Ajuste de fonte no mobile */
         }
       `})]})}const R5="/assets/ficha-icon-Ds6_MepT.png",a_=({expiry:i})=>{const[e,n]=w.useState("");return w.useEffect(()=>{const s=setInterval(()=>{const o=new Date().getTime(),c=new Date(i).getTime()-o;if(c<0)n("EXPIRADA"),clearInterval(s);else{const f=Math.floor(c/864e5),m=Math.floor(c%(1e3*60*60*24)/(1e3*60*60)),g=Math.floor(c%(1e3*60*60)/(1e3*60));n(`${f}d ${m}h ${g}m`)}},1e3);return()=>clearInterval(s)},[i]),u.jsxs("span",{className:"mission-timer",children:["⏳ ",e]})},C5=i=>i?{__html:i.replace(/\*(.*?)\*/g,"<strong>$1</strong>").replace(/_(.*?)_/g,"<em>$1</em>").replace(/\n/g,"<br />")}:{__html:""};function I5(){const i=Ki(),[e,n]=w.useState(null),[s,o]=w.useState([]),[c,f]=w.useState([]),[m,g]=w.useState([]),[b,_]=w.useState([]),[E,T]=w.useState(!0),[V,B]=w.useState(!1),[U,O]=w.useState(!1),[X,Q]=w.useState(!1),[te,ie]=w.useState(!1),[pe,he]=w.useState(!1),[I,N]=w.useState(null),[j,P]=w.useState(null),[k,C]=w.useState(null),[R,Se]=w.useState(null),[ae,F]=w.useState(null),[re,be]=w.useState(""),[He,Qe]=w.useState(""),[D,ee]=w.useState([]),[fe,ye]=w.useState([]),[me,Ne]=w.useState({nome:"",local:"",contratante:"",descricaoMissao:"",objetivosMissao:"",requisitos:"",grupo:"",recompensa:"",rank:"E",imagem:"",duracao:"",gilRecompensa:""}),[Te,ft]=w.useState({missaoId:"",dataInicio:"",mapas:[],cenarios:[],monstros:[],npcs:[],jogadores:[]}),[Ze,Zt]=w.useState(""),[Yt,xe]=w.useState("mapas"),[je,it]=w.useState(()=>localStorage.getItem("mestreAssinatura")||"Narrador");w.useEffect(()=>{localStorage.setItem("mestreAssinatura",je)},[je]),w.useEffect(()=>{const L=setTimeout(()=>{B(!0)},2e3);return()=>clearTimeout(L)},[]),w.useEffect(()=>{Ut&&Ut.pause();const L=rf(kt,Re=>{if(Re){n(Re);const ze=On(Ht(Ae,"missoes"),xa("mestreId","==",Re.uid),Lo("createdAt","desc")),It=On(Ht(Ae,"resenhas"),xa("mestreId","==",Re.uid),Lo("createdAt","desc")),W=On(Ht(Ae,"sessoes"),xa("mestreId","==",Re.uid),Lo("dataInicio","asc")),De=On(Ht(Ae,"characters")),$e=Mn(ze,ht=>o(ht.docs.map(Ve=>({id:Ve.id,...Ve.data()})))),jt=Mn(It,ht=>f(ht.docs.map(Ve=>({id:Ve.id,...Ve.data()})))),ce=Mn(W,ht=>g(ht.docs.map(Ve=>({id:Ve.id,...Ve.data()})))),tt=Mn(De,ht=>{_(ht.docs.map(Ve=>({id:Ve.id,...Ve.data()}))),T(!1)});return()=>{$e(),jt(),ce(),tt()}}else T(!1),i("/login")});return()=>L()},[i]),w.useEffect(()=>{if(I){const L=b.find(Re=>Re.id===I.id);L&&N(L)}},[b]);const qe=async L=>{if(L.preventDefault(),!!e)try{const Re=(me.duracao.match(/(\d+)w/)||[0,0])[1]*6048e5+(me.duracao.match(/(\d+)d/)||[0,0])[1]*864e5+(me.duracao.match(/(\d+)h/)||[0,0])[1]*36e5;await Uo(Ht(Ae,"missoes"),{...me,mestreNome:je,mestreId:e.uid,createdAt:Fn(),expiraEm:new Date(Date.now()+(Re||36e5)).toISOString()}),O(!1),Ne({nome:"",local:"",contratante:"",descricaoMissao:"",objetivosMissao:"",requisitos:"",grupo:"",recompensa:"",rank:"E",imagem:"",duracao:"",gilRecompensa:""})}catch(Re){alert("Erro ao forjar cartaz: "+Re.message)}},wt=async()=>{if(!He||!re||!e)return alert("Preencha título e conteúdo!");try{const L=new Date;L.setDate(L.getDate()+7),await Uo(Ht(Ae,"resenhas"),{titulo:He,conteudo:re,mestre:je,mestreId:e.uid,destinatarios:D,createdAt:Fn(),expiraEm:L.toISOString()}),Q(!1),be(""),Qe(""),ee([])}catch{alert("Erro ao publicar.")}},q=async(L,Re)=>{if(window.confirm(`Remover ${Re.nome} da missão?`)){const ze=Le(Ae,"missoes",L);await dt(ze,{candidatos:jg(Re)})}},ve=()=>{Ze&&(ft(L=>({...L,[Yt]:[...L[Yt],Ze]})),Zt(""))},de=(L,Re)=>{ft(ze=>({...ze,[L]:ze[L].filter((It,W)=>W!==Re)}))},_e=async L=>{if(L.preventDefault(),!Te.missaoId||!Te.dataInicio||!e)return alert("Selecione a missão e o horário!");try{const Re=s.find(W=>W.id===Te.missaoId),ze=new Date(Te.dataInicio),It=new Date(ze.getTime()+1440*60*1e3);await Uo(Ht(Ae,"sessoes"),{missaoId:Te.missaoId,missaoNome:Re?Re.nome:"Missão Desconhecida",mestreId:e.uid,dataInicio:Te.dataInicio,expiraEm:It.toISOString(),participantes:fe,mapas:Te.mapas,cenarios:Te.cenarios,monstros:Te.monstros,npcs:Te.npcs,jogadores:Te.jogadores,connected_players:[],dm_online:!1,createdAt:Fn()}),ie(!1),ft({missaoId:"",dataInicio:"",mapas:[],cenarios:[],monstros:[],npcs:[],jogadores:[]}),ye([]),alert("Sessão criada com sucesso!")}catch(Re){alert("Erro ao criar sessão: "+Re.message)}},et=L=>{i("/mestre-vtt")};return E||!V?u.jsxs("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",width:"100vw",background:"radial-gradient(circle at center, #001a33 0%, #000000 100%)",color:"#ffcc00",fontFamily:"Cinzel, serif",zIndex:9999,position:"fixed",top:0,left:0},children:[u.jsx("img",{src:Cf,alt:"Carregando...",style:{width:"120px",marginBottom:"20px"}}),u.jsx("p",{style:{fontSize:"18px",letterSpacing:"4px",textTransform:"uppercase",animation:"pulseText 2s infinite ease-in-out"},children:"Sintonizando Éter..."}),u.jsx("style",{children:`
           @keyframes pulseText { 
