@@ -386,7 +386,15 @@ export default function JogadorVttPage() {
             </div>
         )}
 
-        {showLevelUpModal && <div className="levelup-global-overlay"><div className="levelup-content"><h1 className="levelup-title">LEVEL UP!</h1><button className="levelup-confirm-btn" onClick={handleConfirmLevelUp}>CONFIRMAR</button></div></div>}
+        {showLevelUpModal && (
+            <div className="levelup-global-overlay">
+                <div className="levelup-content">
+                    <h1 className="levelup-title">LEVEL UP!</h1>
+                    <button className="levelup-confirm-btn" onClick={handleConfirmLevelUp}>CONFIRMAR</button>
+                </div>
+            </div>
+        )}
+        
         {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && !hasJoinedSession && <div className="upcoming-sessions-banner"><h3>A SESSÃO VAI COMEÇAR EM BREVE</h3>{sessoesFuturas.map(s => <div key={s.id} className="countdown-row"><span className="sessao-nome-future">{s.missaoNome}</span><CountdownTimer targetDate={s.dataInicio} /></div>)}</div>}
         {sessoesAtivas.length > 0 && !hasJoinedSession && <div className="active-sessions-banner fade-in"><h3>SESSÃO EM ANDAMENTO!</h3>{sessoesAtivas.map(s => <div key={s.id} className="session-entry-row"><span className="sessao-nome-active">{s.missaoNome}</span><button className="btn-enter-session" onClick={() => enterVTT(s)}>ENTRAR AGORA</button></div>)}</div>}
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
@@ -716,6 +724,66 @@ export default function JogadorVttPage() {
           background: #ffd700;
           transform: scale(1.1);
         }
+
+        /* --- LEVEL UP STYLE (FFT) PARA O JOGADOR --- */
+        .levelup-global-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8);
+            z-index: 200000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .levelup-content {
+            text-align: center;
+            animation: zoomIn 0.5s ease-out;
+        }
+
+        .levelup-title {
+            font-family: 'Cinzel', serif;
+            font-size: 80px;
+            font-weight: bold;
+            color: #ffcc00;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+            margin: 0 0 30px 0;
+            text-shadow: 
+                3px 3px 0 #000,
+                -1px -1px 0 #000,  
+                1px -1px 0 #000,
+                -1px 1px 0 #000,
+                1px 1px 0 #000,
+                0 0 20px #ffcc00,
+                0 0 40px #ffcc00;
+            animation: pulseText 1.5s infinite alternate;
+        }
+
+        .levelup-confirm-btn {
+            background: linear-gradient(to bottom, #b8860b, #8a6e14);
+            border: 2px solid #fff;
+            color: #000;
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 10px 40px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #ffcc00;
+            transition: 0.2s;
+            border-radius: 50px;
+        }
+        
+        .levelup-confirm-btn:hover {
+            transform: scale(1.1);
+            background: #ffd700;
+            color: #000;
+            box-shadow: 0 0 30px #ffd700;
+        }
+
+        @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes pulseText { from { text-shadow: 0 0 20px #ffcc00; } to { text-shadow: 0 0 40px #ffcc00, 0 0 10px #fff; } }
       `}</style>
     </div>
   );
