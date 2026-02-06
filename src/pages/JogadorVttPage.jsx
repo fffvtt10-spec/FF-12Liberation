@@ -16,6 +16,141 @@ import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
 
+// --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
+const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewEvent, setViewEvent] = useState(null);
+
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+
+  const events = [
+    ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
+    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio) }))
+  ];
+
+  const renderDays = () => {
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="cal-day empty"></div>);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayEvents = events.filter(e => {
+        const eDate = e.dateObj;
+        return eDate.getDate() === d && eDate.getMonth() === month && eDate.getFullYear() === year;
+      });
+
+      days.push(
+        <div key={d} className="cal-day">
+          <span className="cal-day-number">{d}</span>
+          <div className="cal-events-list">
+            {dayEvents.map((ev, idx) => (
+              <div 
+                key={idx} 
+                className={`cal-event-pill ${ev.type}`} 
+                onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
+                title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
+              >
+                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? '⚔️' : '✅'}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return days;
+  };
+
+  return (
+    <div className="ff-modal-overlay-calendar">
+      <div className="ff-modal-calendar ff-card">
+        <div className="cal-header">
+           <button onClick={handlePrevMonth}>◀</button>
+           <h2>{monthNames[month]} {year}</h2>
+           <button onClick={handleNextMonth}>▶</button>
+           <button className="btn-close-cal" onClick={onClose}>FECHAR</button>
+        </div>
+        <div className="cal-grid-header">
+          <div>DOM</div><div>SEG</div><div>TER</div><div>QUA</div><div>QUI</div><div>SEX</div><div>SÁB</div>
+        </div>
+        <div className="cal-grid-body">
+          {renderDays()}
+        </div>
+
+        {viewEvent && (
+            <div className="mini-modal-overlay">
+                <div className="mini-modal detail">
+                    {viewEvent.type === 'session' ? (
+                        <>
+                            <h4 style={{color: '#f44'}}>⚔️ SESSÃO AGENDADA</h4>
+                            <h3>{viewEvent.missaoNome}</h3>
+                            <p><strong>Horário:</strong> {new Date(viewEvent.dataInicio).toLocaleString()}</p>
+                            <p><strong>Narrador:</strong> {viewEvent.mestreNome}</p>
+                            <div className="detail-players">
+                                <strong>Jogadores:</strong>
+                                {viewEvent.participantes?.join(', ') || "Nenhum"}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <h4 style={{color: '#0f0'}}>✅ HORÁRIO DISPONÍVEL</h4>
+                            <p><strong>Data:</strong> {new Date(viewEvent.start).toLocaleString()}</p>
+                            <p>O Mestre está livre neste horário.</p>
+                        </>
+                    )}
+                    <button className="btn-cancelar-main" style={{marginTop:'10px', width:'100%'}} onClick={() => setViewEvent(null)}>FECHAR</button>
+                </div>
+            </div>
+        )}
+      </div>
+      <style>{`
+        .ff-modal-calendar { width: 90vw; height: 90vh; background: #0f172a; border: 2px solid #fbbf24; display: flex; flex-direction: column; padding: 20px; box-shadow: 0 0 50px #000; }
+        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 1.5rem; color: #fbbf24; }
+        .cal-header button { background: transparent; border: 1px solid #fbbf24; color: #fbbf24; cursor: pointer; padding: 5px 15px; font-weight: bold; }
+        .btn-close-cal { background: #f44 !important; border-color: #f44 !important; color: #fff !important; }
+        .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; color: #94a3b8; font-weight: bold; margin-bottom: 10px; }
+        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; flex: 1; overflow-y: auto; }
+        .cal-day { background: #1e293b; border: 1px solid #334155; padding: 5px; min-height: 100px; position: relative; display: flex; flex-direction: column; }
+        .cal-day.empty { background: transparent; border: none; }
+        .cal-day-number { font-weight: bold; color: #64748b; font-size: 0.9rem; align-self: flex-end; }
+        .cal-events-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
+        .cal-event-pill { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cal-event-pill.session { background: #7f1d1d; color: #fca5a5; border: 1px solid #f87171; }
+        .cal-event-pill.slot { background: #064e3b; color: #6ee7b7; border: 1px solid #34d399; }
+        .mini-modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; }
+        .mini-modal { background: #020617; border: 1px solid #fbbf24; padding: 20px; width: 300px; border-radius: 8px; box-shadow: 0 0 20px #000; }
+        .mini-modal.detail { width: 400px; }
+        .mini-modal h4 { color: #fbbf24; margin: 0 0 10px 0; }
+        
+        /* CORREÇÃO DO Z-INDEX DO CALENDÁRIO */
+        .ff-modal-overlay-calendar { 
+          position: fixed; 
+          top: 0; 
+          left: 0; 
+          width: 100vw; 
+          height: 100vh; 
+          background: rgba(0,0,0,0.95); 
+          z-index: 99999; /* Z-INDEX ALTÍSSIMO PARA SOBREPOR TUDO */
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          backdrop-filter: blur(5px); 
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const CountdownTimer = ({ targetDate }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
@@ -84,6 +219,8 @@ export default function JogadorVttPage() {
   const [vttStatus, setVttStatus] = useState(null); 
   const [currentVttSession, setCurrentVttSession] = useState(null);
   const [showFicha, setShowFicha] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [disponibilidades, setDisponibilidades] = useState([]);
   
   const [showCombatTracker, setShowCombatTracker] = useState(false);
   const [viewMonsterDetails, setViewMonsterDetails] = useState(null); 
@@ -130,7 +267,7 @@ export default function JogadorVttPage() {
   }, []);
 
   useEffect(() => {
-    let unsubChar = () => {}; let unsubMissoes = () => {};
+    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
             const docRef = doc(db, "characters", user.uid);
@@ -146,10 +283,12 @@ export default function JogadorVttPage() {
                 } else setLoading(false);
             });
             const qMissoes = query(collection(db, "missoes"));
+            const qDisp = query(collection(db, "disponibilidades")); // Busca geral para jogador ver
             unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         } else { setLoading(false); navigate('/login'); }
     });
-    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); };
+    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); };
   }, [navigate]);
 
   useEffect(() => {
@@ -400,12 +539,24 @@ export default function JogadorVttPage() {
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
 
         <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
+        {/* BOTÃO FLUTUANTE DE AGENDA */}
+        <button className="floating-calendar-btn" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
+        
         {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
         {vttStatus === 'connected' && <button className="floating-dice-btn" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
         {resenhas.length > 0 && <button className="floating-sanchez-btn" onClick={handleOpenSanchez} title="Resenhas"><div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
         <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
 
         <Bazar isMestre={false} playerData={personagem} /> 
+
+        {/* --- MODAL DE CALENDÁRIO JOGADOR --- */}
+        {showCalendar && (
+          <CalendarSystemPlayer 
+            onClose={() => setShowCalendar(false)} 
+            disponibilidades={disponibilidades}
+            sessoes={allSessoes} // Mostra todas as sessões onde o jogador participa
+          />
+        )}
         
         {showMissionModal && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}><div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-compact"><h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3><button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button></div><div className="missions-grid-compact">{missoes.map(m => (<div key={m.id} className={`mission-card-compact rank-${m.rank}`}><div className="mc-left"><span className="mc-rank">{m.rank}</span></div><div className="mc-center"><h4 className="mc-title">{m.nome}</h4><span className="mc-reward">💰 {m.gilRecompensa} Gil</span></div><div className="mc-right"><button className="btn-details-mini" onClick={() => setShowMissionDetails(m)}>Ver Detalhes</button><button className="btn-accept-mini" onClick={() => handleCandidatar(m)}>ACEITAR</button></div></div>))}</div></div></div>)}
         {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
@@ -467,6 +618,10 @@ export default function JogadorVttPage() {
 
         .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-book-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
+
+        /* NOVO BOTÃO AGENDA */
+        .floating-calendar-btn { position: fixed; bottom: 330px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; background: #000; color: #22c55e; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 24px; }
+        .floating-calendar-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
 
         .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
         .floating-sanchez-btn:hover .sanchez-icon-face { opacity: 1; }

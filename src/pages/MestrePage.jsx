@@ -13,6 +13,187 @@ import Forja from '../components/Forja';
 import Ficha from '../components/Ficha'; 
 import fichaIcon from '../assets/ficha-icon.png'; 
 
+// --- COMPONENTE DE CALENDÁRIO INTERNO ---
+const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [viewEvent, setViewEvent] = useState(null); // Para ver detalhes
+  const [newTime, setNewTime] = useState("20:00"); // Hora padrão para novo slot
+
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+
+  // Combinar sessões e disponibilidades em uma lista de eventos
+  const events = [
+    ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
+    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio) }))
+  ];
+
+  const renderDays = () => {
+    const days = [];
+    // Espaços vazios antes do dia 1
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="cal-day empty"></div>);
+    }
+    // Dias do mês
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayEvents = events.filter(e => {
+        const eDate = e.dateObj;
+        return eDate.getDate() === d && eDate.getMonth() === month && eDate.getFullYear() === year;
+      });
+
+      days.push(
+        <div key={d} className={`cal-day ${selectedDay === d ? 'selected' : ''}`} onClick={() => isMaster && setSelectedDay(d)}>
+          <span className="cal-day-number">{d}</span>
+          <div className="cal-events-list">
+            {dayEvents.map((ev, idx) => (
+              <div 
+                key={idx} 
+                className={`cal-event-pill ${ev.type}`} 
+                onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
+                title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
+              >
+                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? '⚔️' : '✅'}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return days;
+  };
+
+  const handleCreateSlot = () => {
+    if (!selectedDay) return;
+    const dateToSave = new Date(year, month, selectedDay);
+    const [hh, mm] = newTime.split(':');
+    dateToSave.setHours(hh, mm);
+    onAddSlot(dateToSave.toISOString());
+    setSelectedDay(null);
+  };
+
+  const handleEditSessionTime = (newDateStr) => {
+    if (viewEvent && viewEvent.type === 'session') {
+       onUpdateSession(viewEvent.id, newDateStr);
+       setViewEvent(null);
+    }
+  };
+
+  return (
+    <div className="ff-modal-overlay-fixed" style={{zIndex: 10000}}>
+      <div className="ff-modal-calendar ff-card">
+        <div className="cal-header">
+           <button onClick={handlePrevMonth}>◀</button>
+           <h2>{monthNames[month]} {year}</h2>
+           <button onClick={handleNextMonth}>▶</button>
+           <button className="btn-close-cal" onClick={onClose}>FECHAR</button>
+        </div>
+        <div className="cal-grid-header">
+          <div>DOM</div><div>SEG</div><div>TER</div><div>QUA</div><div>QUI</div><div>SEX</div><div>SÁB</div>
+        </div>
+        <div className="cal-grid-body">
+          {renderDays()}
+        </div>
+        
+        {/* Modal de Adicionar Disponibilidade (Ao clicar num dia) */}
+        {selectedDay && isMaster && (
+            <div className="mini-modal-overlay">
+                <div className="mini-modal">
+                    <h4>Marcar Disponibilidade</h4>
+                    <p>Dia {selectedDay} de {monthNames[month]}</p>
+                    <label>Horário de Início:</label>
+                    <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="ff-input-dark"/>
+                    <div className="row-btns">
+                        <button className="btn-cyan" onClick={handleCreateSlot}>CRIAR</button>
+                        <button className="btn-red" onClick={() => setSelectedDay(null)}>CANCELAR</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Detalhes do Evento */}
+        {viewEvent && (
+            <div className="mini-modal-overlay">
+                <div className="mini-modal detail">
+                    {viewEvent.type === 'session' ? (
+                        <>
+                            <h4 style={{color: '#f44'}}>⚔️ SESSÃO AGENDADA</h4>
+                            <h3>{viewEvent.missaoNome}</h3>
+                            <p><strong>Horário Atual:</strong> {new Date(viewEvent.dataInicio).toLocaleString()}</p>
+                            <p><strong>Mestre:</strong> {viewEvent.mestreNome || "Você"}</p>
+                            <div className="detail-players">
+                                <strong>Jogadores:</strong>
+                                {viewEvent.participantes?.join(', ') || "Nenhum"}
+                            </div>
+                            {isMaster && (
+                                <div className="edit-time-box">
+                                    <label>Alterar Horário:</label>
+                                    <input 
+                                        type="datetime-local" 
+                                        className="ff-input-dark"
+                                        onChange={(e) => handleEditSessionTime(e.target.value)}
+                                    />
+                                    <small>Selecione para mudar imediatamente.</small>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <h4 style={{color: '#0f0'}}>✅ DISPONIBILIDADE</h4>
+                            <p><strong>Data:</strong> {new Date(viewEvent.start).toLocaleString()}</p>
+                            <p>Horário reservado para futuras sessões.</p>
+                            {isMaster && (
+                                <button className="btn-red" onClick={() => { onDeleteSlot(viewEvent.id); setViewEvent(null); }}>REMOVER DISPONIBILIDADE</button>
+                            )}
+                        </>
+                    )}
+                    <button className="btn-cancelar-main" style={{marginTop:'10px', width:'100%'}} onClick={() => setViewEvent(null)}>FECHAR</button>
+                </div>
+            </div>
+        )}
+      </div>
+      <style>{`
+        .ff-modal-calendar { width: 90vw; height: 90vh; background: #0f172a; border: 2px solid #fbbf24; display: flex; flex-direction: column; padding: 20px; box-shadow: 0 0 50px #000; }
+        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 1.5rem; color: #fbbf24; }
+        .cal-header button { background: transparent; border: 1px solid #fbbf24; color: #fbbf24; cursor: pointer; padding: 5px 15px; font-weight: bold; }
+        .btn-close-cal { background: #f44 !important; border-color: #f44 !important; color: #fff !important; }
+        
+        .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; color: #94a3b8; font-weight: bold; margin-bottom: 10px; }
+        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; flex: 1; overflow-y: auto; }
+        
+        .cal-day { background: #1e293b; border: 1px solid #334155; padding: 5px; min-height: 100px; position: relative; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; }
+        .cal-day:hover { background: #334155; }
+        .cal-day.empty { background: transparent; border: none; cursor: default; }
+        .cal-day.selected { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
+        .cal-day-number { font-weight: bold; color: #64748b; font-size: 0.9rem; align-self: flex-end; }
+        
+        .cal-events-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
+        .cal-event-pill { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cal-event-pill.session { background: #7f1d1d; color: #fca5a5; border: 1px solid #f87171; }
+        .cal-event-pill.slot { background: #064e3b; color: #6ee7b7; border: 1px solid #34d399; }
+
+        .mini-modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; }
+        .mini-modal { background: #020617; border: 1px solid #fbbf24; padding: 20px; width: 300px; border-radius: 8px; box-shadow: 0 0 20px #000; }
+        .mini-modal.detail { width: 400px; }
+        .mini-modal h4 { color: #fbbf24; margin: 0 0 10px 0; }
+        .row-btns { display: flex; gap: 10px; margin-top: 15px; }
+        .edit-time-box { margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
+      `}</style>
+    </div>
+  );
+};
+
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
@@ -52,6 +233,7 @@ export default function MestrePage() {
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
+  const [disponibilidades, setDisponibilidades] = useState([]); // Novo state
   
   // Loading Control
   const [loading, setLoading] = useState(true);
@@ -61,6 +243,7 @@ export default function MestrePage() {
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
+  const [showCalendar, setShowCalendar] = useState(false); // Novo Modal Calendar
   const [showFichasList, setShowFichasList] = useState(false); 
   const [selectedFicha, setSelectedFicha] = useState(null); 
   
@@ -81,7 +264,7 @@ export default function MestrePage() {
   
   const [sessionForm, setSessionForm] = useState({
     missaoId: '', 
-    dataInicio: '', 
+    selectedSlotId: '', // Mudou de dataInicio manual para ID do Slot
     mapas: [],      
     cenarios: [],   
     monstros: [],   
@@ -117,17 +300,19 @@ export default function MestrePage() {
             const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
+            const qD = query(collection(db, "disponibilidades"), where("mestreId", "==", user.uid)); // Query Disponibilidades
             const qC = query(collection(db, "characters"));
 
             const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubS = onSnapshot(qS, (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            const unsubD = onSnapshot(qD, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubC = onSnapshot(qC, (snap) => {
                 setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 setLoading(false); 
             });
 
-            return () => { unsubM(); unsubR(); unsubS(); unsubC(); };
+            return () => { unsubM(); unsubR(); unsubS(); unsubC(); unsubD(); };
         } else {
             setLoading(false);
             navigate('/login'); 
@@ -196,18 +381,65 @@ export default function MestrePage() {
       }));
   };
 
+  // --- NOVOS HANDLERS DE CALENDÁRIO ---
+  const addAvailabilitySlot = async (isoDateString) => {
+      if (!currentUser) return;
+      try {
+          await addDoc(collection(db, "disponibilidades"), {
+              mestreId: currentUser.uid,
+              start: isoDateString,
+              status: 'free'
+          });
+          alert("Disponibilidade criada!");
+      } catch (e) {
+          alert("Erro ao criar slot: " + e.message);
+      }
+  };
+
+  const deleteAvailabilitySlot = async (id) => {
+      if (!window.confirm("Remover esta disponibilidade?")) return;
+      try {
+          await deleteDoc(doc(db, "disponibilidades", id));
+      } catch (e) {
+          alert("Erro ao remover: " + e.message);
+      }
+  };
+
+  const updateSessionTime = async (sessionId, newDateStr) => {
+      if (!newDateStr) return;
+      try {
+          // Atualiza a dataInicio da sessão e recalcula expiração
+          const inicio = new Date(newDateStr);
+          const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000));
+          await updateDoc(doc(db, "sessoes", sessionId), {
+              dataInicio: newDateStr,
+              expiraEm: fim.toISOString()
+          });
+          alert("Horário da sessão atualizado!");
+      } catch (e) {
+          alert("Erro ao atualizar horário: " + e.message);
+      }
+  };
+
+  // --- CRIAÇÃO DE SESSÃO ATUALIZADA (FLUXO NOVO) ---
   const criarSessao = async (e) => {
       e.preventDefault();
-      if (!sessionForm.missaoId || !sessionForm.dataInicio || !currentUser) return alert("Selecione a missão e o horário!");
+      if (!sessionForm.missaoId || !sessionForm.selectedSlotId || !currentUser) return alert("Selecione a missão e um horário disponível!");
+      
       try {
+        const slot = disponibilidades.find(d => d.id === sessionForm.selectedSlotId);
+        if (!slot) return alert("Horário inválido ou já ocupado.");
+
         const missaoObj = missoes.find(m => m.id === sessionForm.missaoId);
-        const inicio = new Date(sessionForm.dataInicio);
+        const inicio = new Date(slot.start);
         const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); 
+
+        // Cria a sessão
         await addDoc(collection(db, "sessoes"), {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
             mestreId: currentUser.uid,
-            dataInicio: sessionForm.dataInicio,
+            dataInicio: slot.start, // Usa a data do slot
             expiraEm: fim.toISOString(),
             participantes: sessaoDestinatarios, 
             mapas: sessionForm.mapas,
@@ -219,10 +451,14 @@ export default function MestrePage() {
             dm_online: false,
             createdAt: serverTimestamp()
         });
+
+        // Remove a disponibilidade pois virou sessão
+        await deleteDoc(doc(db, "disponibilidades", sessionForm.selectedSlotId));
+
         setShowSessionModal(false);
-        setSessionForm({ missaoId: '', dataInicio: '', mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
+        setSessionForm({ missaoId: '', selectedSlotId: '', maps: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
         setSessaoDestinatarios([]);
-        alert("Sessão criada com sucesso!");
+        alert("Sessão agendada com sucesso!");
       } catch (err) {
           alert("Erro ao criar sessão: " + err.message);
       }
@@ -350,9 +586,12 @@ export default function MestrePage() {
 
           {/* COLUNA 3: SESSÕES */}
           <div className="ff-card board-column">
-            <div className="card-header no-border">
+            <div className="card-header no-border" style={{display:'flex', gap:'5px'}}>
               <h3>SESSÕES DE JOGO</h3>
-              <button className="ff-add-btn small-btn" onClick={() => setShowSessionModal(true)}>INICIAR NOVA SESSÃO</button>
+              <div style={{display:'flex', gap:'5px'}}>
+                <button className="ff-add-btn small-btn" onClick={() => setShowCalendar(true)}>📅 AGENDA</button>
+                <button className="ff-add-btn small-btn" onClick={() => setShowSessionModal(true)}>+ SESSÃO</button>
+              </div>
             </div>
             <div className="mission-scroll">
                {sessoes.length === 0 ? (
@@ -390,6 +629,19 @@ export default function MestrePage() {
       {/* BOTÕES FLUTUANTES DE SISTEMA */}
       <Bazar isMestre={true} />
       <Forja />
+
+      {/* MODAL DE CALENDÁRIO */}
+      {showCalendar && (
+        <CalendarSystem 
+            onClose={() => setShowCalendar(false)} 
+            isMaster={true}
+            disponibilidades={disponibilidades}
+            sessoes={sessoes}
+            onAddSlot={addAvailabilitySlot}
+            onUpdateSession={updateSessionTime}
+            onDeleteSlot={deleteAvailabilitySlot}
+        />
+      )}
 
       {/* MODAL DE LISTA DE FICHAS (EXPANDIDO) */}
       {showFichasList && (
@@ -467,7 +719,25 @@ export default function MestrePage() {
                   <h3 className="modal-title-ff">CRIAR NOVA SESSÃO</h3>
                   <form onSubmit={criarSessao}>
                       <div className="modal-input-group"><label>SELECIONAR MISSÃO</label><select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required><option value="">-- Escolha --</option>{missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}</select></div>
-                      <div className="modal-input-group"><label>DATA E HORÁRIO</label><input type="datetime-local" className="ff-input-dark" value={sessionForm.dataInicio} onChange={e => setSessionForm({...sessionForm, dataInicio: e.target.value})} required /></div>
+                      
+                      {/* --- NOVO SELETOR DE SLOT --- */}
+                      <div className="modal-input-group">
+                          <label>HORÁRIO DISPONÍVEL (DA AGENDA)</label>
+                          <select className="ff-select-dark" value={sessionForm.selectedSlotId} onChange={e => setSessionForm({...sessionForm, selectedSlotId: e.target.value})} required>
+                              <option value="">-- Selecione um Horário --</option>
+                              {disponibilidades
+                                  .filter(d => new Date(d.start) > new Date()) // Apenas futuros
+                                  .sort((a,b) => new Date(a.start) - new Date(b.start))
+                                  .map(d => (
+                                      <option key={d.id} value={d.id}>
+                                          {new Date(d.start).toLocaleString()}
+                                      </option>
+                                  ))
+                              }
+                          </select>
+                          <small style={{color:'#666', fontStyle:'italic'}}>*Crie horários no botão AGENDA se a lista estiver vazia.</small>
+                      </div>
+
                       <div className="player-selector-box-fixed"><label>JOGADORES:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={sessaoDestinatarios.includes(p.name)} onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} /> {p.name} ({p.class})</label>))}</div></div>
                       
                       <div className="upload-section-box">
