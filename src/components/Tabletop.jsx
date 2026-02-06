@@ -2,12 +2,40 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
 
+// --- HELPER: GERAR COR DO JOGADOR ---
+const getPlayerColor = (uid) => {
+    if (!uid) return '#ffffff';
+    let hash = 0;
+    for (let i = 0; i < uid.length; i++) {
+        hash = uid.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const c = (hash & 0x00ffffff).toString(16).toUpperCase();
+    return '#' + '00000'.substring(0, 6 - c.length) + c;
+};
+
+// --- COMPONENTE INTERNO DO PING ---
+const PingMarker = ({ ping }) => {
+    return (
+        <div 
+            className={`ping-marker ${ping.isMaster ? 'master-ping' : ''}`}
+            style={{ 
+                left: ping.x, 
+                top: ping.y,
+                '--ping-color': ping.color // Variável CSS para facilitar
+            }}
+        >
+            <div className="ping-center" style={{ backgroundColor: ping.color }}></div>
+            <div className="ping-ripple" style={{ borderColor: ping.color }}></div>
+            {ping.isMaster && <div className="ping-ripple delay" style={{ borderColor: ping.color }}></div>}
+        </div>
+    );
+};
+
 // --- COMPONENTE INTERNO DO TOKEN ---
 const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) => {
     const [flash, setFlash] = useState('');
     const prevHp = useRef(token.stats?.hp?.current);
 
-    // Efeito Visual de Dano/Cura (Flash)
     useEffect(() => {
         let currentHp;
         if (token.type === 'player' && charData) {
@@ -18,8 +46,8 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
 
         const prev = prevHp.current;
         if (prev !== undefined && currentHp !== undefined && currentHp !== prev) {
-            if (currentHp < prev) setFlash('flash-damage'); // Vermelho
-            else if (currentHp > prev) setFlash('flash-heal'); // Verde
+            if (currentHp < prev) setFlash('flash-damage');
+            else if (currentHp > prev) setFlash('flash-heal');
             
             const timer = setTimeout(() => setFlash(''), 1000);
             return () => clearTimeout(timer);
@@ -27,24 +55,17 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
         prevHp.current = currentHp;
     }, [token.stats?.hp?.current, charData?.character_sheet?.status?.hp?.current]);
 
-    // Tamanho e Imagem
     const sizePx = gridSize * (token.size || 1);
     let imgUrl = token.img;
 
-    // Prioriza a imagem da ficha se for jogador
     if (token.type === 'player' && charData) {
         if (charData.character_sheet?.imgUrl) imgUrl = charData.character_sheet.imgUrl;
     }
 
-    // Posição da Imagem
     const bgPosX = token.imgX !== undefined ? token.imgX : 50;
     const bgPosY = token.imgY !== undefined ? token.imgY : 50;
-
-    // Lógica de Visibilidade
-    // Se visible for undefined, consideramos true.
     const isVisible = token.visible !== false; 
 
-    // Se não for mestre e estiver oculto, não renderiza nada
     if (!isMaster && !isVisible) return null;
 
     return (
@@ -60,7 +81,6 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
             }}
             onMouseDown={(e) => onMouseDown(e, token)}
         >
-            {/* Imagem */}
             <div 
                 className="token-inner" 
                 style={{
@@ -69,7 +89,6 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
                 }}
             ></div>
             
-            {/* Controles de Tamanho (Apenas Mestre) */}
             {isMaster && (
                 <div className="token-sizer">
                     <button onMouseDown={(e) => { e.stopPropagation(); onUpdate('resize', token, -1); }}>-</button>
@@ -77,7 +96,6 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
                 </div>
             )}
             
-            {/* Nome do Token */}
             <div className="token-name">{token.name}</div>
         </div>
     );
@@ -87,8 +105,8 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const [activeMap, setActiveMap] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [tokens, setTokens] = useState([]);
+  const [pings, setPings] = useState([]); 
   
-  // Map Manager
   const [mapList, setMapList] = useState([]); 
   const [editingName, setEditingName] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -107,12 +125,16 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const mapContainerRef = useRef(null);
   const imgRef = useRef(null);
 
+  // --- EFEITOS E SINCRONIZAÇÃO ---
   useEffect(() => {
     if (sessaoData) {
       setActiveMap(sessaoData.active_map || null);
       if (sessaoData.grid_cols && sessaoData.grid_cols !== gridCols) setGridCols(sessaoData.grid_cols);
       if (sessaoData.tokens) setTokens(sessaoData.tokens);
       else setTokens([]);
+      
+      if (sessaoData.pings) setPings(sessaoData.pings);
+      else setPings([]);
 
       if (isMaster) {
         const rawLinks = sessaoData.mapas || []; 
@@ -126,6 +148,31 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       }
     }
   }, [sessaoData, isMaster]); 
+
+  // --- CORREÇÃO: Limpeza automática de pings com setInterval ---
+  useEffect(() => {
+      if (!isMaster) return; // Apenas o mestre limpa
+
+      const interval = setInterval(() => {
+          if (!pings || pings.length === 0) return;
+
+          const now = Date.now();
+          // Identifica pings expirados (mais de 3 segundos)
+          const pingsToDelete = pings.filter(p => now - p.createdAt > 3000);
+          
+          if (pingsToDelete.length > 0) {
+              const sessaoRef = doc(db, "sessoes", sessaoData.id);
+              // Remove um por um para evitar conflitos de concorrência com novos pings
+              pingsToDelete.forEach(async (p) => {
+                  try {
+                      await updateDoc(sessaoRef, { pings: arrayRemove(p) });
+                  } catch(e) { console.log("Erro ao limpar ping", e); }
+              });
+          }
+      }, 1000); // Verifica a cada 1 segundo
+
+      return () => clearInterval(interval);
+  }, [pings, isMaster, sessaoData?.id]);
 
   const recalcGrid = () => {
       if (mapContainerRef.current) {
@@ -144,8 +191,31 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  const handleCreatePing = async (e) => {
+      if (!activeMap) return;
+      const coords = getLocalCoords(e);
+      
+      const newPing = {
+          id: Date.now().toString() + Math.random(),
+          x: coords.x,
+          y: coords.y,
+          color: isMaster ? '#ffd700' : getPlayerColor(currentUserUid),
+          isMaster: !!isMaster, // Garante que é booleano
+          createdAt: Date.now(),
+          uid: currentUserUid || 'anon'
+      };
+
+      try {
+          await updateDoc(doc(db, "sessoes", sessaoData.id), {
+              pings: arrayUnion(newPing)
+          });
+      } catch (err) {
+          console.error("Erro ao criar ping:", err);
+      }
+  };
+
   const handleTokenMouseDown = (e, token) => {
-      if (activeTool === 'ruler') return;
+      if (activeTool === 'ruler' || activeTool === 'ping') return;
       const isMine = token.type === 'player' && token.uid === currentUserUid;
       if (!isMaster && !isMine) return;
 
@@ -203,6 +273,12 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   };
 
   const handleMouseDown = (e) => {
+      if (activeTool === 'ping') {
+          e.preventDefault();
+          handleCreatePing(e);
+          return;
+      }
+
       if (activeTool === 'ruler' || e.button === 2) {
           e.preventDefault(); 
           setIsMeasuring(true);
@@ -259,6 +335,8 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                         <div className="tt-toolbar">
                             <button className={`tool-btn ${activeTool === 'cursor' ? 'active' : ''}`} onClick={() => setActiveTool('cursor')} title="Mover">👆</button>
                             <button className={`tool-btn ${activeTool === 'ruler' ? 'active' : ''}`} onClick={() => setActiveTool('ruler')} title="Régua">📏</button>
+                            <button className={`tool-btn ${activeTool === 'ping' ? 'active' : ''}`} onClick={() => setActiveTool('ping')} title="Ping">🎯</button>
+                            
                             {isMaster && (
                                 <div className="grid-control-box">
                                     <span className="grid-label">GRID</span>
@@ -287,9 +365,19 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                             onContextMenu={e => e.preventDefault()}
-                            style={{ cursor: activeTool === 'ruler' ? 'crosshair' : 'default' }}
+                            style={{ 
+                                cursor: activeTool === 'ruler' ? 'crosshair' : activeTool === 'ping' ? 'copy' : 'default' 
+                            }}
                         >
                             <img ref={imgRef} src={activeMap.url} alt="Map" className="map-img-element" />
+                            
+                            {/* CAMADA DE PINGS */}
+                            <div className="pings-layer">
+                                {pings.map(p => (
+                                    <PingMarker key={p.id} ping={p} />
+                                ))}
+                            </div>
+
                             {gridSizePx > 0 && (
                                 <>
                                     <div className="grid-layer" style={{
@@ -376,18 +464,69 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             
             .map-layer-container { position: relative; box-shadow: 0 0 30px #000; user-select: none; }
             .map-img-element { display: block; max-width: 100%; max-height: 80vh; object-fit: contain; pointer-events: none; }
-            .grid-layer, .tokens-layer, .ruler-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+            .grid-layer, .tokens-layer, .pings-layer, .ruler-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
             .grid-layer { pointer-events: none; z-index: 2; opacity: 0.6; }
             .tokens-layer { z-index: 5; }
+            .pings-layer { z-index: 20; pointer-events: none; }
             .ruler-overlay { z-index: 10; pointer-events: none; }
             .ruler-tag { position: absolute; background: rgba(0,0,0,0.9); color: #ffcc00; border: 1px solid #ffcc00; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; pointer-events: none; z-index: 20; }
+
+            /* --- ESTILOS DE PING (CORRIGIDO) --- */
+            .ping-marker {
+                position: absolute;
+                width: 0; height: 0;
+                transform: translate(-50%, -50%);
+                pointer-events: none;
+                z-index: 20;
+            }
+            .ping-center {
+                position: absolute;
+                left: -6px; top: -6px;
+                width: 12px; height: 12px;
+                border-radius: 50%;
+                box-shadow: 0 0 10px var(--ping-color);
+                animation: pingPop 0.3s ease-out;
+            }
+            .ping-ripple {
+                position: absolute;
+                left: -25px; top: -25px;
+                width: 50px; height: 50px;
+                border-radius: 50%;
+                border: 3px solid;
+                opacity: 0;
+                box-shadow: 0 0 5px var(--ping-color);
+                animation: pingRipple 1.5s ease-out infinite;
+            }
+            .ping-ripple.delay { animation-delay: 0.5s; }
+            
+            /* Estilo específico do Mestre */
+            .ping-marker.master-ping .ping-center {
+                width: 16px; height: 16px; left: -8px; top: -8px;
+                box-shadow: 0 0 20px #ffd700, 0 0 40px #ffd700;
+                background-color: #ffd700 !important;
+            }
+            .ping-marker.master-ping .ping-ripple {
+                border-color: #ffd700 !important;
+                border-width: 4px;
+                animation-duration: 1s;
+                width: 60px; height: 60px; left: -30px; top: -30px;
+            }
+
+            @keyframes pingPop { 
+                0% { transform: scale(0); opacity: 0; } 
+                80% { transform: scale(1.2); opacity: 1; }
+                100% { transform: scale(1); opacity: 1; } 
+            }
+            @keyframes pingRipple {
+                0% { transform: scale(0.2); opacity: 1; border-width: 3px; }
+                100% { transform: scale(2.0); opacity: 0; border-width: 0px; }
+            }
 
             .vtt-token { position: absolute; border-radius: 50%; box-shadow: 0 0 10px #000; z-index: 10; overflow: visible; }
             .vtt-token.dragging { z-index: 100; transition: none; box-shadow: 0 10px 20px rgba(0,0,0,0.8); transform: scale(1.05); }
             .vtt-token.enemy { border: 2px solid #f44; }
             .vtt-token.player { border: 2px solid #00f2ff; }
             
-            /* GHOST MODE: Para tokens ocultos vistos pelo Mestre */
             .vtt-token.ghost-token { opacity: 0.5; filter: grayscale(100%); border-style: dashed; }
 
             .token-inner { width: 100%; height: 100%; border-radius: 50%; background-size: cover; pointer-events: none; background-repeat: no-repeat; }
