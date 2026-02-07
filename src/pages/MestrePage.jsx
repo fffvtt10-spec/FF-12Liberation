@@ -12,6 +12,7 @@ import Bazar from '../components/Bazar';
 import Forja from '../components/Forja'; 
 import Ficha from '../components/Ficha'; 
 import fichaIcon from '../assets/ficha-icon.png'; 
+import GuildBoard from '../components/GuildBoard'; // <--- IMPORTADO O QUADRO DA GUILDA
 
 // --- COMPONENTE DE CALENDÁRIO INTERNO ---
 const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
@@ -627,6 +628,7 @@ export default function MestrePage() {
       </button>
 
       {/* BOTÕES FLUTUANTES DE SISTEMA */}
+      <GuildBoard isMaster={true} /> {/* QUADRO DA GUILDA INSERIDO AQUI */}
       <Bazar isMestre={true} />
       <Forja />
 
@@ -1106,6 +1108,13 @@ export default function MestrePage() {
         .ficha-row-name strong { display: block; color: #fff; font-size: 1.1rem; }
         .ficha-row-name small { color: #94a3b8; }
         .btn-cyan { padding: 8px 15px; font-size: 0.8rem; }
+        .guild-btn-float {
+            top: auto !important;
+            left: auto !important;
+            transform: none !important;
+            bottom: 30px !important;
+            right: 270px !important; /* 30 (Bazar) -> 110 (Forja) -> 190 (Ficha) -> 270 (Guilda) */
+        }
       `}</style>
     </div>
   );

@@ -15,6 +15,7 @@ import NPCViewer from '../components/NPCViewer';
 import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
+import GuildBoard from '../components/GuildBoard'; // <--- IMPORT NOVO
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -302,10 +303,10 @@ export default function JogadorVttPage() {
             if (sessionUpdated) {
                 setCurrentVttSession(sessionUpdated);
                 if (sessionUpdated.latest_roll) {
-                     const roll = sessionUpdated.latest_roll;
-                     if (roll.timestamp > dismissedRollTimestamp.current) {
+                      const roll = sessionUpdated.latest_roll;
+                      if (roll.timestamp > dismissedRollTimestamp.current) {
                         setRollResult(prev => { if (!prev || prev.timestamp !== roll.timestamp) return roll; return prev; });
-                     }
+                      }
                 }
                 const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
                 setVttStatus(playerInList ? 'connected' : 'waiting');
@@ -547,7 +548,10 @@ export default function JogadorVttPage() {
         {resenhas.length > 0 && <button className="floating-sanchez-btn" onClick={handleOpenSanchez} title="Resenhas"><div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
         <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
 
-        <Bazar isMestre={false} playerData={personagem} /> 
+        <Bazar isMestre={false} playerData={personagem} />
+        
+        {/* QUADRO DA GUILDA ADICIONADO AQUI */}
+        <GuildBoard isMaster={false} />
 
         {/* --- MODAL DE CALENDÁRIO JOGADOR --- */}
         {showCalendar && (
@@ -939,6 +943,14 @@ export default function JogadorVttPage() {
 
         @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes pulseText { from { text-shadow: 0 0 20px #ffcc00; } to { text-shadow: 0 0 40px #ffcc00, 0 0 10px #fff; } }
+        /* POSICIONAMENTO BOTÃO GUILDA (JOGADOR) */
+        .guild-btn-float {
+            top: auto !important;
+            left: auto !important;
+            transform: none !important;
+            bottom: 30px !important;
+            right: 110px !important; /* Fica à esquerda do Bazar (que costuma ser right: 20/30px) */
+        }
       `}</style>
     </div>
   );
