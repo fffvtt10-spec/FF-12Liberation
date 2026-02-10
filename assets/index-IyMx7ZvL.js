@@ -548,7 +548,14 @@ ${this.customData.serverResponse}`:this.message=this._baseMessage}}var mi;(funct
             .hidemobile { display: none; } 
             
             .col-center-equip { transform: scale(0.85); margin-top: -30px; margin-bottom: 10px; }
-            .radar-wrapper { display: none; }
+            
+            /* RESTAURANDO O GRÁFICO DE ATRIBUTOS COM AJUSTE DE ESCALA */
+            .radar-wrapper { 
+                display: flex !important; 
+                justify-content: center; 
+                transform: scale(0.85); /* Diminui um pouco para não vazar a tela */
+                margin: -20px 0; /* Ajusta margem vertical para não ocupar muito espaço */
+            }
             
             .stat-row-simple { gap: 5px; }
             .s-box input { font-size: 14px; }
