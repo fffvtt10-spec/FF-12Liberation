@@ -8,13 +8,18 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
   const [items, setItems] = useState([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditing, setIsEditing] = useState(null);
-  const [form, setForm] = useState({ nome: '', descricao: '', imagem: '' });
+  // Adicionado campo quantidade ao formulário
+  const [form, setForm] = useState({ nome: '', descricao: '', imagem: '', quantidade: 1 });
 
   useEffect(() => {
     if (!isOpen) return;
-    const q = query(collection(db, "game_items"), where("status", "==", "vault"), orderBy("createdAt", "desc"));
+    // Buscamos itens que estão no cofre (vault) OU que já foram comprados (têm ownerId), para o mestre gerenciar
+    const q = query(collection(db, "game_items"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
-      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Filtramos visualmente o que é pertinente à Forja (Itens no Cofre Global ou Itens Pessoais para gerenciamento)
+      const allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Mostra itens que estão no 'vault' (criados e não vendidos ou devolvidos) ou que possuem dono (para o mestre ver)
+      setItems(allItems.filter(i => i.status === 'vault' || i.ownerId));
     });
     return () => unsub();
   }, [isOpen]);
@@ -22,15 +27,38 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
   const handleSaveItem = async (e) => {
     e.preventDefault();
     if (!form.nome) return alert("O item precisa de um nome!");
+    
     try {
-      const payload = { ...form, updatedAt: serverTimestamp() };
+      const payload = { 
+        nome: form.nome,
+        descricao: form.descricao,
+        imagem: form.imagem,
+        updatedAt: serverTimestamp() 
+      };
+
       if (isEditing) {
+        // Edição altera apenas o item específico selecionado
         await updateDoc(doc(db, "game_items", isEditing), payload);
         setIsEditing(null);
       } else {
-        await addDoc(collection(db, "game_items"), { ...payload, status: "vault", ownerId: null, valorGil: 0, createdAt: serverTimestamp() });
+        // CRIAÇÃO EM LOTE: Cria N documentos baseados na quantidade informada
+        const qtd = parseInt(form.quantidade) || 1;
+        const batchPromises = [];
+        
+        for (let i = 0; i < qtd; i++) {
+            batchPromises.push(addDoc(collection(db, "game_items"), { 
+                ...payload, 
+                status: "vault", 
+                ownerId: null, 
+                valorGil: 0, 
+                createdAt: serverTimestamp() 
+            }));
+        }
+        
+        await Promise.all(batchPromises);
+        alert(`${qtd} item(ns) forjado(s) com sucesso!`);
       }
-      setForm({ nome: '', descricao: '', imagem: '' });
+      setForm({ nome: '', descricao: '', imagem: '', quantidade: 1 });
     } catch (err) { alert("Erro ao forjar item."); console.error(err); }
   };
 
@@ -40,8 +68,20 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
     }
   };
 
-  const handleEditClick = (item) => { setIsEditing(item.id); setForm(item); };
-  const handleCancelEdit = () => { setIsEditing(null); setForm({ nome: '', descricao: '', imagem: '' }); };
+  // NOVA FUNÇÃO: O mestre desafixa o item do jogador e joga direto pro Bazar
+  const handleReturnToBazar = async (id) => {
+      if (window.confirm("Desafixar item do jogador e retornar ao Bazar para venda?")) {
+          await updateDoc(doc(db, "game_items", id), {
+              ownerId: null,
+              buyerName: null,
+              status: 'bazar', // Vai direto pro bazar
+              updatedAt: serverTimestamp()
+          });
+      }
+  };
+
+  const handleEditClick = (item) => { setIsEditing(item.id); setForm({...item, quantidade: 1}); }; // Na edição, qtde é irrelevante visualmente
+  const handleCancelEdit = () => { setIsEditing(null); setForm({ nome: '', descricao: '', imagem: '', quantidade: 1 }); };
   const filteredItems = items.filter(item => item.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -68,9 +108,25 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
                     <input placeholder="Nome do Artefato" value={form.nome} onChange={e=>setForm({...form, nome: e.target.value})} className="forja-input" />
                     <input placeholder="URL da Imagem (Imgur)" value={form.imagem} onChange={e=>setForm({...form, imagem: e.target.value})} className="forja-input" />
                   </div>
-                  <textarea placeholder="Descrição detalhada e lore do item..." value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} className="forja-input area" />
+                  <div className="row">
+                     {/* Input de Quantidade para criação em massa */}
+                     {!isEditing && (
+                         <div style={{flex: '0 0 100px'}}>
+                             <input 
+                                type="number" 
+                                min="1" 
+                                placeholder="Qtd." 
+                                value={form.quantidade} 
+                                onChange={e=>setForm({...form, quantidade: e.target.value})} 
+                                className="forja-input" 
+                                title="Quantidade de itens a criar"
+                             />
+                         </div>
+                     )}
+                     <textarea placeholder="Descrição detalhada e lore do item..." value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} className="forja-input area" style={{height: '40px'}} />
+                  </div>
                   <div className="form-actions">
-                    <button type="submit" className="btn-forjar">{isEditing ? "REFUNDIR (SALVAR)" : "FORJAR ITEM"}</button>
+                    <button type="submit" className="btn-forjar">{isEditing ? "REFUNDIR (SALVAR)" : "FORJAR ITENS"}</button>
                     {isEditing && <button type="button" onClick={handleCancelEdit} className="btn-cancel">CANCELAR</button>}
                   </div>
                 </form>
@@ -84,11 +140,15 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
                   <div className="item-img" style={{backgroundImage: `url(${item.imagem || 'https://via.placeholder.com/150?text=?'})`}}></div>
                   <div className="item-info">
                     <h4>{item.nome}</h4>
-                    {item.ownerId && (<div className="owner-tag">COMPRADO POR: {item.buyerName || "Jogador"}</div>)}
+                    {item.ownerId && (<div className="owner-tag">POSSE DE: {item.buyerName || "Jogador"}</div>)}
                     <p className="desc">{item.descricao}</p>
                     <small style={{color: '#666'}}>Status: {item.ownerId ? "Cofre Pessoal" : "Cofre Global"}</small>
                   </div>
                   <div className="item-actions">
+                    {/* Botão para devolver ao bazar (Lógica de desafixar) */}
+                    {item.ownerId && (
+                        <button className="btn-icon" onClick={() => handleReturnToBazar(item.id)} title="Desafixar e Retornar ao Bazar">♻️</button>
+                    )}
                     <button className="btn-icon edit" onClick={() => handleEditClick(item)} title="Editar">🔨</button>
                     <button className="btn-icon delete" onClick={() => handleDelete(item.id)} title="Destruir">🔥</button>
                   </div>
