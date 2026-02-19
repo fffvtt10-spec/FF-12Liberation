@@ -14,8 +14,6 @@ import NPCViewer from '../components/NPCViewer';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
 // --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
-
-// Mapa Dobrável
 const IconTabletop = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
@@ -23,16 +21,12 @@ const IconTabletop = () => (
     <line x1="16" y1="6" x2="16" y2="22" />
   </svg>
 );
-
-// D20 Estilizado
 const IconDice = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" />
     <path d="M12 22V12" />
   </svg>
 );
-
-// Quadro/Paisagem
 const IconScenery = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -40,8 +34,6 @@ const IconScenery = () => (
     <polyline points="21 15 16 10 5 21" />
   </svg>
 );
-
-// Caveira/Monstro
 const IconMonsters = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2c-4 0-8 3-8 8 0 4 3 7 5 7.5V21h6v-3.5c2-.5 5-3.5 5-7.5 0-5-4-8-8-8z" />
@@ -50,16 +42,12 @@ const IconMonsters = () => (
     <path d="M10 14h4" />
   </svg>
 );
-
-// Silhueta de Pessoa
 const IconNPC = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
-
-// Peão de Xadrez (Jogador)
 const IconPlayers = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2a3 3 0 0 1 3 3c0 2-3 3-3 3s-3-1-3-3a3 3 0 0 1 3-3z" />
@@ -68,8 +56,6 @@ const IconPlayers = () => (
     <line x1="7" y1="22" x2="17" y2="22" />
   </svg>
 );
-
-// Espadas Cruzadas
 const IconCombat = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
@@ -78,8 +64,6 @@ const IconCombat = () => (
     <path d="M19 21l2-2" />
   </svg>
 );
-
-// Livro
 const IconBook = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -112,7 +96,15 @@ export default function MestreVTTPage() {
   const [isDraggingTracker, setIsDraggingTracker] = useState(false);
   const [dragOffsetTracker, setDragOffsetTracker] = useState({ x: 0, y: 0 });
 
-  // Estados Criação e Edição
+  // Estados Monster Details Drag
+  const [detailsPos, setDetailsPos] = useState({ x: 620, y: 100 });
+  const [isDraggingDetails, setIsDraggingDetails] = useState(false);
+  const [dragOffsetDetails, setDragOffsetDetails] = useState({ x: 0, y: 0 });
+
+  // Token Highlight
+  const [highlightTokenId, setHighlightTokenId] = useState(null);
+
+  // Estados Criação e Edição Bestiário
   const [editingToken, setEditingToken] = useState(null);
   const [monsterForm, setMonsterForm] = useState({
       name: '', img: '', stars: 1, difficultyQ: false, 
@@ -120,6 +112,7 @@ export default function MestreVTTPage() {
       xp: 0, drops: '', tips: '', description: '', visibleBars: false
   });
   const [bestiary, setBestiary] = useState([]);
+  const [bestiaryTab, setBestiaryTab] = useState('monsters'); // 'monsters' | 'objects'
   const [creatingMonsterStep, setCreatingMonsterStep] = useState('list'); 
 
   const [allCharacters, setAllCharacters] = useState([]);
@@ -131,18 +124,14 @@ export default function MestreVTTPage() {
 
   useEffect(() => { sessaoRef.current = sessaoAtiva; }, [sessaoAtiva]);
 
-  // --- 1. MINIMUM TIME LOADING ---
+  // Loading Timer
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, 2000); 
+    const timer = setTimeout(() => { setMinTimeElapsed(true); }, 2000); 
     return () => clearTimeout(timer);
   }, []);
 
-  // Check Loading State
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-
-  // --- 2. AUTH & DATA ---
+  // Auth & Data Sync
   useEffect(() => {
     let unsubSession = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -196,27 +185,46 @@ export default function MestreVTTPage() {
     return () => unsubAll();
   }, [sessaoAtiva?.participantes]); 
 
-  // Monster/Player Handlers
+  // Handler Piscar Token no VTT
+  const blinkToken = (id) => {
+      setHighlightTokenId(id);
+      setTimeout(() => setHighlightTokenId(null), 3000); 
+  };
+
+  // Bestiary Handlers
+  const handleDeleteBestiary = async (id) => {
+      if(!window.confirm("Excluir item permanentemente?")) return;
+      try { await deleteDoc(doc(db, "bestiary", id)); } 
+      catch(e) { console.error(e); }
+  };
+
   const handleSaveMonster = async () => {
       try {
-          await addDoc(collection(db, "bestiary"), { ...monsterForm, mestreId: auth.currentUser.uid, createdAt: new Date().toISOString() });
+          const cat = bestiaryTab === 'objects' ? 'object' : 'monster';
+          await addDoc(collection(db, "bestiary"), { 
+              ...monsterForm, 
+              category: cat,
+              mestreId: auth.currentUser.uid, 
+              createdAt: new Date().toISOString() 
+          });
           setCreatingMonsterStep('list');
           setMonsterForm({ name: '', img: '', stars: 1, difficultyQ: false, hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10, xp: 0, drops: '', tips: '', description: '', visibleBars: false });
       } catch (e) { alert("Erro: " + e.message); }
   };
 
-  const handleDeployMonster = async (monster) => {
+  const handleDeployMonster = async (item) => {
       if(!sessaoAtiva) return;
+      const tType = item.category === 'object' ? 'object' : 'enemy';
       const newToken = {
-          id: `enemy_${Date.now()}`,
-          type: 'enemy',
-          name: monster.name,
-          img: monster.img,
+          id: `${tType}_${Date.now()}`,
+          type: tType,
+          name: item.name,
+          img: item.img,
           x: 0, y: 0, size: 1,
           visible: true, 
-          visibleBars: monster.visibleBars,
-          stats: { hp: { current: monster.hpCurrent, max: monster.hpMax }, mp: { current: monster.mpCurrent, max: monster.mpMax } },
-          details: { ...monster } 
+          visibleBars: item.visibleBars,
+          stats: { hp: { current: item.hpCurrent, max: item.hpMax }, mp: { current: item.mpCurrent, max: item.mpMax } },
+          details: { ...item } 
       };
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: [...(sessaoAtiva.tokens||[]), newToken] });
       setShowMonsterManager(false); 
@@ -255,13 +263,13 @@ export default function MestreVTTPage() {
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
   };
 
-  const onDragStart = (e, index) => { e.dataTransfer.setData("dragIndex", index); };
-  const onDrop = async (e, dropIndex) => {
+  const onDragStart = (e, originalIndex) => { e.dataTransfer.setData("dragIndex", originalIndex); };
+  const onDrop = async (e, dropOriginalIndex) => {
       const dragIndex = e.dataTransfer.getData("dragIndex");
       if (dragIndex === "") return;
       const newTokens = [...sessaoAtiva.tokens];
       const [draggedItem] = newTokens.splice(dragIndex, 1);
-      newTokens.splice(dropIndex, 0, draggedItem);
+      newTokens.splice(dropOriginalIndex, 0, draggedItem);
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: newTokens });
   };
 
@@ -269,10 +277,17 @@ export default function MestreVTTPage() {
       setIsDraggingTracker(true);
       setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
   };
+  
+  const handleDetailsMouseDown = (e) => {
+      setIsDraggingDetails(true);
+      setDragOffsetDetails({ x: e.clientX - detailsPos.x, y: e.clientY - detailsPos.y });
+  };
+
   const handleWindowMouseMove = (e) => {
       if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
+      if (isDraggingDetails) { setDetailsPos({ x: e.clientX - dragOffsetDetails.x, y: e.clientY - dragOffsetDetails.y }); }
   };
-  const handleWindowMouseUp = () => { setIsDraggingTracker(false); };
+  const handleWindowMouseUp = () => { setIsDraggingTracker(false); setIsDraggingDetails(false); };
 
   // Token Edit Logic
   const handleUpdateTokenStats = async () => {
@@ -302,7 +317,9 @@ export default function MestreVTTPage() {
       setEditingToken({ ...editingToken, [axis]: currentVal + val });
   };
 
-  // --- LOADING SCREEN (PADRONIZADA) ---
+  const filteredBestiary = bestiary.filter(b => bestiaryTab === 'monsters' ? (b.category !== 'object') : (b.category === 'object'));
+
+  // --- LOADING SCREEN ---
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -316,13 +333,7 @@ export default function MestreVTTPage() {
           fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
           animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
-        <style>{`
-          @keyframes pulseText { 
-            0% { opacity: 0.3; } 
-            50% { opacity: 1; } 
-            100% { opacity: 0.3; } 
-          }
-        `}</style>
+        <style>{`@keyframes pulseText { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }`}</style>
       </div>
     );
   }
@@ -361,7 +372,9 @@ export default function MestreVTTPage() {
         sessaoData={sessaoAtiva} isMaster={true} showManager={showMapManager}
         onCloseManager={() => setShowMapManager(false)} personagensData={personagensData}
         onEditToken={(token) => setEditingToken(JSON.parse(JSON.stringify(token)))}
+        highlightTokenId={highlightTokenId} // <--- Passando o Highlight para o VTT
       />
+      
       <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} />
       <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showNPCManager} onCloseManager={() => setShowNPCManager(false)} />
       {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
@@ -381,7 +394,8 @@ export default function MestreVTTPage() {
                   <h3 className="tracker-title">COMBATE</h3>
               </div>
               <div className="tracker-list">
-                  {sessaoAtiva.tokens?.map((token, index) => {
+                  {/* --- COMBATE (JOGADORES E MONSTROS) --- */}
+                  {sessaoAtiva.tokens?.map((token, index) => ({...token, originalIndex: index})).filter(t => t.type !== 'object').map((token) => {
                       let hpVal = 0, hpMax = 0, mpVal = 0, mpMax = 0, imgUrl = token.img;
                       
                       if(token.type === 'player') {
@@ -405,12 +419,12 @@ export default function MestreVTTPage() {
                             key={token.id} 
                             className="tracker-item"
                             draggable
-                            onDragStart={(e) => onDragStart(e, index)}
+                            onDragStart={(e) => onDragStart(e, token.originalIndex)}
                             onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => onDrop(e, index)}
+                            onDrop={(e) => onDrop(e, token.originalIndex)}
                           >
                               <div className="t-col-img">
-                                  <div className="t-index">{index + 1}</div>
+                                  <div className="t-index">{token.originalIndex + 1}</div>
                                   <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`, opacity: isVisible ? 1 : 0.5}}></div>
                               </div>
                               
@@ -444,72 +458,118 @@ export default function MestreVTTPage() {
                                       <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                   </div>
                                   <div className="act-btns">
-                                      <button 
-                                        className="btn-icon-sm" 
-                                        title={isVisible ? "Ocultar" : "Mostrar"} 
-                                        onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })}
-                                        style={{color: isVisible ? '#ffcc00' : '#666'}}
-                                      >
+                                      <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
                                           {isVisible ? '👁️' : '🙈'}
                                       </button>
-
+                                      <button className="btn-icon-sm" title="Destacar no Mapa" onClick={() => blinkToken(token.id)}>👁️‍🗨️</button>
                                       {token.type === 'enemy' && (
                                           <button className="btn-icon-sm" title="Detalhes" onClick={() => setViewMonsterDetails({ ...token.details, img: token.img })}>📜</button>
                                       )}
-                                      
                                       <button className="btn-icon-sm delete" title="Remover" onClick={() => handleRemoveToken(token.id)}>✕</button>
                                   </div>
                               </div>
                           </div>
                       );
                   })}
+
+                  {/* --- OBJETOS --- */}
+                  {sessaoAtiva.tokens?.some(t => t.type === 'object') && (
+                      <>
+                          <div className="tracker-divider">OBJETOS</div>
+                          {sessaoAtiva.tokens?.map((token, index) => ({...token, originalIndex: index})).filter(t => t.type === 'object').map((token) => {
+                              const isVisible = token.visible !== false;
+
+                              return (
+                                  <div 
+                                    key={token.id} 
+                                    className="tracker-item object-item"
+                                    draggable
+                                    onDragStart={(e) => onDragStart(e, token.originalIndex)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => onDrop(e, token.originalIndex)}
+                                  >
+                                      <div className="t-col-img">
+                                          <div className="t-index">{token.originalIndex + 1}</div>
+                                          <div className="t-img" style={{backgroundImage: `url(${token.img})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`, opacity: isVisible ? 1 : 0.5}}></div>
+                                      </div>
+                                      
+                                      <div className="t-col-info">
+                                          <div className="t-name" style={{color: '#ffcc00'}}>{token.name} <small>(Obj)</small></div>
+                                      </div>
+
+                                      <div className="t-col-actions">
+                                          <div className="img-adj-grid">
+                                              <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)-10 })}>▲</button>
+                                              <div style={{display:'flex'}}>
+                                                <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)-10 })}>◄</button>
+                                                <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)+10 })}>►</button>
+                                              </div>
+                                              <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
+                                          </div>
+                                          <div className="act-btns">
+                                              <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
+                                                  {isVisible ? '👁️' : '🙈'}
+                                              </button>
+                                              <button className="btn-icon-sm" title="Destacar no Mapa" onClick={() => blinkToken(token.id)}>👁️‍🗨️</button>
+                                              <button className="btn-icon-sm delete" title="Remover" onClick={() => handleRemoveToken(token.id)}>✕</button>
+                                          </div>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </>
+                  )}
+
                   {(!sessaoAtiva.tokens || sessaoAtiva.tokens.length === 0) && <div className="empty-tracker">Mesa Vazia</div>}
               </div>
           </div>
       )}
 
+      {/* --- DETALHES DO MONSTRO FLUTUANTE (NÃO MAIS OVERLAY E ARRASTÁVEL) --- */}
       {viewMonsterDetails && (
-          <div className="ff-modal-overlay-flex" onClick={() => setViewMonsterDetails(null)}>
-              <div className="monster-detail-card" onClick={e => e.stopPropagation()}>
-                  <div className="md-header">
-                      <div className="md-title-row">
-                          <h2>{viewMonsterDetails.name}</h2>
-                          <div className="md-stars">
-                              {[...Array(viewMonsterDetails.stars || 1)].map((_,i) => <span key={i}>★</span>)}
-                              {viewMonsterDetails.difficultyQ && <span className="md-boss-mark">?</span>}
-                          </div>
-                      </div>
-                      <div className="md-sub">XP: {viewMonsterDetails.xp}</div>
-                  </div>
-                  <div className="md-body">
-                      <div className="md-img-col">
-                          <div className="md-portrait" style={{backgroundImage: `url(${viewMonsterDetails.img})`}}></div>
-                      </div>
-                      <div className="md-info-col custom-scrollbar">
-                          <div className="md-block">
-                              <label>DESCRIÇÃO</label>
-                              <p>{viewMonsterDetails.description || "Sem descrição."}</p>
-                          </div>
-                          {viewMonsterDetails.drops && (
-                              <div className="md-block">
-                                  <label>DROPS & ITENS</label>
-                                  <p>{viewMonsterDetails.drops}</p>
-                              </div>
-                          )}
-                          {viewMonsterDetails.tips && (
-                              <div className="md-block tips">
-                                  <label>DICAS DO SANCHEZ (GM)</label>
-                                  <p>{viewMonsterDetails.tips}</p>
-                              </div>
-                          )}
+          <div 
+              className="monster-detail-card draggable-card fade-in" 
+              style={{ position: 'absolute', top: detailsPos.y, left: detailsPos.x, zIndex: 1100 }}
+              onClick={e => e.stopPropagation()}
+          >
+              <div className="md-header" onMouseDown={handleDetailsMouseDown} style={{cursor: 'grab'}}>
+                  <div className="md-title-row">
+                      <h2>{viewMonsterDetails.name}</h2>
+                      <div className="md-stars">
+                          {[...Array(viewMonsterDetails.stars || 1)].map((_,i) => <span key={i}>★</span>)}
+                          {viewMonsterDetails.difficultyQ && <span className="md-boss-mark">?</span>}
                       </div>
                   </div>
-                  <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
+                  <div className="md-sub">XP: {viewMonsterDetails.xp}</div>
               </div>
+              <div className="md-body">
+                  <div className="md-img-col">
+                      <div className="md-portrait" style={{backgroundImage: `url(${viewMonsterDetails.img})`}}></div>
+                  </div>
+                  <div className="md-info-col custom-scrollbar">
+                      <div className="md-block">
+                          <label>DESCRIÇÃO</label>
+                          <p>{viewMonsterDetails.description || "Sem descrição."}</p>
+                      </div>
+                      {viewMonsterDetails.drops && (
+                          <div className="md-block">
+                              <label>DROPS & ITENS</label>
+                              <p>{viewMonsterDetails.drops}</p>
+                          </div>
+                      )}
+                      {viewMonsterDetails.tips && (
+                          <div className="md-block tips">
+                              <label>DICAS DO SANCHEZ (GM)</label>
+                              <p>{viewMonsterDetails.tips}</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+              <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
           </div>
       )}
 
-      {/* DOCK FERRAMENTAS - Z-INDEX 2000 */}
+      {/* DOCK FERRAMENTAS */}
       <div className="dm-tools-dock">
           <div className="tool-group"><Bazar isMestre={true} vttDock={true} /><div className="tool-label">BAZAR</div></div>
           <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA</div></div>
@@ -519,27 +579,41 @@ export default function MestreVTTPage() {
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank')}><IconBook /></button><div className="tool-label">LIVRO</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowSceneryManager(true)}><IconScenery /></button><div className="tool-label">CENÁRIOS</div></div>
           
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMonsterManager(true)}><IconMonsters /></button><div className="tool-label">MONSTROS</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMonsterManager(true)}><IconMonsters /></button><div className="tool-label">BESTIÁRIO & OBJETOS</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowNPCManager(true)}><IconNPC /></button><div className="tool-label">NPCS</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowPlayerManager(true)}><IconPlayers /></button><div className="tool-label">JOGADORES</div></div>
       </div>
 
       {selectedFicha && <Ficha characterData={selectedFicha} isMaster={true} onClose={() => setSelectedFicha(null)} />}
 
-      {/* --- MODAL DE BESTIÁRIO (CSS CORRIGIDO) --- */}
+      {/* --- MODAL DE BESTIÁRIO/OBJETOS --- */}
       {showMonsterManager && (
           <div className="modal-overlay-custom" onClick={() => setShowMonsterManager(false)}>
               <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
-                  <div className="modal-header-c"><h3>BESTIÁRIO</h3><button className="close-c" onClick={() => setShowMonsterManager(false)}>✕</button></div>
+                  <div className="modal-header-c">
+                      <h3>{bestiaryTab === 'monsters' ? 'BESTIÁRIO' : 'OBJETOS'}</h3>
+                      <div className="bestiary-tabs">
+                           <button className={bestiaryTab === 'monsters' ? 'active' : ''} onClick={() => {setBestiaryTab('monsters'); setCreatingMonsterStep('list');}}>MONSTROS</button>
+                           <button className={bestiaryTab === 'objects' ? 'active' : ''} onClick={() => {setBestiaryTab('objects'); setCreatingMonsterStep('list');}}>OBJETOS</button>
+                      </div>
+                      <button className="close-c" onClick={() => setShowMonsterManager(false)}>✕</button>
+                  </div>
+                  
                   {creatingMonsterStep === 'list' ? (
                       <div className="monster-list-view">
-                          <button className="btn-create-monster" onClick={() => setCreatingMonsterStep('create')}>+ CRIAR NOVA AMEAÇA</button>
+                          <button className="btn-create-monster" onClick={() => setCreatingMonsterStep('create')}>+ CRIAR NOVO {bestiaryTab === 'monsters' ? 'MONSTRO' : 'OBJETO'}</button>
                           <div className="bestiary-grid">
-                              {bestiary.map(mon => (
+                              {filteredBestiary.map(mon => (
                                   <div key={mon.id} className="monster-card-db">
                                       <div className="m-thumb" style={{backgroundImage: `url(${mon.img})`}}></div>
-                                      <div className="m-info"><strong>{mon.name}</strong><small>HP: {mon.hpMax}</small></div>
-                                      <div className="m-actions"><button className="btn-deploy" onClick={() => handleDeployMonster(mon)}>INSERIR</button></div>
+                                      <div className="m-info">
+                                          <strong>{mon.name}</strong>
+                                          {mon.category !== 'object' && <small>HP: {mon.hpMax}</small>}
+                                      </div>
+                                      <div className="m-actions">
+                                          <button className="btn-deploy" onClick={() => handleDeployMonster(mon)}>INSERIR</button>
+                                          <button className="btn-delete" onClick={() => handleDeleteBestiary(mon.id)}>EXCLUIR</button>
+                                      </div>
                                   </div>
                               ))}
                           </div>
@@ -550,17 +624,26 @@ export default function MestreVTTPage() {
                               <div className="img-upload-box"><div className="preview-img" style={{backgroundImage: `url(${monsterForm.img})`}}></div><input placeholder="Link Imagem..." value={monsterForm.img} onChange={e => setMonsterForm({...monsterForm, img: e.target.value})} /></div>
                               <div className="details-inputs">
                                   <input className="input-title" placeholder="Nome" value={monsterForm.name} onChange={e => setMonsterForm({...monsterForm, name: e.target.value})} />
-                                  <div className="stats-row-c">
-                                      <div><label>HP Max</label><input type="number" value={monsterForm.hpMax} onChange={e => setMonsterForm({...monsterForm, hpMax: Number(e.target.value), hpCurrent: Number(e.target.value)})} /></div>
-                                      <div><label>MP Max</label><input type="number" value={monsterForm.mpMax} onChange={e => setMonsterForm({...monsterForm, mpMax: Number(e.target.value), mpCurrent: Number(e.target.value)})} /></div>
-                                  </div>
+                                  
+                                  {bestiaryTab === 'monsters' && (
+                                    <div className="stats-row-c">
+                                        <div><label>HP Max</label><input type="number" value={monsterForm.hpMax} onChange={e => setMonsterForm({...monsterForm, hpMax: Number(e.target.value), hpCurrent: Number(e.target.value)})} /></div>
+                                        <div><label>MP Max</label><input type="number" value={monsterForm.mpMax} onChange={e => setMonsterForm({...monsterForm, mpMax: Number(e.target.value), mpCurrent: Number(e.target.value)})} /></div>
+                                    </div>
+                                  )}
+
                                   <div className="toggle-row"><input type="checkbox" checked={monsterForm.visibleBars} onChange={e => setMonsterForm({...monsterForm, visibleBars: e.target.checked})} /><label>Barras visíveis?</label></div>
                               </div>
                           </div>
                           <div className="text-areas-row" style={{flexDirection:'column', height:'auto'}}>
                               <textarea style={{height:'60px'}} placeholder="Descrição (Lore)..." value={monsterForm.description} onChange={e => setMonsterForm({...monsterForm, description: e.target.value})} />
-                              <textarea style={{height:'60px'}} placeholder="Drops (Use Enter para tópicos)" value={monsterForm.drops} onChange={(e) => setMonsterForm({...monsterForm, drops: e.target.value})} />
-                              <textarea style={{height:'60px'}} placeholder="Dicas do Sanchez (Secreto)" value={monsterForm.tips} onChange={e => setMonsterForm({...monsterForm, tips: e.target.value})} />
+                              
+                              {bestiaryTab === 'monsters' && (
+                                  <>
+                                      <textarea style={{height:'60px'}} placeholder="Drops (Use Enter para tópicos)" value={monsterForm.drops} onChange={(e) => setMonsterForm({...monsterForm, drops: e.target.value})} />
+                                      <textarea style={{height:'60px'}} placeholder="Dicas do Sanchez (Secreto)" value={monsterForm.tips} onChange={e => setMonsterForm({...monsterForm, tips: e.target.value})} />
+                                  </>
+                              )}
                           </div>
                           <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
                       </div>
@@ -569,7 +652,7 @@ export default function MestreVTTPage() {
           </div>
       )}
 
-      {/* --- MODAL INSERIR JOGADOR (CSS CORRIGIDO) --- */}
+      {/* --- MODAL INSERIR JOGADOR --- */}
       {showPlayerManager && (
           <div className="modal-overlay-custom" onClick={() => setShowPlayerManager(false)}>
               <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
@@ -590,20 +673,24 @@ export default function MestreVTTPage() {
           <div className="modal-overlay-custom" onClick={() => setEditingToken(null)}>
               <div className="modal-box-custom refined-edit" onClick={e => e.stopPropagation()}>
                   <h3 className="modal-edit-title">EDITAR: {editingToken.name}</h3>
-                  <div className="refined-stats-container">
-                      <div className="refined-stat-row">
-                          <span className="stat-label hp">HP</span>
-                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, hp: {...editingToken.stats.hp, current: editingToken.stats.hp.current - 1}}})}>-</button>
-                          <span className="stat-value">{editingToken.stats.hp.current} / {editingToken.stats.hp.max}</span>
-                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, hp: {...editingToken.stats.hp, current: editingToken.stats.hp.current + 1}}})}>+</button>
+                  
+                  {editingToken.type !== 'object' && (
+                      <div className="refined-stats-container">
+                          <div className="refined-stat-row">
+                              <span className="stat-label hp">HP</span>
+                              <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, hp: {...editingToken.stats.hp, current: editingToken.stats.hp.current - 1}}})}>-</button>
+                              <span className="stat-value">{editingToken.stats.hp.current} / {editingToken.stats.hp.max}</span>
+                              <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, hp: {...editingToken.stats.hp, current: editingToken.stats.hp.current + 1}}})}>+</button>
+                          </div>
+                          <div className="refined-stat-row">
+                              <span className="stat-label mp">MP</span>
+                              <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, mp: {...editingToken.stats.mp, current: editingToken.stats.mp.current - 1}}})}>-</button>
+                              <span className="stat-value">{editingToken.stats.mp.current} / {editingToken.stats.mp.max}</span>
+                              <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, mp: {...editingToken.stats.mp, current: editingToken.stats.mp.current + 1}}})}>+</button>
+                          </div>
                       </div>
-                      <div className="refined-stat-row">
-                          <span className="stat-label mp">MP</span>
-                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, mp: {...editingToken.stats.mp, current: editingToken.stats.mp.current - 1}}})}>-</button>
-                          <span className="stat-value">{editingToken.stats.mp.current} / {editingToken.stats.mp.max}</span>
-                          <button className="btn-adj" onClick={() => setEditingToken({...editingToken, stats: {...editingToken.stats, mp: {...editingToken.stats.mp, current: editingToken.stats.mp.current + 1}}})}>+</button>
-                      </div>
-                  </div>
+                  )}
+
                   <div className="refined-image-control">
                       <label>AJUSTAR ROSTO (POSIÇÃO)</label>
                       <div className="d-pad-grid">
@@ -642,8 +729,10 @@ export default function MestreVTTPage() {
         .combat-tracker-panel { position: absolute; width: 320px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
         .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
         .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
+        .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
         .tracker-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
         .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
+        .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
         .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
@@ -667,9 +756,11 @@ export default function MestreVTTPage() {
         .btn-icon-sm.delete:hover { background: #300; border-color: #f44; color: #f44; }
         .empty-tracker { text-align: center; padding: 30px; color: #666; font-style: italic; font-size: 12px; font-family: 'serif'; }
 
-        /* MONSTER DETAIL */
+        /* MONSTER DETAIL DRAGGABLE WINDOW */
         .monster-detail-card { width: 500px; max-width: 95vw; background: #0d0d10 url('https://www.transparenttextures.com/patterns/dark-matter.png'); border: 2px solid #b8860b; box-shadow: 0 0 50px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
-        .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; }
+        .draggable-card { box-shadow: 0 10px 40px rgba(0,0,0,0.9); }
+        .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; cursor: grab; }
+        .md-header:active { cursor: grabbing; }
         .md-title-row { display: flex; justify-content: space-between; align-items: center; }
         .md-title-row h2 { margin: 0; font-family: 'Cinzel', serif; color: #ffcc00; font-size: 20px; letter-spacing: 2px; }
         .md-stars { color: #ffd700; font-size: 14px; text-shadow: 0 0 5px #ffd700; }
@@ -702,7 +793,11 @@ export default function MestreVTTPage() {
         .modal-header-c h3 { margin: 0; color: #ffcc00; }
         .close-c { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
         
-        /* ESTILOS REPARADOS PARA BESTIÁRIO E LISTA JOGADORES */
+        /* TABS DO BESTIÁRIO E OBJETOS */
+        .bestiary-tabs { display: flex; gap: 15px; margin: 0 20px; }
+        .bestiary-tabs button { background: transparent; border: none; color: #aaa; font-family: 'Cinzel', serif; font-size: 12px; cursor: pointer; padding-bottom: 5px; font-weight: bold; }
+        .bestiary-tabs button.active { color: #ffcc00; border-bottom: 2px solid #ffcc00; }
+        
         .monster-list-view { display: flex; flex-direction: column; gap: 15px; width: 100%; }
         .btn-create-monster { background: #222; border: 1px dashed #ffcc00; color: #ffcc00; padding: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; text-align: center; width: 100%; }
         .btn-create-monster:hover { background: rgba(255, 204, 0, 0.1); }
@@ -712,14 +807,16 @@ export default function MestreVTTPage() {
         .m-info { flex: 1; display: flex; flex-direction: column; font-size: 12px; }
         .m-info strong { color: #fff; font-size: 14px; }
         .m-info small { color: #888; }
+        .m-actions { display: flex; flex-direction: column; gap: 4px; }
         .btn-deploy { background: #00f2ff; color: #000; border: none; font-size: 10px; font-weight: bold; padding: 4px 8px; cursor: pointer; border-radius: 2px; }
+        .btn-delete { background: #f44; color: #fff; border: none; font-size: 10px; font-weight: bold; padding: 4px 8px; cursor: pointer; border-radius: 2px; }
         
         .player-select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
         .char-select-card { background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; border-radius: 4px; }
         .char-select-card:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
         .c-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #fff; flex-shrink: 0; }
 
-        /* REFINED EDIT MODAL (CORRIGIDO PARA NÃO CORTAR) */
+        /* REFINED EDIT MODAL */
         .modal-box-custom.refined-edit { width: 450px; padding: 30px; overflow: visible; background: #0d0d10; border: 2px solid #ffcc00; box-shadow: 0 0 50px rgba(255, 204, 0, 0.2); max-height: none; height: auto; }
         .modal-edit-title { text-align: center; color: #ffcc00; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; letter-spacing: 1px; }
         .refined-stats-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
@@ -734,7 +831,6 @@ export default function MestreVTTPage() {
         .d-pad-grid { display: inline-grid; grid-template-columns: 30px 30px 30px; gap: 5px; justify-content: center; }
         .d-pad-grid button { width: 30px; height: 30px; background: #222; border: 1px solid #555; color: #ffcc00; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; }
         .d-pad-grid button:hover { background: #ffcc00; color: #000; }
-        .center-dot { width: 6px; height: 6px; background: #555; border-radius: 50%; margin: auto; }
         .btn-save-refined { width: 100%; padding: 15px; font-size: 14px; font-weight: bold; background: #ffcc00; color: #000; border: none; cursor: pointer; text-transform: uppercase; margin-top: 10px; transition: 0.2s; }
         .btn-save-refined:hover { background: #fff; box-shadow: 0 0 20px #ffcc00; }
 

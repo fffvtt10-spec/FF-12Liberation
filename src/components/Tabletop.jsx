@@ -14,25 +14,30 @@ const getPlayerColor = (uid) => {
 };
 
 // --- COMPONENTE INTERNO DO PING ---
-const PingMarker = ({ ping }) => {
+// Agora centraliza automaticamente no grid
+const PingMarker = ({ ping, gridSizePx }) => {
+    const pxX = ping.gX * gridSizePx + gridSizePx / 2;
+    const pxY = ping.gY * gridSizePx + gridSizePx / 2;
+
     return (
         <div 
             className={`ping-marker ${ping.isMaster ? 'master-ping' : ''}`}
             style={{ 
-                left: ping.x, 
-                top: ping.y,
+                left: pxX, 
+                top: pxY,
                 '--ping-color': ping.color // Variável CSS para facilitar
             }}
         >
             <div className="ping-center" style={{ backgroundColor: ping.color }}></div>
             <div className="ping-ripple" style={{ borderColor: ping.color }}></div>
             {ping.isMaster && <div className="ping-ripple delay" style={{ borderColor: ping.color }}></div>}
+            <div className="ping-name" style={{ color: ping.color }}>{ping.userName}</div>
         </div>
     );
 };
 
 // --- COMPONENTE INTERNO DO TOKEN ---
-const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) => {
+const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighlighted }) => {
     const [flash, setFlash] = useState('');
     const prevHp = useRef(token.stats?.hp?.current);
 
@@ -70,7 +75,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
 
     return (
         <div 
-            className={`vtt-token ${token.type} ${flash} ${!isVisible ? 'ghost-token' : ''}`}
+            className={`vtt-token ${token.type} ${flash} ${!isVisible ? 'ghost-token' : ''} ${isHighlighted ? 'blinking-highlight' : ''}`}
             style={{
                 width: sizePx,
                 height: sizePx,
@@ -79,7 +84,8 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
                 cursor: isMaster || (token.type === 'player' && token.controlledBy === 'me') ? 'grab' : 'default',
                 zIndex: isMaster ? 100 : 50 
             }}
-            onMouseDown={(e) => onMouseDown(e, token)}
+            onMouseDown={(e) => onStart(e, token)}
+            onTouchStart={(e) => onStart(e, token)}
         >
             <div 
                 className="token-inner" 
@@ -91,8 +97,8 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
             
             {isMaster && (
                 <div className="token-sizer">
-                    <button onMouseDown={(e) => { e.stopPropagation(); onUpdate('resize', token, -1); }}>-</button>
-                    <button onMouseDown={(e) => { e.stopPropagation(); onUpdate('resize', token, 1); }}>+</button>
+                    <button onMouseDown={(e) => { e.stopPropagation(); onUpdate('resize', token, -1); }} onTouchStart={(e) => { e.stopPropagation(); onUpdate('resize', token, -1); }}>-</button>
+                    <button onMouseDown={(e) => { e.stopPropagation(); onUpdate('resize', token, 1); }} onTouchStart={(e) => { e.stopPropagation(); onUpdate('resize', token, 1); }}>+</button>
                 </div>
             )}
             
@@ -101,7 +107,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onMouseDown, charData }) =
     );
 };
 
-export default function Tabletop({ sessaoData, isMaster, showManager, onCloseManager, currentUserUid, personagensData }) {
+export default function Tabletop({ sessaoData, isMaster, showManager, onCloseManager, currentUserUid, personagensData, highlightTokenId }) {
   const [activeMap, setActiveMap] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [tokens, setTokens] = useState([]);
@@ -121,9 +127,16 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const [isMeasuring, setIsMeasuring] = useState(false);
   const [rulerStart, setRulerStart] = useState(null);
   const [rulerCurrent, setRulerCurrent] = useState(null);
+
+  // Estados da Ferramenta de Pintura
+  const [paintColor, setPaintColor] = useState('#00f2ff');
+  const [isPainting, setIsPainting] = useState(false);
+  const [currentPaintGroupId, setCurrentPaintGroupId] = useState(null);
+  const [tempPaintCells, setTempPaintCells] = useState([]);
   
   const mapContainerRef = useRef(null);
   const imgRef = useRef(null);
+  const lastPingTime = useRef(0);
 
   // --- EFEITOS E SINCRONIZAÇÃO ---
   useEffect(() => {
@@ -149,27 +162,25 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
     }
   }, [sessaoData, isMaster]); 
 
-  // --- CORREÇÃO: Limpeza automática de pings com setInterval ---
+  // Limpeza automática de pings (agora checa a cada segundo e expira após 3s)
   useEffect(() => {
-      if (!isMaster) return; // Apenas o mestre limpa
+      if (!isMaster) return;
 
       const interval = setInterval(() => {
           if (!pings || pings.length === 0) return;
 
           const now = Date.now();
-          // Identifica pings expirados (mais de 3 segundos)
           const pingsToDelete = pings.filter(p => now - p.createdAt > 3000);
           
           if (pingsToDelete.length > 0) {
               const sessaoRef = doc(db, "sessoes", sessaoData.id);
-              // Remove um por um para evitar conflitos de concorrência com novos pings
               pingsToDelete.forEach(async (p) => {
                   try {
                       await updateDoc(sessaoRef, { pings: arrayRemove(p) });
                   } catch(e) { console.log("Erro ao limpar ping", e); }
               });
           }
-      }, 1000); // Verifica a cada 1 segundo
+      }, 1000); 
 
       return () => clearInterval(interval);
   }, [pings, isMaster, sessaoData?.id]);
@@ -188,20 +199,38 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const getLocalCoords = (e) => {
       if (!mapContainerRef.current) return { x: 0, y: 0 };
       const rect = mapContainerRef.current.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
   const handleCreatePing = async (e) => {
       if (!activeMap) return;
-      const coords = getLocalCoords(e);
       
+      const now = Date.now();
+      if (now - lastPingTime.current < 5000) return; // Cooldown de 5 segundos
+      lastPingTime.current = now;
+
+      const coords = getLocalCoords(e);
+      // Salva a posição atrelada ao Grid, para bater com a responsividade
+      const gX = Math.floor(coords.x / gridSizePx);
+      const gY = Math.floor(coords.y / gridSizePx);
+      
+      let uName = "Desconhecido";
+      if (isMaster) uName = "Mestre";
+      else {
+          const char = personagensData?.find(p => p.uid === currentUserUid);
+          if (char) uName = char.name;
+      }
+
       const newPing = {
           id: Date.now().toString() + Math.random(),
-          x: coords.x,
-          y: coords.y,
+          gX: gX,
+          gY: gY,
           color: isMaster ? '#ffd700' : getPlayerColor(currentUserUid),
-          isMaster: !!isMaster, // Garante que é booleano
+          isMaster: !!isMaster, 
           createdAt: Date.now(),
+          userName: uName,
           uid: currentUserUid || 'anon'
       };
 
@@ -214,24 +243,46 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       }
   };
 
-  const handleTokenMouseDown = (e, token) => {
-      if (activeTool === 'ruler' || activeTool === 'ping') return;
+  const handleTokenStart = (e, token) => {
+      if (activeTool !== 'cursor') return;
       const isMine = token.type === 'player' && token.uid === currentUserUid;
       if (!isMaster && !isMine) return;
 
       e.stopPropagation();
-      e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
       const rect = e.currentTarget.getBoundingClientRect();
-      setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      setDragOffset({ x: clientX - rect.left, y: clientY - rect.top });
       setDraggingToken({ ...token, tempX: token.x * gridSizePx, tempY: token.y * gridSizePx });
   };
 
-  const handleMouseMove = (e) => {
-      if (isMeasuring) setRulerCurrent(getLocalCoords(e));
+  const handleMove = (e) => {
+      if (isMeasuring && activeTool === 'ruler') {
+          const coords = getLocalCoords(e);
+          setRulerCurrent({ 
+              gX: Math.floor(coords.x / gridSizePx), 
+              gY: Math.floor(coords.y / gridSizePx) 
+          });
+      }
+
+      if (isPainting && activeTool === 'paint') {
+          const coords = getLocalCoords(e);
+          const gX = Math.floor(coords.x / gridSizePx);
+          const gY = Math.floor(coords.y / gridSizePx);
+          
+          setTempPaintCells(prev => {
+              if (prev.find(c => c.gX === gX && c.gY === gY)) return prev;
+              return [...prev, { gX, gY, color: paintColor }];
+          });
+      }
+
       if (draggingToken) {
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
           const parentRect = mapContainerRef.current.getBoundingClientRect();
-          let newX = e.clientX - parentRect.left - dragOffset.x;
-          let newY = e.clientY - parentRect.top - dragOffset.y;
+          let newX = clientX - parentRect.left - dragOffset.x;
+          let newY = clientY - parentRect.top - dragOffset.y;
           const sizeMult = draggingToken.size || 1;
           const maxX = parentRect.width - (gridSizePx * sizeMult);
           const maxY = parentRect.height - (gridSizePx * sizeMult);
@@ -239,8 +290,27 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       }
   };
 
-  const handleMouseUp = async () => {
+  const handleUp = async () => {
       if (isMeasuring) { setIsMeasuring(false); setRulerStart(null); setRulerCurrent(null); }
+      
+      if (isPainting && activeTool === 'paint') {
+          setIsPainting(false);
+          if (tempPaintCells.length > 0) {
+              const newGroup = {
+                  groupId: currentPaintGroupId,
+                  color: paintColor,
+                  cells: tempPaintCells
+              };
+              try {
+                  await updateDoc(doc(db, "sessoes", sessaoData.id), {
+                      painted_groups: arrayUnion(newGroup)
+                  });
+              } catch(err) { console.error("Erro ao salvar pintura", err); }
+              setTempPaintCells([]);
+              setCurrentPaintGroupId(null);
+          }
+      }
+
       if (draggingToken) {
           const gridX = Math.round(draggingToken.tempX / gridSizePx);
           const gridY = Math.round(draggingToken.tempY / gridSizePx);
@@ -272,19 +342,34 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       }
   };
 
-  const handleMouseDown = (e) => {
+  const handleMapStart = (e) => {
       if (activeTool === 'ping') {
-          e.preventDefault();
+          if (e.cancelable) e.preventDefault();
           handleCreatePing(e);
           return;
       }
 
+      if (activeTool === 'paint') {
+          if (e.cancelable) e.preventDefault();
+          setIsPainting(true);
+          const groupId = Date.now().toString();
+          setCurrentPaintGroupId(groupId);
+          const coords = getLocalCoords(e);
+          const gX = Math.floor(coords.x / gridSizePx);
+          const gY = Math.floor(coords.y / gridSizePx);
+          setTempPaintCells([{ gX, gY, color: paintColor }]);
+          return;
+      }
+
+      // Check for right click OR if tool is ruler
       if (activeTool === 'ruler' || e.button === 2) {
-          e.preventDefault(); 
+          if (e.cancelable) e.preventDefault(); 
           setIsMeasuring(true);
-          const rawCoords = getLocalCoords(e);
-          setRulerStart(rawCoords);
-          setRulerCurrent(rawCoords);
+          const coords = getLocalCoords(e);
+          const gX = Math.floor(coords.x / gridSizePx);
+          const gY = Math.floor(coords.y / gridSizePx);
+          setRulerStart({ gX, gY });
+          setRulerCurrent({ gX, gY });
       }
   };
 
@@ -296,12 +381,20 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   };
 
   const calculateDistance = () => {
-    if (!rulerStart || !rulerCurrent || !gridSizePx) return "0m";
-    const dx = Math.abs(rulerStart.x - rulerCurrent.x);
-    const dy = Math.abs(rulerStart.y - rulerCurrent.y);
-    const distPx = Math.sqrt(dx*dx + dy*dy);
-    const squares = distPx / gridSizePx;
-    return `${(squares * 1.5).toFixed(1)}m (${squares.toFixed(1)} qd)`;
+    if (!rulerStart || !rulerCurrent) return "0m";
+    const dx = Math.abs(rulerStart.gX - rulerCurrent.gX);
+    const dy = Math.abs(rulerStart.gY - rulerCurrent.gY);
+    const squares = dx + dy; // Distância de Manhattan / Deslocamento Ortogonal
+    return `${(squares * 1.5).toFixed(1)}m (${squares} qd)`;
+  };
+
+  const handleDeletePaintGroup = async (groupObj) => {
+      if (!isMaster) return;
+      try {
+          await updateDoc(doc(db, "sessoes", sessaoData.id), {
+              painted_groups: arrayRemove(groupObj)
+          });
+      } catch(err) { console.error("Erro ao apagar pintura", err); }
   };
 
   const handleSaveMapInfo = async (mapItem) => {
@@ -328,101 +421,161 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   return (
     <>
         {activeMap && (
-            <div className={`tabletop-wrapper ${isMinimized ? 'minimized' : ''}`}>
-                <div className="tt-header">
-                    <span className="tt-title">📍 {activeMap.name}</span>
-                    {!isMinimized && (
-                        <div className="tt-toolbar">
-                            <button className={`tool-btn ${activeTool === 'cursor' ? 'active' : ''}`} onClick={() => setActiveTool('cursor')} title="Mover">👆</button>
-                            <button className={`tool-btn ${activeTool === 'ruler' ? 'active' : ''}`} onClick={() => setActiveTool('ruler')} title="Régua">📏</button>
-                            <button className={`tool-btn ${activeTool === 'ping' ? 'active' : ''}`} onClick={() => setActiveTool('ping')} title="Ping">🎯</button>
-                            
-                            {isMaster && (
-                                <div className="grid-control-box">
-                                    <span className="grid-label">GRID</span>
-                                    <div className="grid-input-wrapper">
-                                        <button className="grid-btn-mini" onClick={() => updateGridDb(gridCols - 1)}>-</button>
-                                        <input type="number" className="grid-number-display" value={gridCols} onChange={(e) => updateGridDb(e.target.value)} />
-                                        <button className="grid-btn-mini" onClick={() => updateGridDb(gridCols + 1)}>+</button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    <div className="tt-controls">
-                        <button onClick={() => setIsMinimized(!isMinimized)}>{isMinimized ? '🔼' : '🔽'}</button>
-                        {isMaster && <button className="close-x" onClick={handleDeactivateMap}>✕</button>}
-                    </div>
+            <>
+                {/* OVERLAY EXCLUSIVO PARA FORÇAR CELULAR NA HORIZONTAL */}
+                <div className="rotate-device-overlay">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin-phone-icon">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                    <h2 style={{marginTop: '20px', fontSize: '20px', textShadow: '0 0 10px #ffcc00'}}>VIRE O DISPOSITIVO</h2>
+                    <p style={{fontSize: '12px', color: '#ccc', maxWidth: '80%', margin: '10px auto'}}>
+                        A Mesa Virtual requer a tela na horizontal para liberar os controles de forma correta e exibir o mapa inteiro.
+                    </p>
                 </div>
 
-                {!isMinimized && (
-                    <div className="tt-viewport">
-                        <div 
-                            className="map-layer-container"
-                            ref={mapContainerRef}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
-                            onContextMenu={e => e.preventDefault()}
-                            style={{ 
-                                cursor: activeTool === 'ruler' ? 'crosshair' : activeTool === 'ping' ? 'copy' : 'default' 
-                            }}
-                        >
-                            <img ref={imgRef} src={activeMap.url} alt="Map" className="map-img-element" />
-                            
-                            {/* CAMADA DE PINGS */}
-                            <div className="pings-layer">
-                                {pings.map(p => (
-                                    <PingMarker key={p.id} ping={p} />
-                                ))}
-                            </div>
-
-                            {gridSizePx > 0 && (
-                                <>
-                                    <div className="grid-layer" style={{
-                                        backgroundSize: `${gridSizePx}px ${gridSizePx}px`,
-                                        backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)`
-                                    }}></div>
-                                    <div className="tokens-layer">
-                                        {tokens.map(t => (
-                                            (draggingToken && draggingToken.id === t.id) ? null : (
-                                                <Token 
-                                                    key={t.id} token={t} gridSize={gridSizePx} isMaster={isMaster}
-                                                    onUpdate={handleTokenUpdate} onMouseDown={handleTokenMouseDown}
-                                                    charData={t.type === 'player' ? personagensData.find(p => p.uid === t.uid) : null}
-                                                />
-                                            )
-                                        ))}
-                                        {draggingToken && (
-                                            <div 
-                                                className={`vtt-token ${draggingToken.type} dragging`}
-                                                style={{
-                                                    width: gridSizePx * (draggingToken.size || 1), height: gridSizePx * (draggingToken.size || 1),
-                                                    left: draggingToken.tempX, top: draggingToken.tempY,
-                                                    cursor: 'grabbing', zIndex: 1000
-                                                }}
-                                            >
-                                                <div className="token-inner" style={{backgroundImage: `url(${draggingToken.img})`, backgroundPosition: `${draggingToken.imgX||50}% ${draggingToken.imgY||50}%`}}></div>
-                                            </div>
-                                        )}
+                <div className={`tabletop-wrapper ${isMinimized ? 'minimized' : ''}`}>
+                    <div className="tt-header">
+                        <span className="tt-title">📍 {activeMap.name}</span>
+                        {!isMinimized && (
+                            <div className="tt-toolbar">
+                                <button className={`tool-btn ${activeTool === 'cursor' ? 'active' : ''}`} onClick={() => setActiveTool('cursor')} title="Mover">👆</button>
+                                <button className={`tool-btn ${activeTool === 'ruler' ? 'active' : ''}`} onClick={() => setActiveTool('ruler')} title="Régua">📏</button>
+                                <button className={`tool-btn ${activeTool === 'ping' ? 'active' : ''}`} onClick={() => setActiveTool('ping')} title="Ping">🎯</button>
+                                {isMaster && (
+                                    <button className={`tool-btn ${activeTool === 'paint' ? 'active' : ''}`} onClick={() => setActiveTool('paint')} title="Pintar Mapa">🖌️</button>
+                                )}
+                                
+                                {isMaster && activeTool === 'paint' && (
+                                    <div className="paint-colors">
+                                        <input type="color" value={paintColor} onChange={e => setPaintColor(e.target.value)} title="Escolher Cor" />
                                     </div>
-                                </>
-                            )}
-                            {isMeasuring && rulerStart && rulerCurrent && (
-                                <div className="ruler-overlay">
-                                    <svg width="100%" height="100%">
-                                        <line x1={rulerStart.x} y1={rulerStart.y} x2={rulerCurrent.x} y2={rulerCurrent.y} stroke="#ffcc00" strokeWidth="3" strokeDasharray="10,5" filter="drop-shadow(0px 0px 2px black)" />
-                                        <circle cx={rulerStart.x} cy={rulerStart.y} r="4" fill="#ffcc00" stroke="black" />
-                                        <circle cx={rulerCurrent.x} cy={rulerCurrent.y} r="4" fill="#ffcc00" stroke="black" />
-                                    </svg>
-                                    <div className="ruler-tag" style={{ left: rulerCurrent.x + 15, top: rulerCurrent.y + 15 }}>{calculateDistance()}</div>
-                                </div>
-                            )}
+                                )}
+
+                                {isMaster && (
+                                    <div className="grid-control-box">
+                                        <span className="grid-label">GRID</span>
+                                        <div className="grid-input-wrapper">
+                                            <button className="grid-btn-mini" onClick={() => updateGridDb(gridCols - 1)}>-</button>
+                                            <input type="number" className="grid-number-display" value={gridCols} onChange={(e) => updateGridDb(e.target.value)} />
+                                            <button className="grid-btn-mini" onClick={() => updateGridDb(gridCols + 1)}>+</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isMaster && sessaoData.painted_groups?.length > 0 && (
+                                    <div className="paint-groups-manager">
+                                        {sessaoData.painted_groups.map((g, i) => (
+                                            <button key={g.groupId} className="paint-group-btn" onClick={() => handleDeletePaintGroup(g)} title="Apagar Pintura">M{i+1} ✖</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="tt-controls">
+                            <button onClick={() => setIsMinimized(!isMinimized)}>{isMinimized ? '🔼' : '🔽'}</button>
+                            {isMaster && <button className="close-x" onClick={handleDeactivateMap}>✕</button>}
                         </div>
                     </div>
-                )}
-            </div>
+
+                    {!isMinimized && (
+                        <div className="tt-viewport">
+                            <div 
+                                className="map-layer-container"
+                                ref={mapContainerRef}
+                                onMouseDown={handleMapStart}
+                                onTouchStart={handleMapStart}
+                                onMouseMove={handleMove}
+                                onTouchMove={handleMove}
+                                onMouseUp={handleUp}
+                                onTouchEnd={handleUp}
+                                onMouseLeave={handleUp}
+                                onTouchCancel={handleUp}
+                                onContextMenu={e => e.preventDefault()}
+                                style={{ 
+                                    cursor: activeTool === 'ruler' ? 'crosshair' : activeTool === 'ping' ? 'copy' : activeTool === 'paint' ? 'cell' : 'default' 
+                                }}
+                            >
+                                <img ref={imgRef} src={activeMap.url} alt="Map" className="map-img-element" />
+                                
+                                {gridSizePx > 0 && (
+                                    <>
+                                        {/* CAMADA DE PINTURAS (Abaixo dos tokens) */}
+                                        <div className="paint-layer">
+                                            {sessaoData.painted_groups?.map(group => (
+                                                group.cells.map((cell, idx) => (
+                                                    <div key={`${group.groupId}-${idx}`} className="painted-grid-cell" style={{
+                                                        left: cell.gX * gridSizePx, top: cell.gY * gridSizePx, width: gridSizePx, height: gridSizePx,
+                                                        backgroundColor: group.color
+                                                    }} />
+                                                ))
+                                            ))}
+                                            {tempPaintCells.map((cell, idx) => (
+                                                <div key={`temp-${idx}`} className="painted-grid-cell" style={{
+                                                    left: cell.gX * gridSizePx, top: cell.gY * gridSizePx, width: gridSizePx, height: gridSizePx,
+                                                    backgroundColor: cell.color
+                                                }} />
+                                            ))}
+                                        </div>
+
+                                        <div className="grid-layer" style={{
+                                            backgroundSize: `${gridSizePx}px ${gridSizePx}px`,
+                                            backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)`
+                                        }}></div>
+                                        
+                                        <div className="tokens-layer">
+                                            {tokens.map(t => (
+                                                (draggingToken && draggingToken.id === t.id) ? null : (
+                                                    <Token 
+                                                        key={t.id} token={t} gridSize={gridSizePx} isMaster={isMaster}
+                                                        onUpdate={handleTokenUpdate} onStart={handleTokenStart}
+                                                        charData={t.type === 'player' ? personagensData?.find(p => p.uid === t.uid) : null}
+                                                        isHighlighted={t.id === highlightTokenId}
+                                                    />
+                                                )
+                                            ))}
+                                            {draggingToken && (
+                                                <div 
+                                                    className={`vtt-token ${draggingToken.type} dragging`}
+                                                    style={{
+                                                        width: gridSizePx * (draggingToken.size || 1), height: gridSizePx * (draggingToken.size || 1),
+                                                        left: draggingToken.tempX, top: draggingToken.tempY,
+                                                        cursor: 'grabbing', zIndex: 1000
+                                                    }}
+                                                >
+                                                    <div className="token-inner" style={{backgroundImage: `url(${draggingToken.img})`, backgroundPosition: `${draggingToken.imgX||50}% ${draggingToken.imgY||50}%`}}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {/* CAMADA DE PINGS */}
+                                        <div className="pings-layer">
+                                            {pings.map(p => (
+                                                <PingMarker key={p.id} ping={p} gridSizePx={gridSizePx} />
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                                {isMeasuring && rulerStart && rulerCurrent && (
+                                    <div className="ruler-overlay">
+                                        <svg width="100%" height="100%">
+                                            <path 
+                                                d={`M ${rulerStart.gX * gridSizePx + gridSizePx/2} ${rulerStart.gY * gridSizePx + gridSizePx/2} 
+                                                    L ${rulerCurrent.gX * gridSizePx + gridSizePx/2} ${rulerStart.gY * gridSizePx + gridSizePx/2} 
+                                                    L ${rulerCurrent.gX * gridSizePx + gridSizePx/2} ${rulerCurrent.gY * gridSizePx + gridSizePx/2}`} 
+                                                stroke="#ffcc00" strokeWidth="3" strokeDasharray="10,5" fill="none" filter="drop-shadow(0px 0px 2px black)" 
+                                            />
+                                            <circle cx={rulerStart.gX * gridSizePx + gridSizePx/2} cy={rulerStart.gY * gridSizePx + gridSizePx/2} r="4" fill="#ffcc00" stroke="black" />
+                                            <circle cx={rulerCurrent.gX * gridSizePx + gridSizePx/2} cy={rulerCurrent.gY * gridSizePx + gridSizePx/2} r="4" fill="#ffcc00" stroke="black" />
+                                        </svg>
+                                        <div className="ruler-tag" style={{ left: rulerCurrent.gX * gridSizePx + gridSizePx/2 + 15, top: rulerCurrent.gY * gridSizePx + gridSizePx/2 + 15 }}>{calculateDistance()}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </>
         )}
 
         {isMaster && showManager && ( 
@@ -451,7 +604,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .tabletop-wrapper.minimized { width: 400px; height: 45px; top: 96%; left: 50%; border-color: #444; border-radius: 10px 10px 0 0; }
             .tt-header { height: 45px; background: #1a1a1a; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; }
             .tt-title { color: #ffcc00; font-weight: bold; letter-spacing: 1px; font-size: 14px; }
-            .tt-toolbar { display: flex; gap: 15px; align-items: center; background: #000; padding: 4px 15px; border-radius: 20px; border: 1px solid #333; }
+            .tt-toolbar { display: flex; gap: 15px; align-items: center; background: #000; padding: 4px 15px; border-radius: 20px; border: 1px solid #333; flex-wrap: wrap; }
             .tool-btn { background: none; border: none; font-size: 18px; cursor: pointer; opacity: 0.5; }
             .tool-btn.active { opacity: 1; border-bottom: 2px solid #00f2ff; }
             .tt-controls button { background: none; border: none; color: #aaa; cursor: pointer; margin-left: 10px; }
@@ -462,16 +615,32 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .grid-btn-mini { background: #333; color: #fff; border: none; width: 20px; cursor: pointer; }
             .grid-number-display { width: 30px; background: #222; border: none; color: #ffcc00; text-align: center; font-size: 12px; outline: none; }
             
-            .map-layer-container { position: relative; box-shadow: 0 0 30px #000; user-select: none; }
+            /* TOQUE NATIVO (MOBILE) - OBRIGA O GRID A IGNORAR O SCROLL DA PÁGINA PARA TOQUES FLUIDOS */
+            .map-layer-container { position: relative; box-shadow: 0 0 30px #000; user-select: none; touch-action: none; }
             .map-img-element { display: block; max-width: 100%; max-height: 80vh; object-fit: contain; pointer-events: none; }
-            .grid-layer, .tokens-layer, .pings-layer, .ruler-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+            
+            .grid-layer, .tokens-layer, .pings-layer, .ruler-overlay, .paint-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
             .grid-layer { pointer-events: none; z-index: 2; opacity: 0.6; }
+            .paint-layer { pointer-events: none; z-index: 3; }
             .tokens-layer { z-index: 5; }
             .pings-layer { z-index: 20; pointer-events: none; }
             .ruler-overlay { z-index: 10; pointer-events: none; }
             .ruler-tag { position: absolute; background: rgba(0,0,0,0.9); color: #ffcc00; border: 1px solid #ffcc00; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; pointer-events: none; z-index: 20; }
 
-            /* --- ESTILOS DE PING (CORRIGIDO) --- */
+            /* --- OVERLAY PARA FORÇAR CELULAR NA HORIZONTAL --- */
+            .rotate-device-overlay { display: none; }
+            @media screen and (max-width: 950px) and (orientation: portrait) {
+                .rotate-device-overlay {
+                    display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                    background: #000; z-index: 9999999; flex-direction: column; align-items: center; justify-content: center;
+                    color: #ffcc00; font-family: 'Cinzel', serif; text-align: center; padding: 20px; box-sizing: border-box;
+                }
+                .tabletop-wrapper { display: none !important; }
+            }
+            .spin-phone-icon { animation: spinPhone 2s ease-in-out infinite; }
+            @keyframes spinPhone { 0% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } 100% { transform: rotate(-90deg); } }
+
+            /* --- ESTILOS DE PING E NOMES --- */
             .ping-marker {
                 position: absolute;
                 width: 0; height: 0;
@@ -499,7 +668,16 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             }
             .ping-ripple.delay { animation-delay: 0.5s; }
             
-            /* Estilo específico do Mestre */
+            .ping-name {
+                position: absolute; 
+                top: 25px; left: 50%; 
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.85);
+                padding: 2px 8px; border-radius: 4px; 
+                font-size: 11px; font-weight: bold; 
+                white-space: nowrap; font-family: sans-serif;
+            }
+
             .ping-marker.master-ping .ping-center {
                 width: 16px; height: 16px; left: -8px; top: -8px;
                 box-shadow: 0 0 20px #ffd700, 0 0 40px #ffd700;
@@ -522,14 +700,48 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                 100% { transform: scale(2.0); opacity: 0; border-width: 0px; }
             }
 
+            /* --- ESTILOS DA PINTURA DE MAPA (GLASSMORPHISM) --- */
+            .paint-colors { display: flex; align-items: center; margin-left: 10px; border-left: 1px solid #444; padding-left: 10px; }
+            .paint-colors input[type="color"] { background: none; border: none; width: 25px; height: 25px; cursor: pointer; padding: 0; }
+            .paint-groups-manager { display: flex; gap: 5px; margin-left: 10px; align-items: center; }
+            .paint-group-btn { background: #222; border: 1px solid #555; color: #fff; padding: 2px 6px; font-size: 10px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+            .paint-group-btn:hover { background: #f44; border-color: #f44; }
+
+            .painted-grid-cell {
+                position: absolute;
+                backdrop-filter: blur(2px);
+                animation: pulsePaint 2s infinite alternate ease-in-out;
+                pointer-events: none;
+                box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+                border-radius: 2px;
+            }
+            @keyframes pulsePaint {
+                0% { filter: brightness(0.8); opacity: 0.6; }
+                100% { filter: brightness(1.2); opacity: 1; }
+            }
+
+            /* --- TOKENS --- */
             .vtt-token { position: absolute; border-radius: 50%; box-shadow: 0 0 10px #000; z-index: 10; overflow: visible; }
             .vtt-token.dragging { z-index: 100; transition: none; box-shadow: 0 10px 20px rgba(0,0,0,0.8); transform: scale(1.05); }
             .vtt-token.enemy { border: 2px solid #f44; }
             .vtt-token.player { border: 2px solid #00f2ff; }
+            .vtt-token.object { border: 2px dashed #ffcc00; border-radius: 4px; } 
             
             .vtt-token.ghost-token { opacity: 0.5; filter: grayscale(100%); border-style: dashed; }
 
-            .token-inner { width: 100%; height: 100%; border-radius: 50%; background-size: cover; pointer-events: none; background-repeat: no-repeat; }
+            /* ANIMAÇÃO DE DESTAQUE (BLINK/PISCAR) */
+            .blinking-highlight {
+                animation: superBlink 0.5s infinite alternate !important;
+                border: 4px solid #ffcc00 !important;
+                box-shadow: 0 0 30px #ffcc00, 0 0 50px rgba(255, 204, 0, 0.5) !important;
+                z-index: 200 !important;
+            }
+            @keyframes superBlink {
+                0% { filter: brightness(1); transform: scale(1); }
+                100% { filter: brightness(1.8); transform: scale(1.2); }
+            }
+
+            .token-inner { width: 100%; height: 100%; border-radius: inherit; background-size: cover; pointer-events: none; background-repeat: no-repeat; }
             .token-name { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; font-size: 10px; padding: 2px 5px; border-radius: 4px; white-space: nowrap; pointer-events: none; opacity: 0; transition: 0.2s; z-index: 15; text-shadow: 0 0 3px #000; }
             .vtt-token:hover .token-name { opacity: 1; }
             

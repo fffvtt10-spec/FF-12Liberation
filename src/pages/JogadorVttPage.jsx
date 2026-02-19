@@ -229,6 +229,11 @@ export default function JogadorVttPage() {
   const [isDraggingTracker, setIsDraggingTracker] = useState(false);
   const [dragOffsetTracker, setDragOffsetTracker] = useState({ x: 0, y: 0 });
 
+  // Estados Monster Details Drag
+  const [detailsPos, setDetailsPos] = useState({ x: 620, y: 100 });
+  const [isDraggingDetails, setIsDraggingDetails] = useState(false);
+  const [dragOffsetDetails, setDragOffsetDetails] = useState({ x: 0, y: 0 });
+
   const [showDiceSelector, setShowDiceSelector] = useState(false);
   const [rollResult, setRollResult] = useState(null);
   const dismissedRollTimestamp = useRef(0);
@@ -361,10 +366,15 @@ export default function JogadorVttPage() {
       setIsDraggingTracker(true);
       setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
   };
+  const handleDetailsMouseDown = (e) => {
+      setIsDraggingDetails(true);
+      setDragOffsetDetails({ x: e.clientX - detailsPos.x, y: e.clientY - detailsPos.y });
+  };
   const handleWindowMouseMove = (e) => {
       if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
+      if (isDraggingDetails) { setDetailsPos({ x: e.clientX - dragOffsetDetails.x, y: e.clientY - dragOffsetDetails.y }); }
   };
-  const handleWindowMouseUp = () => { setIsDraggingTracker(false); };
+  const handleWindowMouseUp = () => { setIsDraggingTracker(false); setIsDraggingDetails(false); };
 
   // --- LOADING SCREEN ---
   if (loading || !minTimeElapsed) {
@@ -426,7 +436,8 @@ export default function JogadorVttPage() {
                     <h3 className="tracker-title">COMBATE</h3>
                 </div>
                 <div className="tracker-list">
-                    {currentVttSession.tokens?.map((token, index) => {
+                    {/* --- COMBATE (JOGADORES E MONSTROS) --- */}
+                    {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
                         const isVisible = token.visible !== false;
                         if(!isVisible) return null; 
 
@@ -435,7 +446,6 @@ export default function JogadorVttPage() {
                             imgUrl = personagem.character_sheet.imgUrl;
                         }
 
-                        // AGORA MOSTRA SEMPRE A VIDA DOS INIMIGOS
                         let hpDisplay = "?", mpDisplay = "?";
                         let hpMax = "?", mpMax = "?";
 
@@ -445,7 +455,6 @@ export default function JogadorVttPage() {
                             mpDisplay = personagem.character_sheet?.status?.mp?.current;
                             mpMax = personagem.character_sheet?.status?.mp?.max;
                         } else if (token.type === 'enemy') {
-                            // MOSTRA VIDA DO INIMIGO
                             hpDisplay = token.stats?.hp?.current;
                             hpMax = token.stats?.hp?.max;
                             mpDisplay = token.stats?.mp?.current;
@@ -460,7 +469,7 @@ export default function JogadorVttPage() {
                         return (
                             <div key={token.id} className="tracker-item readonly">
                                 <div className="t-col-img">
-                                    <div className="t-index">{index + 1}</div>
+                                    <div className="t-index">{token.originalIndex + 1}</div>
                                     <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
                                 </div>
                                 <div className="t-col-info">
@@ -486,43 +495,70 @@ export default function JogadorVttPage() {
                             </div>
                         );
                     })}
+
+                    {/* --- OBJETOS --- */}
+                    {currentVttSession.tokens?.some(t => t.type === 'object') && (
+                        <>
+                            <div className="tracker-divider">OBJETOS</div>
+                            {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type === 'object').map((token) => {
+                                const isVisible = token.visible !== false;
+                                if(!isVisible) return null; 
+
+                                return (
+                                    <div key={token.id} className="tracker-item object-item readonly">
+                                        <div className="t-col-img">
+                                            <div className="t-index">{token.originalIndex + 1}</div>
+                                            <div className="t-img" style={{backgroundImage: `url(${token.img})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
+                                        </div>
+                                        <div className="t-col-info">
+                                            <div className="t-name" style={{color: '#ffcc00'}}>{token.name} <small>(Obj)</small></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </>
+                    )}
+
                     {(!currentVttSession.tokens || currentVttSession.tokens.length === 0) && <div className="empty-tracker">Mesa Vazia</div>}
                 </div>
             </div>
         )}
 
+        {/* --- DETALHES DO MONSTRO FLUTUANTE --- */}
         {viewMonsterDetails && (
-            <div className="ff-modal-overlay-flex" onClick={() => setViewMonsterDetails(null)}>
-                <div className="monster-detail-card" onClick={e => e.stopPropagation()}>
-                    <div className="md-header">
-                        <div className="md-title-row">
-                            <h2>{viewMonsterDetails.name}</h2>
-                            <div className="md-stars">
-                                {[...Array(viewMonsterDetails.stars || 1)].map((_,i) => <span key={i}>★</span>)}
-                                {viewMonsterDetails.difficultyQ && <span className="md-boss-mark">?</span>}
-                            </div>
-                        </div>
-                        <div className="md-sub">Nível de Ameaça</div>
-                    </div>
-                    <div className="md-body">
-                        <div className="md-img-col">
-                            <div className="md-portrait" style={{backgroundImage: `url(${viewMonsterDetails.img})`}}></div>
-                        </div>
-                        <div className="md-info-col custom-scrollbar">
-                            <div className="md-block">
-                                <label>DESCRIÇÃO</label>
-                                <p>{viewMonsterDetails.description || "Sem dados disponíveis."}</p>
-                            </div>
-                            {viewMonsterDetails.drops && (
-                                <div className="md-block">
-                                    <label>DROPS CONHECIDOS</label>
-                                    <p>{viewMonsterDetails.drops}</p>
-                                </div>
-                            )}
+            <div 
+                className="monster-detail-card draggable-card fade-in" 
+                style={{ position: 'absolute', top: detailsPos.y, left: detailsPos.x, zIndex: 1100 }}
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="md-header" onMouseDown={handleDetailsMouseDown} style={{cursor: 'grab'}}>
+                    <div className="md-title-row">
+                        <h2>{viewMonsterDetails.name}</h2>
+                        <div className="md-stars">
+                            {[...Array(viewMonsterDetails.stars || 1)].map((_,i) => <span key={i}>★</span>)}
+                            {viewMonsterDetails.difficultyQ && <span className="md-boss-mark">?</span>}
                         </div>
                     </div>
-                    <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
+                    <div className="md-sub">Nível de Ameaça</div>
                 </div>
+                <div className="md-body">
+                    <div className="md-img-col">
+                        <div className="md-portrait" style={{backgroundImage: `url(${viewMonsterDetails.img})`}}></div>
+                    </div>
+                    <div className="md-info-col custom-scrollbar">
+                        <div className="md-block">
+                            <label>DESCRIÇÃO</label>
+                            <p>{viewMonsterDetails.description || "Sem dados disponíveis."}</p>
+                        </div>
+                        {viewMonsterDetails.drops && (
+                            <div className="md-block">
+                                <label>DROPS CONHECIDOS</label>
+                                <p>{viewMonsterDetails.drops}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
             </div>
         )}
 
@@ -558,7 +594,7 @@ export default function JogadorVttPage() {
           <CalendarSystemPlayer 
             onClose={() => setShowCalendar(false)} 
             disponibilidades={disponibilidades}
-            sessoes={allSessoes} // Mostra todas as sessões onde o jogador participa
+            sessoes={allSessoes} 
           />
         )}
         
@@ -645,9 +681,11 @@ export default function JogadorVttPage() {
         }
         .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
         .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
+        .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
         .tracker-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
         
         .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
+        .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
         .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
@@ -665,15 +703,11 @@ export default function JogadorVttPage() {
         .btn-icon-sm:hover { border-color: #ffcc00; color: #fff; }
         .empty-tracker { text-align: center; padding: 30px; color: #666; font-style: italic; font-size: 12px; font-family: 'serif'; }
 
-        /* MONSTER DETAIL MODAL DARK FANTASY */
-        .monster-detail-card { 
-            width: 500px; max-width: 95vw;
-            background: #0d0d10 url('https://www.transparenttextures.com/patterns/dark-matter.png');
-            border: 2px solid #b8860b;
-            box-shadow: 0 0 50px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.8);
-            border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;
-        }
-        .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; }
+        /* MONSTER DETAIL DRAGGABLE WINDOW */
+        .monster-detail-card { width: 500px; max-width: 95vw; background: #0d0d10 url('https://www.transparenttextures.com/patterns/dark-matter.png'); border: 2px solid #b8860b; box-shadow: 0 0 50px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+        .draggable-card { box-shadow: 0 10px 40px rgba(0,0,0,0.9); }
+        .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; cursor: grab; }
+        .md-header:active { cursor: grabbing; }
         .md-title-row { display: flex; justify-content: space-between; align-items: center; }
         .md-title-row h2 { margin: 0; font-family: 'Cinzel', serif; color: #ffcc00; font-size: 20px; letter-spacing: 2px; }
         .md-stars { color: #ffd700; font-size: 14px; text-shadow: 0 0 5px #ffd700; }
