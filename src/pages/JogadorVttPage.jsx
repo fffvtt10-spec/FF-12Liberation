@@ -15,7 +15,7 @@ import NPCViewer from '../components/NPCViewer';
 import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
-import GuildBoard from '../components/GuildBoard'; // <--- IMPORT NOVO
+import GuildBoard from '../components/GuildBoard'; 
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -133,7 +133,6 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
         .mini-modal.detail { width: 400px; }
         .mini-modal h4 { color: #fbbf24; margin: 0 0 10px 0; }
         
-        /* CORREÇÃO DO Z-INDEX DO CALENDÁRIO */
         .ff-modal-overlay-calendar { 
           position: fixed; 
           top: 0; 
@@ -141,7 +140,7 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
           width: 100vw; 
           height: 100vh; 
           background: rgba(0,0,0,0.95); 
-          z-index: 99999; /* Z-INDEX ALTÍSSIMO PARA SOBREPOR TUDO */
+          z-index: 99999; 
           display: flex; 
           align-items: center; 
           justify-content: center; 
@@ -190,13 +189,12 @@ const BookIcon = () => (
   </svg>
 );
 
-// Função auxiliar para formatar texto estilo WhatsApp
 const formatSanchezText = (text) => {
     if (!text) return { __html: "" };
     let formatted = text
-      .replace(/\*(.*?)\*/g, '<strong>$1</strong>') // Negrito
-      .replace(/_(.*?)_/g, '<em>$1</em>')           // Itálico
-      .replace(/\n/g, '<br />');                    // Quebra de linha
+      .replace(/\*(.*?)\*/g, '<strong>$1</strong>') 
+      .replace(/_(.*?)_/g, '<em>$1</em>')           
+      .replace(/\n/g, '<br />');                    
     return { __html: formatted };
   };
 
@@ -229,7 +227,6 @@ export default function JogadorVttPage() {
   const [isDraggingTracker, setIsDraggingTracker] = useState(false);
   const [dragOffsetTracker, setDragOffsetTracker] = useState({ x: 0, y: 0 });
 
-  // Estados Monster Details Drag
   const [detailsPos, setDetailsPos] = useState({ x: 620, y: 100 });
   const [isDraggingDetails, setIsDraggingDetails] = useState(false);
   const [dragOffsetDetails, setDragOffsetDetails] = useState({ x: 0, y: 0 });
@@ -242,7 +239,6 @@ export default function JogadorVttPage() {
   const prevLevelRef = useRef(null); 
   const audioRef = useRef(new Audio(levelUpMusic)); 
   
-  // Loading Check
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
@@ -264,7 +260,6 @@ export default function JogadorVttPage() {
     setSessoesAtivas(ativas); setSessoesFuturas(futuras);
   }, [currentTime, allSessoes]);
 
-  // Loading Timer
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
@@ -289,7 +284,7 @@ export default function JogadorVttPage() {
                 } else setLoading(false);
             });
             const qMissoes = query(collection(db, "missoes"));
-            const qDisp = query(collection(db, "disponibilidades")); // Busca geral para jogador ver
+            const qDisp = query(collection(db, "disponibilidades")); 
             unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         } else { setLoading(false); navigate('/login'); }
@@ -361,7 +356,6 @@ export default function JogadorVttPage() {
     window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
   };
 
-  // --- DRAG WINDOW LOGIC ---
   const handleTrackerMouseDown = (e) => {
       setIsDraggingTracker(true);
       setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
@@ -376,7 +370,6 @@ export default function JogadorVttPage() {
   };
   const handleWindowMouseUp = () => { setIsDraggingTracker(false); setIsDraggingDetails(false); };
 
-  // --- LOADING SCREEN ---
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -422,11 +415,10 @@ export default function JogadorVttPage() {
         {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
-        {/* MODAL DE COMBATE (VISUALIZADOR ARRASTÁVEL) */}
         {showCombatTracker && currentVttSession && (
             <div 
                 className="combat-tracker-panel player-view fade-in"
-                style={{ top: trackerPos.y, left: trackerPos.x, zIndex: 1000 }}
+                style={{ top: trackerPos.y, left: trackerPos.x, zIndex: 2100 }}
             >
                 <div 
                     className="tracker-header"
@@ -436,7 +428,6 @@ export default function JogadorVttPage() {
                     <h3 className="tracker-title">COMBATE</h3>
                 </div>
                 <div className="tracker-list">
-                    {/* --- COMBATE (JOGADORES E MONSTROS) --- */}
                     {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
                         const isVisible = token.visible !== false;
                         if(!isVisible) return null; 
@@ -496,7 +487,6 @@ export default function JogadorVttPage() {
                         );
                     })}
 
-                    {/* --- OBJETOS --- */}
                     {currentVttSession.tokens?.some(t => t.type === 'object') && (
                         <>
                             <div className="tracker-divider">OBJETOS</div>
@@ -524,11 +514,10 @@ export default function JogadorVttPage() {
             </div>
         )}
 
-        {/* --- DETALHES DO MONSTRO FLUTUANTE --- */}
         {viewMonsterDetails && (
             <div 
                 className="monster-detail-card draggable-card fade-in" 
-                style={{ position: 'absolute', top: detailsPos.y, left: detailsPos.x, zIndex: 1100 }}
+                style={{ position: 'absolute', top: detailsPos.y, left: detailsPos.x, zIndex: 2200 }}
                 onClick={e => e.stopPropagation()}
             >
                 <div className="md-header" onMouseDown={handleDetailsMouseDown} style={{cursor: 'grab'}}>
@@ -576,7 +565,6 @@ export default function JogadorVttPage() {
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
 
         <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
-        {/* BOTÃO FLUTUANTE DE AGENDA */}
         <button className="floating-calendar-btn" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
         
         {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
@@ -586,10 +574,8 @@ export default function JogadorVttPage() {
 
         <Bazar isMestre={false} playerData={personagem} />
         
-        {/* QUADRO DA GUILDA ADICIONADO AQUI */}
         <GuildBoard isMaster={false} />
 
-        {/* --- MODAL DE CALENDÁRIO JOGADOR --- */}
         {showCalendar && (
           <CalendarSystemPlayer 
             onClose={() => setShowCalendar(false)} 
@@ -603,11 +589,9 @@ export default function JogadorVttPage() {
         {viewImage && (<div className="ff-modal-overlay-flex" style={{zIndex: 100001}} onClick={() => setViewImage(null)}><div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div></div>)}
         {showResenhasList && (<div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}><div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-row"><h3 className="modal-title-ff">RESENHAS</h3><button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button></div><div className="resenhas-list-container">{resenhas.map(r => (<div key={r.id} className="resenha-row-player" onClick={() => { setViewResenha(r); setShowResenhasList(false); }}><h4>{r.titulo}</h4></div>))}</div></div></div>)}
         
-        {/* --- NOVO VISUALIZADOR DA RESENHA ESTILO FINAL FANTASY TACTICS --- */}
         {viewResenha && (
             <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
             <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
-                {/* Lado Esquerdo: Foto e Nome */}
                 <div className="fft-portrait-section">
                     <div className="fft-portrait-frame">
                     <img src={sanchezImg} alt="Sanchez" />
@@ -617,7 +601,6 @@ export default function JogadorVttPage() {
                     </div>
                 </div>
 
-                {/* Lado Direito: Conteúdo */}
                 <div className="fft-content-section">
                     <h2 className="fft-title">{viewResenha.titulo}</h2>
                     <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
@@ -632,42 +615,40 @@ export default function JogadorVttPage() {
 
       </div>
       <style>{`
-        /* CSS IGUAL AO ANTERIOR + NOVOS */
         .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         
-        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 50; cursor: pointer; }
+        /* Z-INDEX ALTERADO PARA 2000 PARA FICAR ACIMA DO TABLETOP (1000) */
+        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
         .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; }
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
         .char-meta { font-size: 12px; color: #00f2ff; }
         
-        /* BOTÕES FLUTUANTES EMPILHADOS */
-        .floating-mission-btn { position: fixed; bottom: 30px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 24px; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        /* Z-INDEX DOS BOTÕES FLUTUANTES ALTERADOS PARA 2000 */
+        .floating-mission-btn { position: fixed; bottom: 30px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
 
-        .floating-dice-btn { position: fixed; bottom: 90px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; background: #111; color: #fff; font-size: 20px; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-dice-btn { position: fixed; bottom: 90px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; background: #111; color: #fff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-dice-btn:hover { border-color: #ffcc00; transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
         
-        .floating-combat-btn { position: fixed; bottom: 150px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #f44; background: #111; color: #f44; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-combat-btn { position: fixed; bottom: 150px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #f44; background: #111; color: #f44; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-combat-btn:hover { border-color: #fff; color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #f44; }
 
-        .floating-sanchez-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-sanchez-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-sanchez-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
 
-        .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-book-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
 
-        /* NOVO BOTÃO AGENDA */
-        .floating-calendar-btn { position: fixed; bottom: 330px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; background: #000; color: #22c55e; cursor: pointer; z-index: 999; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 24px; }
+        .floating-calendar-btn { position: fixed; bottom: 330px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; background: #000; color: #22c55e; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 24px; }
         .floating-calendar-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
 
         .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
         .floating-sanchez-btn:hover .sanchez-icon-face { opacity: 1; }
-        .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 1000; box-shadow: 0 0 5px #000; }
+        .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
         
-        /* TRACKER VISUAL PLAYER */
         .combat-tracker-panel { 
             position: absolute; 
             width: 300px; 
@@ -675,7 +656,7 @@ export default function JogadorVttPage() {
             background: linear-gradient(180deg, #0d0d10 0%, #000 100%);
             border: 2px solid #b8860b; 
             border-radius: 6px; 
-            z-index: 55; 
+            z-index: 2100; 
             display: flex; flex-direction: column; 
             box-shadow: 0 0 25px rgba(0,0,0,0.9);
         }
@@ -703,7 +684,6 @@ export default function JogadorVttPage() {
         .btn-icon-sm:hover { border-color: #ffcc00; color: #fff; }
         .empty-tracker { text-align: center; padding: 30px; color: #666; font-style: italic; font-size: 12px; font-family: 'serif'; }
 
-        /* MONSTER DETAIL DRAGGABLE WINDOW */
         .monster-detail-card { width: 500px; max-width: 95vw; background: #0d0d10 url('https://www.transparenttextures.com/patterns/dark-matter.png'); border: 2px solid #b8860b; box-shadow: 0 0 50px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
         .draggable-card { box-shadow: 0 10px 40px rgba(0,0,0,0.9); }
         .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; cursor: grab; }
@@ -726,8 +706,7 @@ export default function JogadorVttPage() {
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* OUTROS ESTILOS (Sessão, VTT Widget, etc) */
-        .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 90; width: 200px; }
+        .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 999; width: 200px; }
         .vtt-status-widget.waiting { border-color: #ffcc00; }
         .vtt-status-widget.connected { border-color: #0f0; }
         .status-indicator { width: 15px; height: 15px; border-radius: 50%; background: #fff; }
@@ -804,7 +783,6 @@ export default function JogadorVttPage() {
         .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 15px; background: transparent; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
         .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
 
-        /* --- FINAL FANTASY TACTICS MODAL STYLE --- */
         .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         
         .fft-dialog-box {
@@ -886,12 +864,11 @@ export default function JogadorVttPage() {
           line-height: 1.6;
           color: #e0e0e0;
           padding-right: 10px;
-          /* Barra invisível mas funcional */
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none;  /* IE 10+ */
+          scrollbar-width: none; 
+          -ms-overflow-style: none; 
         }
         .fft-scroll-text::-webkit-scrollbar { 
-          display: none; /* Chrome/Safari */
+          display: none; 
         }
 
         .fft-close-btn {
@@ -918,7 +895,6 @@ export default function JogadorVttPage() {
           transform: scale(1.1);
         }
 
-        /* --- LEVEL UP STYLE (FFT) PARA O JOGADOR --- */
         .levelup-global-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
@@ -977,13 +953,14 @@ export default function JogadorVttPage() {
 
         @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes pulseText { from { text-shadow: 0 0 20px #ffcc00; } to { text-shadow: 0 0 40px #ffcc00, 0 0 10px #fff; } }
-        /* POSICIONAMENTO BOTÃO GUILDA (JOGADOR) */
+        
         .guild-btn-float {
             top: auto !important;
             left: auto !important;
             transform: none !important;
             bottom: 30px !important;
-            right: 110px !important; /* Fica à esquerda do Bazar (que costuma ser right: 20/30px) */
+            right: 110px !important; 
+            z-index: 2000 !important; /* GARANTINDO QUE A GUILDA TAMBÉM NÃO FIQUE ATRÁS */
         }
       `}</style>
     </div>
