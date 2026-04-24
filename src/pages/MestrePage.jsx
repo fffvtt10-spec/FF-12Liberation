@@ -12,14 +12,14 @@ import Bazar from '../components/Bazar';
 import Forja from '../components/Forja'; 
 import Ficha from '../components/Ficha'; 
 import fichaIcon from '../assets/ficha-icon.png'; 
-import GuildBoard from '../components/GuildBoard'; // <--- IMPORTADO O QUADRO DA GUILDA
+import GuildBoard from '../components/GuildBoard'; 
 
 // --- COMPONENTE DE CALENDÁRIO INTERNO ---
 const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
-  const [viewEvent, setViewEvent] = useState(null); // Para ver detalhes
-  const [newTime, setNewTime] = useState("20:00"); // Hora padrão para novo slot
+  const [viewEvent, setViewEvent] = useState(null); 
+  const [newTime, setNewTime] = useState("20:00"); 
 
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
@@ -34,7 +34,6 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
   const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
-  // Combinar sessões e disponibilidades em uma lista de eventos
   const events = [
     ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
     ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio), isArena: s.isArena }))
@@ -42,11 +41,9 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
 
   const renderDays = () => {
     const days = [];
-    // Espaços vazios antes do dia 1
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${i}`} className="cal-day empty"></div>);
     }
-    // Dias do mês
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dayEvents = events.filter(e => {
@@ -107,7 +104,6 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
           {renderDays()}
         </div>
         
-        {/* Modal de Adicionar Disponibilidade (Ao clicar num dia) */}
         {selectedDay && isMaster && (
             <div className="mini-modal-overlay">
                 <div className="mini-modal">
@@ -123,7 +119,6 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
             </div>
         )}
 
-        {/* Modal de Detalhes do Evento */}
         {viewEvent && (
             <div className="mini-modal-overlay">
                 <div className="mini-modal detail">
@@ -217,13 +212,12 @@ const Timer = ({ expiry }) => {
   return <span className="mission-timer">⏳ {timeLeft}</span>;
 };
 
-// Função auxiliar para formatar texto estilo WhatsApp
 const formatSanchezText = (text) => {
   if (!text) return { __html: "" };
   let formatted = text
-    .replace(/\*(.*?)\*/g, '<strong>$1</strong>') // Negrito
-    .replace(/_(.*?)_/g, '<em>$1</em>')           // Itálico
-    .replace(/\n/g, '<br />');                    // Quebra de linha
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    .replace(/_(.*?)_/g, '<em>$1</em>')           
+    .replace(/\n/g, '<br />');                    
   return { __html: formatted };
 };
 
@@ -235,17 +229,15 @@ export default function MestrePage() {
   const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
-  const [disponibilidades, setDisponibilidades] = useState([]); // Novo state
+  const [disponibilidades, setDisponibilidades] = useState([]); 
   
-  // Loading Control
   const [loading, setLoading] = useState(true);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
-  // Modais
   const [showModal, setShowModal] = useState(false); 
   const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
-  const [showCalendar, setShowCalendar] = useState(false); // Novo Modal Calendar
+  const [showCalendar, setShowCalendar] = useState(false); 
   const [showFichasList, setShowFichasList] = useState(false); 
   const [selectedFicha, setSelectedFicha] = useState(null); 
   
@@ -256,19 +248,20 @@ export default function MestrePage() {
   const [arenaForm, setArenaForm] = useState({
       nomeEvento: '',
       selectedSlotId: '',
+      mapas: [],    // ADICIONADO PARA ARENA
+      cenarios: [], // ADICIONADO PARA ARENA
+      npcs: [],     // ADICIONADO PARA ARENA
       equipes: [
           { id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] },
           { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }
       ]
   });
   
-  // Visualizações
   const [showDetails, setShowDetails] = useState(null); 
   const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
   const [viewMembers, setViewMembers] = useState(null); 
 
-  // Forms
   const [resenha, setResenha] = useState("");
   const [tituloResenha, setTituloResenha] = useState("");
   const [destinatarios, setDestinatarios] = useState([]);
@@ -279,13 +272,14 @@ export default function MestrePage() {
   
   const [sessionForm, setSessionForm] = useState({
     missaoId: '', 
-    selectedSlotId: '', // Mudou de dataInicio manual para ID do Slot
+    selectedSlotId: '', 
     mapas: [],      
     cenarios: [],   
     monstros: [],   
     npcs: [],       
     jogadores: []   
   });
+  
   const [tempLink, setTempLink] = useState("");
   const [tempType, setTempType] = useState("mapas"); 
 
@@ -297,15 +291,13 @@ export default function MestrePage() {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
   }, [mestreIdentidade]);
 
-  // --- 1. MINIMUM TIME LOADING LOGIC ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
-    }, 2000); // 2 Segundos Mínimos
+    }, 2000); 
     return () => clearTimeout(timer);
   }, []);
 
-  // --- 2. AUTH & DATA ---
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
 
@@ -315,7 +307,7 @@ export default function MestrePage() {
             const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
             const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
-            const qD = query(collection(db, "disponibilidades"), where("mestreId", "==", user.uid)); // Query Disponibilidades
+            const qD = query(collection(db, "disponibilidades"), where("mestreId", "==", user.uid));
             const qC = query(collection(db, "characters"));
 
             const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -344,7 +336,6 @@ export default function MestrePage() {
       }
   }, [personagensDb]);
 
-  // --- HANDLERS ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -396,7 +387,23 @@ export default function MestrePage() {
       }));
   };
 
-  // --- NOVOS HANDLERS DE CALENDÁRIO ---
+  // --- HANDLERS UPLOAD ARENA ---
+  const handleAddArenaAsset = () => {
+      if (!tempLink) return;
+      setArenaForm(prev => ({
+          ...prev,
+          [tempType]: [...prev[tempType], tempLink]
+      }));
+      setTempLink(""); 
+  };
+
+  const handleRemoveArenaAsset = (type, index) => {
+      setArenaForm(prev => ({
+          ...prev,
+          [type]: prev[type].filter((_, i) => i !== index)
+      }));
+  };
+
   const addAvailabilitySlot = async (isoDateString) => {
       if (!currentUser) return;
       try {
@@ -423,7 +430,6 @@ export default function MestrePage() {
   const updateSessionTime = async (sessionId, newDateStr) => {
       if (!newDateStr) return;
       try {
-          // Atualiza a dataInicio da sessão e recalcula expiração
           const inicio = new Date(newDateStr);
           const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000));
           await updateDoc(doc(db, "sessoes", sessionId), {
@@ -436,7 +442,6 @@ export default function MestrePage() {
       }
   };
 
-  // --- CRIAÇÃO DE SESSÃO ATUALIZADA (FLUXO NOVO) ---
   const criarSessao = async (e) => {
       e.preventDefault();
       if (!sessionForm.missaoId || !sessionForm.selectedSlotId || !currentUser) return alert("Selecione a missão e um horário disponível!");
@@ -449,12 +454,11 @@ export default function MestrePage() {
         const inicio = new Date(slot.start);
         const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); 
 
-        // Cria a sessão
         await addDoc(collection(db, "sessoes"), {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
             mestreId: currentUser.uid,
-            dataInicio: slot.start, // Usa a data do slot
+            dataInicio: slot.start, 
             expiraEm: fim.toISOString(),
             participantes: sessaoDestinatarios, 
             mapas: sessionForm.mapas,
@@ -467,11 +471,10 @@ export default function MestrePage() {
             createdAt: serverTimestamp()
         });
 
-        // Remove a disponibilidade pois virou sessão
         await deleteDoc(doc(db, "disponibilidades", sessionForm.selectedSlotId));
 
         setShowSessionModal(false);
-        setSessionForm({ missaoId: '', selectedSlotId: '', maps: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
+        setSessionForm({ missaoId: '', selectedSlotId: '', mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
         setSessaoDestinatarios([]);
         alert("Sessão agendada com sucesso!");
       } catch (err) {
@@ -536,7 +539,10 @@ export default function MestrePage() {
               equipes: equipesParaSalvar,
               isArena: true,
               pvp_mode: true,
-              mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [],
+              mapas: arenaForm.mapas,        // SALVANDO MAPAS DA ARENA
+              cenarios: arenaForm.cenarios,  // SALVANDO CENÁRIOS DA ARENA
+              npcs: arenaForm.npcs,          // SALVANDO NPCS DA ARENA
+              monstros: [], jogadores: [],
               connected_players: [], dm_online: false,
               createdAt: serverTimestamp()
           });
@@ -544,7 +550,10 @@ export default function MestrePage() {
           await deleteDoc(doc(db, "disponibilidades", arenaForm.selectedSlotId));
 
           setShowArenaModal(false);
-          setArenaForm({ nomeEvento: '', selectedSlotId: '', equipes: [{ id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] }, { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }] });
+          setArenaForm({ 
+              nomeEvento: '', selectedSlotId: '', mapas: [], cenarios: [], npcs: [], 
+              equipes: [{ id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] }, { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }] 
+          });
           alert("Arena agendada com sucesso!");
       } catch (err) {
           alert("Erro ao criar Arena: " + err.message);
@@ -577,7 +586,6 @@ export default function MestrePage() {
       navigate('/mestre-vtt');
   };
 
-  // --- TELA DE CARREGAMENTO (PADRONIZADA 2S) ---
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -715,11 +723,9 @@ export default function MestrePage() {
                                <span>📅 {new Date(s.dataInicio).toLocaleString()}</span>
                                <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
                            </div>
-                           {!s.isArena && (
-                             <div className="sessao-assets-count">
-                                 🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
-                             </div>
-                           )}
+                           <div className="sessao-assets-count">
+                               🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
+                           </div>
                            <div className="poster-actions" style={{marginTop: '15px'}}>
                                {s.isArena ? (
                                    <button className="btn-cyan arena-btn" onClick={() => setViewArenaManager(s)}>⚔️ GERENCIAR TIMES</button>
@@ -737,12 +743,10 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* BOTÃO FLUTUANTE DE FICHAS */}
       <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
           <img src={fichaIcon} alt="Fichas" />
       </button>
 
-      {/* BOTÕES FLUTUANTES DE SISTEMA */}
       <GuildBoard isMaster={true} />
       <Bazar isMestre={true} />
       <Forja />
@@ -781,7 +785,6 @@ export default function MestrePage() {
           </div>
       )}
 
-      {/* MODAL DA FICHA EM MODO MESTRE */}
       {selectedFicha && (
           <Ficha 
             characterData={selectedFicha} 
@@ -845,6 +848,34 @@ export default function MestrePage() {
                                   </div>
                               </div>
                           ))}
+                      </div>
+
+                      {/* --- NOVO: SEÇÃO DE IMPORTAR IMAGENS PARA ARENA --- */}
+                      <div className="upload-section-box" style={{borderColor: '#8b5cf6'}}>
+                          <h4 className="upload-section-title" style={{color: '#c4b5fd', borderBottomColor: '#8b5cf6'}}>IMPORTAR IMAGENS DA ARENA</h4>
+                          <div className="link-import-row">
+                              <input 
+                                className="ff-input-dark" 
+                                placeholder="Link da imagem..."
+                                value={tempLink} 
+                                onChange={e => setTempLink(e.target.value)} 
+                              />
+                              <select 
+                                className="ff-select-dark small-select" 
+                                value={tempType} 
+                                onChange={e => setTempType(e.target.value)}
+                              >
+                                <option value="mapas">Tabletop</option>
+                                <option value="cenarios">Cenário</option>
+                                <option value="npcs">NPCs</option>
+                              </select>
+                              <button type="button" className="btn-cyan" style={{borderColor: '#a855f7', color: '#a855f7'}} onClick={handleAddArenaAsset}>+</button>
+                          </div>
+                          <div className="assets-lists">
+                              {arenaForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveArenaAsset('mapas', i)}>×</button></div>))}
+                              {arenaForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveArenaAsset('cenarios', i)}>×</button></div>))}
+                              {arenaForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveArenaAsset('npcs', i)}>×</button></div>))}
+                          </div>
                       </div>
 
                       <div className="btn-group-ff">

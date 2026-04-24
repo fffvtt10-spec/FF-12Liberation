@@ -324,6 +324,15 @@ export default function MestreVTTPage() {
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { pvp_mode: newVal });
   };
 
+  // --- HELPER: BUSCAR COR DO TIME NO MODO PVP ---
+  const getTeamColor = (tokenName) => {
+      if (!sessaoAtiva || !sessaoAtiva.equipes) return null;
+      for (let eq of sessaoAtiva.equipes) {
+          if (eq.membros.includes(tokenName)) return eq.cor;
+      }
+      return null;
+  };
+
   const filteredBestiary = bestiary.filter(b => bestiaryTab === 'monsters' ? (b.category !== 'object') : (b.category === 'object'));
 
   // --- LOADING SCREEN ---
@@ -373,7 +382,7 @@ export default function MestreVTTPage() {
           <div className="status-indicator active"></div>
           <div className="status-info"><h2>SESSÃO ATIVA: {sessaoAtiva.missaoNome}</h2><p>Mestre Online • {connectedPlayers.length} Jogadores Conectados</p></div>
           
-          {/* --- NOVO: BOTÃO MODO PVP GLOBAL --- */}
+          {/* --- BOTAO MODO PVP GLOBAL --- */}
           <button 
               className={`btn-pvp-toggle ${sessaoAtiva.pvp_mode ? 'active' : ''}`}
               onClick={handleTogglePVPMode}
@@ -388,7 +397,7 @@ export default function MestreVTTPage() {
         sessaoData={sessaoAtiva} isMaster={true} showManager={showMapManager}
         onCloseManager={() => setShowMapManager(false)} personagensData={personagensData}
         onEditToken={(token) => setEditingToken(JSON.parse(JSON.stringify(token)))}
-        highlightTokenId={highlightTokenId} // <--- Passando o Highlight para o VTT
+        highlightTokenId={highlightTokenId} 
       />
       
       <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} />
@@ -430,14 +439,20 @@ export default function MestreVTTPage() {
 
                       const isVisible = token.visible !== false;
 
+                      // --- IDENTIFICAÇÃO DE COR DO TIME NO PVP ---
+                      const isPvP = sessaoAtiva.pvp_mode;
+                      const teamColor = isPvP ? getTeamColor(token.name) : null;
+                      const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
+
                       return (
                           <div 
                             key={token.id} 
-                            className={`tracker-item ${token.stealth ? 'stealth-active' : ''}`}
+                            className={`tracker-item ${token.type} ${!isVisible ? 'hidden' : ''} ${token.stealth ? 'stealth-active' : ''}`}
                             draggable
                             onDragStart={(e) => onDragStart(e, token.originalIndex)}
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={(e) => onDrop(e, token.originalIndex)}
+                            style={customBorder}
                           >
                               <div className="t-col-img">
                                   <div className="t-index">{token.originalIndex + 1}</div>
@@ -445,7 +460,7 @@ export default function MestreVTTPage() {
                               </div>
                               
                               <div className="t-col-info">
-                                  <div className="t-name">{token.name}</div>
+                                  <div className="t-name" style={teamColor ? {color: teamColor} : {}}>{token.name}</div>
                                   <div className="t-stats-row">
                                       <div className="t-stat hp">
                                           <label>HP</label>
@@ -474,7 +489,6 @@ export default function MestreVTTPage() {
                                       <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                   </div>
                                   <div className="act-btns">
-                                      {/* --- NOVO: BOTÃO DE FURTIVIDADE NO TRACKER --- */}
                                       <button 
                                           className="btn-icon-sm" 
                                           title={token.stealth ? "Remover Furtividade (Apenas Dono e Mestre veem)" : "Ativar Furtividade (Invisível para adversários)"} 
@@ -532,7 +546,6 @@ export default function MestreVTTPage() {
                                               <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                           </div>
                                           <div className="act-btns">
-                                              {/* --- NOVO: BOTÃO DE FURTIVIDADE NO TRACKER --- */}
                                               <button 
                                                   className="btn-icon-sm" 
                                                   title={token.stealth ? "Remover Furtividade" : "Ativar Furtividade"} 
@@ -559,7 +572,7 @@ export default function MestreVTTPage() {
           </div>
       )}
 
-      {/* --- DETALHES DO MONSTRO FLUTUANTE (NÃO MAIS OVERLAY E ARRASTÁVEL) --- */}
+      {/* --- DETALHES DO MONSTRO FLUTUANTE --- */}
       {viewMonsterDetails && (
           <div 
               className="monster-detail-card draggable-card fade-in" 
@@ -759,7 +772,7 @@ export default function MestreVTTPage() {
         .status-info h2 { margin: 0; font-size: 14px; color: #fff; }
         .status-info p { margin: 0; font-size: 10px; color: #00f2ff; }
 
-        /* NOVO: BOTAO PVP E FURTIVIDADE */
+        /* BOTAO PVP E FURTIVIDADE */
         .btn-pvp-toggle { background: #111; color: #666; border: 1px solid #555; padding: 6px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-left: 20px; font-family: 'Cinzel', serif; font-size: 12px; }
         .btn-pvp-toggle.active { background: #3b0764; color: #c4b5fd; border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5); }
         .tracker-item.stealth-active { border-color: #a855f7; border-style: dashed; box-shadow: inset 0 0 15px rgba(168, 85, 247, 0.2); }
@@ -790,8 +803,8 @@ export default function MestreVTTPage() {
         .img-adj-grid button { width: 14px; height: 12px; font-size: 7px; padding: 0; line-height: 1; background: #222; border: 1px solid #555; color: #aaa; cursor: pointer; }
         .img-adj-grid button:hover { background: #ffcc00; color: #000; }
         .act-btns { display: flex; flex-direction: column; gap: 3px; }
-        .btn-icon-sm { background: #222; border: 1px solid #555; color: #ccc; width: 22px; height: 22px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 3px; }
-        .btn-icon-sm:hover { border-color: #ffcc00; color: #fff; }
+        .btn-icon-sm { background: #222; border: 1px solid #555; color: #ccc; width: 22px; height: 22px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: 0.2s; }
+        .btn-icon-sm:hover { background: #444; color: #fff; border-color: #fff; }
         .btn-icon-sm.delete:hover { background: #300; border-color: #f44; color: #f44; }
         .empty-tracker { text-align: center; padding: 30px; color: #666; font-style: italic; font-size: 12px; font-family: 'serif'; }
 

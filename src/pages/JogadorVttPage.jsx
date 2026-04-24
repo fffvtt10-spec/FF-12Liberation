@@ -408,6 +408,15 @@ export default function JogadorVttPage() {
   };
   const handleWindowMouseUp = () => { setIsDraggingTracker(false); setIsDraggingDetails(false); };
 
+  // --- HELPER: BUSCAR COR DO TIME NO MODO PVP ---
+  const getTeamColor = (tokenName) => {
+      if (!currentVttSession || !currentVttSession.equipes) return null;
+      for (let eq of currentVttSession.equipes) {
+          if (eq.membros.includes(tokenName)) return eq.cor;
+      }
+      return null;
+  };
+
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -453,7 +462,7 @@ export default function JogadorVttPage() {
         {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
-        {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP --- */}
+        {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP E CORES DO TIME --- */}
         {showCombatTracker && currentVttSession && (
             <div 
                 className="combat-tracker-panel player-view fade-in"
@@ -469,7 +478,7 @@ export default function JogadorVttPage() {
                 <div className="tracker-list">
                     {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
                         
-                        // NOVA LÓGICA DE VISIBILIDADE (INCLUI FURTIVIDADE)
+                        // LÓGICA DE VISIBILIDADE (INCLUI FURTIVIDADE)
                         const isBaseVisible = token.visible !== false;
                         const isOwner = token.uid === auth.currentUser.uid;
                         const isPvP = currentVttSession.pvp_mode;
@@ -502,14 +511,22 @@ export default function JogadorVttPage() {
                             mpMax = token.stats?.mp?.max;
                         }
 
+                        // --- ADICIONA A COR DO TIME NA BORDA SE O MODO PVP ESTIVER ATIVADO ---
+                        const teamColor = isPvP ? getTeamColor(token.name) : null;
+                        const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
+
                         return (
-                            <div key={token.id} className={`tracker-item readonly ${isPvP && token.stealth && isOwner ? 'tracker-stealth-self' : ''}`}>
+                            <div 
+                                key={token.id} 
+                                className={`tracker-item readonly ${isPvP && token.stealth && isOwner ? 'tracker-stealth-self' : ''}`}
+                                style={customBorder}
+                            >
                                 <div className="t-col-img">
                                     <div className="t-index">{token.originalIndex + 1}</div>
                                     <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
                                 </div>
                                 <div className="t-col-info">
-                                    <div className="t-name">{token.name}</div>
+                                    <div className="t-name" style={teamColor ? {color: teamColor} : {}}>{token.name}</div>
                                     <div className="t-stats-row">
                                         <div className="t-stat hp">
                                             <label>HP</label>

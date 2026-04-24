@@ -14,6 +14,7 @@ const getPlayerColor = (uid) => {
 };
 
 // --- COMPONENTE INTERNO DO PING ---
+// Agora centraliza automaticamente no grid
 const PingMarker = ({ ping, gridSizePx }) => {
     const pxX = ping.gX * gridSizePx + gridSizePx / 2;
     const pxY = ping.gY * gridSizePx + gridSizePx / 2;
@@ -102,7 +103,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
     };
 
     // Aplica a cor do time se houver e não estiver sobreposto por furtividade/highlight
-    if (teamColor && !isMyStealth && !isHighlighted && token.type === 'player') {
+    if (isPvPMode && teamColor && !isMyStealth && !isHighlighted && token.type === 'player') {
         customStyle.borderColor = teamColor;
         customStyle.boxShadow = `0 0 15px ${teamColor}80`; // 80 é hex para 50% opacidade
     }
