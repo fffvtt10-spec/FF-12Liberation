@@ -203,6 +203,12 @@ export default function JogadorVttPage() {
   const [personagem, setPersonagem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
+  
+  // Arenas Disponíveis para Inscrição
+  const [arenasDisponiveis, setArenasDisponiveis] = useState([]);
+  const [showArenaModal, setShowArenaModal] = useState(false);
+  const [showArenaDetails, setShowArenaDetails] = useState(null);
+
   const [allSessoes, setAllSessoes] = useState([]); 
   const [sessoesAtivas, setSessoesAtivas] = useState([]); 
   const [sessoesFuturas, setSessoesFuturas] = useState([]); 
@@ -268,7 +274,7 @@ export default function JogadorVttPage() {
   }, []);
 
   useEffect(() => {
-    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {};
+    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
             const docRef = doc(db, "characters", user.uid);
@@ -285,11 +291,15 @@ export default function JogadorVttPage() {
             });
             const qMissoes = query(collection(db, "missoes"));
             const qDisp = query(collection(db, "disponibilidades")); 
+            const qArenas = query(collection(db, "sessoes"), where("isArena", "==", true));
+
             unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            unsubArenas = onSnapshot(qArenas, (snap) => setArenasDisponiveis(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
         } else { setLoading(false); navigate('/login'); }
     });
-    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); };
+    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); };
   }, [navigate]);
 
   useEffect(() => {
@@ -347,6 +357,34 @@ export default function JogadorVttPage() {
       await updateDoc(doc(db, "missoes", missao.id), { candidatos: arrayUnion(candidatoObj) });
       alert(isLeader ? "Você é o LÍDER DO GRUPO!" : "Candidatura realizada!");
     } catch (e) { console.error(e); alert("Erro ao candidatar."); }
+  };
+
+  const handleJoinArenaTeam = async (arena, equipeId) => {
+      if (!personagem) return;
+      if (arena.participantes?.includes(personagem.name)) return alert("Você já está inscrito nesta Arena!");
+
+      const novaEquipe = arena.equipes.find(e => e.id === equipeId);
+      if (novaEquipe.membros.length >= novaEquipe.max) return alert("Este time já está cheio!");
+
+      const novasEquipes = arena.equipes.map(eq => {
+          if (eq.id === equipeId) {
+              return { ...eq, membros: [...eq.membros, personagem.name] };
+          }
+          return eq;
+      });
+
+      const novosParticipantes = [...(arena.participantes || []), personagem.name];
+
+      try {
+          await updateDoc(doc(db, "sessoes", arena.id), {
+              equipes: novasEquipes,
+              participantes: novosParticipantes
+          });
+          alert(`Você entrou no time ${novaEquipe.nome}!`);
+          setShowArenaDetails(null);
+      } catch(e) {
+          alert("Erro ao entrar no time.");
+      }
   };
 
   const enterVTT = (sessao) => { setCurrentVttSession(sessao); setHasJoinedSession(true); setVttStatus(new Date() >= new Date(sessao.dataInicio) ? 'connected' : 'waiting'); };
@@ -415,6 +453,7 @@ export default function JogadorVttPage() {
         {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
+        {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP --- */}
         {showCombatTracker && currentVttSession && (
             <div 
                 className="combat-tracker-panel player-view fade-in"
@@ -429,8 +468,14 @@ export default function JogadorVttPage() {
                 </div>
                 <div className="tracker-list">
                     {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
-                        const isVisible = token.visible !== false;
-                        if(!isVisible) return null; 
+                        
+                        // NOVA LÓGICA DE VISIBILIDADE (INCLUI FURTIVIDADE)
+                        const isBaseVisible = token.visible !== false;
+                        const isOwner = token.uid === auth.currentUser.uid;
+                        const isPvP = currentVttSession.pvp_mode;
+                        const isStealthHidden = isPvP && token.stealth && !isOwner;
+
+                        if(!isBaseVisible || isStealthHidden) return null; 
 
                         let imgUrl = token.img;
                         if(token.uid === auth.currentUser.uid && personagem.character_sheet?.imgUrl) {
@@ -458,7 +503,7 @@ export default function JogadorVttPage() {
                         }
 
                         return (
-                            <div key={token.id} className="tracker-item readonly">
+                            <div key={token.id} className={`tracker-item readonly ${isPvP && token.stealth && isOwner ? 'tracker-stealth-self' : ''}`}>
                                 <div className="t-col-img">
                                     <div className="t-index">{token.originalIndex + 1}</div>
                                     <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
@@ -571,6 +616,8 @@ export default function JogadorVttPage() {
         {vttStatus === 'connected' && <button className="floating-dice-btn" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
         {resenhas.length > 0 && <button className="floating-sanchez-btn" onClick={handleOpenSanchez} title="Resenhas"><div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
         <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
+        
+        <button className="floating-arena-btn" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
 
         <Bazar isMestre={false} playerData={personagem} />
         
@@ -584,8 +631,94 @@ export default function JogadorVttPage() {
           />
         )}
         
+        {/* MODAL DE LISTA DE MISSÕES */}
         {showMissionModal && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}><div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-compact"><h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3><button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button></div><div className="missions-grid-compact">{missoes.map(m => (<div key={m.id} className={`mission-card-compact rank-${m.rank}`}><div className="mc-left"><span className="mc-rank">{m.rank}</span></div><div className="mc-center"><h4 className="mc-title">{m.nome}</h4><span className="mc-reward">💰 {m.gilRecompensa} Gil</span></div><div className="mc-right"><button className="btn-details-mini" onClick={() => setShowMissionDetails(m)}>Ver Detalhes</button><button className="btn-accept-mini" onClick={() => handleCandidatar(m)}>ACEITAR</button></div></div>))}</div></div></div>)}
+        
+        {/* MODAL DE DETALHES DA MISSÃO */}
         {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
+        
+        {/* --- MODAIS DA ARENA --- */}
+        {showArenaModal && (
+            <div className="ff-modal-overlay-flex" onClick={() => setShowArenaModal(false)}>
+                <div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header-compact">
+                        <h3 className="modal-title-ff" style={{color:'#a855f7'}}>ARENAS DISPONÍVEIS</h3>
+                        <button className="btn-close-x" onClick={() => setShowArenaModal(false)}>✕</button>
+                    </div>
+                    <div className="missions-grid-compact">
+                        {arenasDisponiveis.filter(a => new Date(a.expiraEm) > new Date()).map(arena => (
+                            <div key={arena.id} className="mission-card-compact" style={{borderColor: '#a855f7'}}>
+                                <div className="mc-left" style={{color:'#a855f7'}}>⚔️</div>
+                                <div className="mc-center">
+                                    <h4 className="mc-title">{arena.missaoNome}</h4>
+                                    <span className="mc-reward">Equipes: {arena.equipes?.length || 0}</span>
+                                </div>
+                                <div className="mc-right">
+                                    <button className="btn-details-mini" style={{borderColor: '#a855f7', color: '#a855f7'}} onClick={() => setShowArenaDetails(arena)}>VER TIMES</button>
+                                </div>
+                            </div>
+                        ))}
+                        {arenasDisponiveis.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhuma arena disponível no momento.</p>}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {showArenaDetails && (
+            <div className="ff-modal-overlay-flex" onClick={() => setShowArenaDetails(null)} style={{zIndex: 100000}}>
+                <div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()} style={{border: '2px solid #a855f7', height: 'auto', maxHeight: '90vh'}}>
+                    <div className="detail-wide-header" style={{background: 'linear-gradient(90deg, #3b0764, #000)'}}>
+                        <div className="dw-rank-badge" style={{color: '#a855f7', textShadow: 'none'}}>⚔️</div>
+                        <div className="dw-title-box">
+                            <h2>{showArenaDetails.missaoNome}</h2>
+                            <span className="dw-narrator">Mestre: {showArenaDetails.mestreNome || "Narrador"}</span>
+                        </div>
+                    </div>
+                    <div className="detail-wide-body" style={{flexDirection: 'column', overflowY: 'auto', padding: '20px'}}>
+                        <h3 style={{color:'#fbbf24', textAlign:'center', marginBottom: '20px'}}>INSCRIÇÃO DE TIMES</h3>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px'}}>
+                            {showArenaDetails.equipes?.map(eq => {
+                                const isFull = eq.membros.length >= eq.max;
+                                const isMinhaEquipe = eq.membros.includes(personagem?.name);
+                                const jaEmOutraEquipe = showArenaDetails.participantes?.includes(personagem?.name) && !isMinhaEquipe;
+
+                                return (
+                                    <div key={eq.id} style={{background:'#111', borderLeft:`4px solid ${eq.cor}`, borderRadius:'4px', padding:'15px', position: 'relative'}}>
+                                        <div style={{display:'flex', justifyContent:'space-between', borderBottom:'1px solid #333', paddingBottom:'10px', marginBottom:'10px'}}>
+                                            <h4 style={{margin:0, color: eq.cor}}>{eq.nome}</h4>
+                                            <span style={{fontSize:'12px', color: isFull ? '#f44' : '#0f0'}}>{eq.membros.length} / {eq.max}</span>
+                                        </div>
+                                        <div style={{minHeight:'80px', marginBottom:'15px', fontSize:'12px', color:'#ccc'}}>
+                                            <strong>Líder:</strong> <span style={{color:'#ffcc00'}}>👑 {eq.lider}</span><br/><br/>
+                                            <strong>Membros:</strong><br/>
+                                            {eq.membros.filter(m => m !== eq.lider).map((m, i) => <div key={i}>• {m}</div>)}
+                                        </div>
+                                        {isMinhaEquipe ? (
+                                            <button disabled style={{width:'100%', padding:'10px', background: eq.cor, color:'#000', fontWeight:'bold', border:'none', borderRadius:'4px', opacity: 0.8}}>SEU TIME</button>
+                                        ) : (
+                                            <button 
+                                                onClick={() => handleJoinArenaTeam(showArenaDetails, eq.id)}
+                                                disabled={isFull || jaEmOutraEquipe}
+                                                style={{
+                                                    width:'100%', padding:'10px', background: isFull || jaEmOutraEquipe ? '#333' : 'transparent', 
+                                                    color: isFull || jaEmOutraEquipe ? '#666' : eq.cor, 
+                                                    border:`1px solid ${isFull || jaEmOutraEquipe ? '#444' : eq.cor}`, 
+                                                    fontWeight:'bold', cursor: isFull || jaEmOutraEquipe ? 'not-allowed' : 'pointer', borderRadius:'4px'
+                                                }}
+                                            >
+                                                {isFull ? 'LOTAÇÃO MÁXIMA' : jaEmOutraEquipe ? 'INSCRITO EM OUTRO TIME' : 'ENTRAR NESTE TIME'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                    <button className="dw-close-btn" onClick={() => setShowArenaDetails(null)}>FECHAR</button>
+                </div>
+            </div>
+        )}
+
         {viewImage && (<div className="ff-modal-overlay-flex" style={{zIndex: 100001}} onClick={() => setViewImage(null)}><div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div></div>)}
         {showResenhasList && (<div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}><div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-row"><h3 className="modal-title-ff">RESENHAS</h3><button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button></div><div className="resenhas-list-container">{resenhas.map(r => (<div key={r.id} className="resenha-row-player" onClick={() => { setViewResenha(r); setShowResenhasList(false); }}><h4>{r.titulo}</h4></div>))}</div></div></div>)}
         
@@ -619,14 +752,12 @@ export default function JogadorVttPage() {
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         
-        /* Z-INDEX ALTERADO PARA 2000 PARA FICAR ACIMA DO TABLETOP (1000) */
         .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
         .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; }
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
         .char-meta { font-size: 12px; color: #00f2ff; }
         
-        /* Z-INDEX DOS BOTÕES FLUTUANTES ALTERADOS PARA 2000 */
         .floating-mission-btn { position: fixed; bottom: 30px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
 
@@ -644,6 +775,9 @@ export default function JogadorVttPage() {
 
         .floating-calendar-btn { position: fixed; bottom: 330px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; background: #000; color: #22c55e; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 24px; }
         .floating-calendar-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
+
+        .floating-arena-btn { position: fixed; bottom: 390px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 20px; }
+        .floating-arena-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
 
         .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
         .floating-sanchez-btn:hover .sanchez-icon-face { opacity: 1; }
@@ -668,6 +802,10 @@ export default function JogadorVttPage() {
         .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
         .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
+        
+        /* NOVO: FEEDBACK VISUAL SE O PRÓPRIO JOGADOR ESTIVER EM FURTIVIDADE */
+        .tracker-item.tracker-stealth-self { border-color: #a855f7; border-style: dashed; opacity: 0.8; box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.3); }
+
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
         .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
         .t-img { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #777; box-shadow: 0 0 5px #000; }
@@ -960,7 +1098,7 @@ export default function JogadorVttPage() {
             transform: none !important;
             bottom: 30px !important;
             right: 110px !important; 
-            z-index: 2000 !important; /* GARANTINDO QUE A GUILDA TAMBÉM NÃO FIQUE ATRÁS */
+            z-index: 2000 !important;
         }
       `}</style>
     </div>

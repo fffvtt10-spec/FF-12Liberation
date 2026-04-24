@@ -317,6 +317,13 @@ export default function MestreVTTPage() {
       setEditingToken({ ...editingToken, [axis]: currentVal + val });
   };
 
+  // --- MODO PVP HANDLER ---
+  const handleTogglePVPMode = async () => {
+      if(!sessaoAtiva) return;
+      const newVal = !sessaoAtiva.pvp_mode;
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { pvp_mode: newVal });
+  };
+
   const filteredBestiary = bestiary.filter(b => bestiaryTab === 'monsters' ? (b.category !== 'object') : (b.category === 'object'));
 
   // --- LOADING SCREEN ---
@@ -365,6 +372,15 @@ export default function MestreVTTPage() {
       <div className="session-status-top">
           <div className="status-indicator active"></div>
           <div className="status-info"><h2>SESSÃO ATIVA: {sessaoAtiva.missaoNome}</h2><p>Mestre Online • {connectedPlayers.length} Jogadores Conectados</p></div>
+          
+          {/* --- NOVO: BOTÃO MODO PVP GLOBAL --- */}
+          <button 
+              className={`btn-pvp-toggle ${sessaoAtiva.pvp_mode ? 'active' : ''}`}
+              onClick={handleTogglePVPMode}
+              title="Alternar Modo PVP/Arena"
+          >
+              {sessaoAtiva.pvp_mode ? '⚔️ MODO PVP: ON' : '🛡️ MODO PVP: OFF'}
+          </button>
       </div>
 
       {/* --- COMPONENTS --- */}
@@ -417,7 +433,7 @@ export default function MestreVTTPage() {
                       return (
                           <div 
                             key={token.id} 
-                            className="tracker-item"
+                            className={`tracker-item ${token.stealth ? 'stealth-active' : ''}`}
                             draggable
                             onDragStart={(e) => onDragStart(e, token.originalIndex)}
                             onDragOver={(e) => e.preventDefault()}
@@ -458,6 +474,15 @@ export default function MestreVTTPage() {
                                       <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                   </div>
                                   <div className="act-btns">
+                                      {/* --- NOVO: BOTÃO DE FURTIVIDADE NO TRACKER --- */}
+                                      <button 
+                                          className="btn-icon-sm" 
+                                          title={token.stealth ? "Remover Furtividade (Apenas Dono e Mestre veem)" : "Ativar Furtividade (Invisível para adversários)"} 
+                                          onClick={() => handleUpdateTokenInTracker(token, { stealth: !token.stealth })} 
+                                          style={{color: token.stealth ? '#a855f7' : '#666'}}
+                                      >
+                                          🥷
+                                      </button>
                                       <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
                                           {isVisible ? '👁️' : '🙈'}
                                       </button>
@@ -482,7 +507,7 @@ export default function MestreVTTPage() {
                               return (
                                   <div 
                                     key={token.id} 
-                                    className="tracker-item object-item"
+                                    className={`tracker-item object-item ${token.stealth ? 'stealth-active' : ''}`}
                                     draggable
                                     onDragStart={(e) => onDragStart(e, token.originalIndex)}
                                     onDragOver={(e) => e.preventDefault()}
@@ -507,6 +532,15 @@ export default function MestreVTTPage() {
                                               <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                           </div>
                                           <div className="act-btns">
+                                              {/* --- NOVO: BOTÃO DE FURTIVIDADE NO TRACKER --- */}
+                                              <button 
+                                                  className="btn-icon-sm" 
+                                                  title={token.stealth ? "Remover Furtividade" : "Ativar Furtividade"} 
+                                                  onClick={() => handleUpdateTokenInTracker(token, { stealth: !token.stealth })} 
+                                                  style={{color: token.stealth ? '#a855f7' : '#666'}}
+                                              >
+                                                  🥷
+                                              </button>
                                               <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
                                                   {isVisible ? '👁️' : '🙈'}
                                               </button>
@@ -724,6 +758,11 @@ export default function MestreVTTPage() {
         .status-indicator { width: 10px; height: 10px; background: #00f2ff; border-radius: 50%; box-shadow: 0 0 10px #00f2ff; animation: pulse 2s infinite; }
         .status-info h2 { margin: 0; font-size: 14px; color: #fff; }
         .status-info p { margin: 0; font-size: 10px; color: #00f2ff; }
+
+        /* NOVO: BOTAO PVP E FURTIVIDADE */
+        .btn-pvp-toggle { background: #111; color: #666; border: 1px solid #555; padding: 6px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-left: 20px; font-family: 'Cinzel', serif; font-size: 12px; }
+        .btn-pvp-toggle.active { background: #3b0764; color: #c4b5fd; border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5); }
+        .tracker-item.stealth-active { border-color: #a855f7; border-style: dashed; box-shadow: inset 0 0 15px rgba(168, 85, 247, 0.2); }
 
         /* COMBAT TRACKER */
         .combat-tracker-panel { position: absolute; width: 320px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }

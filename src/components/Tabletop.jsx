@@ -14,7 +14,6 @@ const getPlayerColor = (uid) => {
 };
 
 // --- COMPONENTE INTERNO DO PING ---
-// Agora centraliza automaticamente no grid
 const PingMarker = ({ ping, gridSizePx }) => {
     const pxX = ping.gX * gridSizePx + gridSizePx / 2;
     const pxY = ping.gY * gridSizePx + gridSizePx / 2;
@@ -25,7 +24,7 @@ const PingMarker = ({ ping, gridSizePx }) => {
             style={{ 
                 left: pxX, 
                 top: pxY,
-                '--ping-color': ping.color // Variável CSS para facilitar
+                '--ping-color': ping.color 
             }}
         >
             <div className="ping-center" style={{ backgroundColor: ping.color }}></div>
@@ -37,7 +36,7 @@ const PingMarker = ({ ping, gridSizePx }) => {
 };
 
 // --- COMPONENTE INTERNO DO TOKEN ---
-const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighlighted }) => {
+const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighlighted, currentUserUid, isPvPMode, teamColor }) => {
     const [flash, setFlash] = useState('');
     const prevHp = useRef(token.stats?.hp?.current);
 
@@ -69,21 +68,49 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
 
     const bgPosX = token.imgX !== undefined ? token.imgX : 50;
     const bgPosY = token.imgY !== undefined ? token.imgY : 50;
-    const isVisible = token.visible !== false; 
+    
+    // --- LÓGICA DE VISIBILIDADE E FURTIVIDADE (PVP) ---
+    const isBaseVisible = token.visible !== false;
+    const isOwner = token.type === 'player' && token.uid === currentUserUid;
+    
+    let isStealthHidden = false;
+    let isMyStealth = false;
 
-    if (!isMaster && !isVisible) return null;
+    if (isPvPMode && token.stealth) {
+        if (isMaster || isOwner) {
+            isMyStealth = true; // Mestre ou Dono veem com filtro visual de furtividade
+        } else {
+            isStealthHidden = true; // Demais jogadores não veem nada
+        }
+    }
+
+    // Oculta o token se não for mestre e estiver invisível OU em furtividade PVP
+    if (!isMaster && (!isBaseVisible || isStealthHidden)) return null;
+
+    let tokenClasses = `vtt-token ${token.type} ${flash}`;
+    if (!isBaseVisible) tokenClasses += ' ghost-token';
+    if (isMyStealth) tokenClasses += ' stealth-token';
+    if (isHighlighted) tokenClasses += ' blinking-highlight';
+
+    const customStyle = {
+        width: sizePx,
+        height: sizePx,
+        left: token.x * gridSize,
+        top: token.y * gridSize,
+        cursor: isMaster || isOwner || (token.type === 'player' && token.controlledBy === 'me') ? 'grab' : 'default',
+        zIndex: isMaster ? 100 : 50 
+    };
+
+    // Aplica a cor do time se houver e não estiver sobreposto por furtividade/highlight
+    if (teamColor && !isMyStealth && !isHighlighted && token.type === 'player') {
+        customStyle.borderColor = teamColor;
+        customStyle.boxShadow = `0 0 15px ${teamColor}80`; // 80 é hex para 50% opacidade
+    }
 
     return (
         <div 
-            className={`vtt-token ${token.type} ${flash} ${!isVisible ? 'ghost-token' : ''} ${isHighlighted ? 'blinking-highlight' : ''}`}
-            style={{
-                width: sizePx,
-                height: sizePx,
-                left: token.x * gridSize,
-                top: token.y * gridSize,
-                cursor: isMaster || (token.type === 'player' && token.controlledBy === 'me') ? 'grab' : 'default',
-                zIndex: isMaster ? 100 : 50 
-            }}
+            className={tokenClasses}
+            style={customStyle}
             onMouseDown={(e) => onStart(e, token)}
             onTouchStart={(e) => onStart(e, token)}
         >
@@ -102,7 +129,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
                 </div>
             )}
             
-            <div className="token-name">{token.name}</div>
+            {!isMyStealth && <div className="token-name">{token.name}</div>}
         </div>
     );
 };
@@ -128,7 +155,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const [rulerStart, setRulerStart] = useState(null);
   const [rulerCurrent, setRulerCurrent] = useState(null);
 
-  // Estados da Ferramenta de Pintura
   const [paintColor, setPaintColor] = useState('#00f2ff');
   const [isPainting, setIsPainting] = useState(false);
   const [currentPaintGroupId, setCurrentPaintGroupId] = useState(null);
@@ -162,7 +188,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
     }
   }, [sessaoData, isMaster]); 
 
-  // Limpeza automática de pings (agora checa a cada segundo e expira após 3s)
   useEffect(() => {
       if (!isMaster) return;
 
@@ -208,11 +233,10 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       if (!activeMap) return;
       
       const now = Date.now();
-      if (now - lastPingTime.current < 5000) return; // Cooldown de 5 segundos
+      if (now - lastPingTime.current < 5000) return;
       lastPingTime.current = now;
 
       const coords = getLocalCoords(e);
-      // Salva a posição atrelada ao Grid, para bater com a responsividade
       const gX = Math.floor(coords.x / gridSizePx);
       const gY = Math.floor(coords.y / gridSizePx);
       
@@ -361,7 +385,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
           return;
       }
 
-      // Check for right click OR if tool is ruler
       if (activeTool === 'ruler' || e.button === 2) {
           if (e.cancelable) e.preventDefault(); 
           setIsMeasuring(true);
@@ -384,7 +407,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
     if (!rulerStart || !rulerCurrent) return "0m";
     const dx = Math.abs(rulerStart.gX - rulerCurrent.gX);
     const dy = Math.abs(rulerStart.gY - rulerCurrent.gY);
-    const squares = dx + dy; // Distância de Manhattan / Deslocamento Ortogonal
+    const squares = dx + dy; 
     return `${(squares * 1.5).toFixed(1)}m (${squares} qd)`;
   };
 
@@ -416,13 +439,21 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
     await updateDoc(doc(db, "sessoes", sessaoData.id), { active_map: null });
   };
 
+  // Função auxiliar para buscar a cor do time (Caso esteja em modo PVP)
+  const getTeamColor = (tokenName) => {
+      if (!sessaoData.equipes) return null;
+      for (let eq of sessaoData.equipes) {
+          if (eq.membros.includes(tokenName)) return eq.cor;
+      }
+      return null;
+  };
+
   if (!activeMap && !isMaster && !showManager) return null;
 
   return (
     <>
         {activeMap && (
             <>
-                {/* OVERLAY EXCLUSIVO PARA FORÇAR CELULAR NA HORIZONTAL */}
                 <div className="rotate-device-overlay">
                     <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin-phone-icon">
                         <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
@@ -500,7 +531,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                 
                                 {gridSizePx > 0 && (
                                     <>
-                                        {/* CAMADA DE PINTURAS (Abaixo dos tokens) */}
                                         <div className="paint-layer">
                                             {sessaoData.painted_groups?.map(group => (
                                                 group.cells.map((cell, idx) => (
@@ -531,6 +561,9 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                                         onUpdate={handleTokenUpdate} onStart={handleTokenStart}
                                                         charData={t.type === 'player' ? personagensData?.find(p => p.uid === t.uid) : null}
                                                         isHighlighted={t.id === highlightTokenId}
+                                                        currentUserUid={currentUserUid}
+                                                        isPvPMode={sessaoData.pvp_mode}
+                                                        teamColor={getTeamColor(t.name)}
                                                     />
                                                 )
                                             ))}
@@ -548,7 +581,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                             )}
                                         </div>
                                         
-                                        {/* CAMADA DE PINGS */}
                                         <div className="pings-layer">
                                             {pings.map(p => (
                                                 <PingMarker key={p.id} ping={p} gridSizePx={gridSizePx} />
@@ -615,7 +647,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .grid-btn-mini { background: #333; color: #fff; border: none; width: 20px; cursor: pointer; }
             .grid-number-display { width: 30px; background: #222; border: none; color: #ffcc00; text-align: center; font-size: 12px; outline: none; }
             
-            /* TOQUE NATIVO (MOBILE) - OBRIGA O GRID A IGNORAR O SCROLL DA PÁGINA PARA TOQUES FLUIDOS */
             .map-layer-container { position: relative; box-shadow: 0 0 30px #000; user-select: none; touch-action: none; }
             .map-img-element { display: block; max-width: 100%; max-height: 80vh; object-fit: contain; pointer-events: none; }
             
@@ -627,7 +658,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .ruler-overlay { z-index: 10; pointer-events: none; }
             .ruler-tag { position: absolute; background: rgba(0,0,0,0.9); color: #ffcc00; border: 1px solid #ffcc00; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; pointer-events: none; z-index: 20; }
 
-            /* --- OVERLAY PARA FORÇAR CELULAR NA HORIZONTAL --- */
             .rotate-device-overlay { display: none; }
             @media screen and (max-width: 950px) and (orientation: portrait) {
                 .rotate-device-overlay {
@@ -640,7 +670,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .spin-phone-icon { animation: spinPhone 2s ease-in-out infinite; }
             @keyframes spinPhone { 0% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } 100% { transform: rotate(-90deg); } }
 
-            /* --- ESTILOS DE PING E NOMES --- */
             .ping-marker {
                 position: absolute;
                 width: 0; height: 0;
@@ -700,7 +729,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                 100% { transform: scale(2.0); opacity: 0; border-width: 0px; }
             }
 
-            /* --- ESTILOS DA PINTURA DE MAPA (GLASSMORPHISM) --- */
             .paint-colors { display: flex; align-items: center; margin-left: 10px; border-left: 1px solid #444; padding-left: 10px; }
             .paint-colors input[type="color"] { background: none; border: none; width: 25px; height: 25px; cursor: pointer; padding: 0; }
             .paint-groups-manager { display: flex; gap: 5px; margin-left: 10px; align-items: center; }
@@ -720,16 +748,19 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                 100% { filter: brightness(1.2); opacity: 1; }
             }
 
-            /* --- TOKENS --- */
-            .vtt-token { position: absolute; border-radius: 50%; box-shadow: 0 0 10px #000; z-index: 10; overflow: visible; }
+            /* --- TOKENS E FURTIVIDADE --- */
+            .vtt-token { position: absolute; border-radius: 50%; box-shadow: 0 0 10px #000; z-index: 10; overflow: visible; transition: border-color 0.3s; }
             .vtt-token.dragging { z-index: 100; transition: none; box-shadow: 0 10px 20px rgba(0,0,0,0.8); transform: scale(1.05); }
             .vtt-token.enemy { border: 2px solid #f44; }
             .vtt-token.player { border: 2px solid #00f2ff; }
             .vtt-token.object { border: 2px dashed #ffcc00; border-radius: 4px; } 
             
             .vtt-token.ghost-token { opacity: 0.5; filter: grayscale(100%); border-style: dashed; }
+            
+            /* CSS NOVO: FURTIVIDADE */
+            .vtt-token.stealth-token { opacity: 0.6; border: 2px dotted #8a2be2 !important; box-shadow: 0 0 15px rgba(138, 43, 226, 0.6) !important; }
+            .vtt-token.stealth-token .token-inner { filter: grayscale(50%) hue-rotate(250deg); }
 
-            /* ANIMAÇÃO DE DESTAQUE (BLINK/PISCAR) */
             .blinking-highlight {
                 animation: superBlink 0.5s infinite alternate !important;
                 border: 4px solid #ffcc00 !important;

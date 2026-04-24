@@ -37,7 +37,7 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
   // Combinar sessões e disponibilidades em uma lista de eventos
   const events = [
     ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
-    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio) }))
+    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio), isArena: s.isArena }))
   ];
 
   const renderDays = () => {
@@ -61,11 +61,11 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
             {dayEvents.map((ev, idx) => (
               <div 
                 key={idx} 
-                className={`cal-event-pill ${ev.type}`} 
+                className={`cal-event-pill ${ev.type} ${ev.isArena ? 'arena' : ''}`} 
                 onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
                 title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
               >
-                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? '⚔️' : '✅'}
+                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? (ev.isArena ? '⚔️' : '🛡️') : '✅'}
               </div>
             ))}
           </div>
@@ -129,7 +129,7 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
                 <div className="mini-modal detail">
                     {viewEvent.type === 'session' ? (
                         <>
-                            <h4 style={{color: '#f44'}}>⚔️ SESSÃO AGENDADA</h4>
+                            <h4 style={{color: viewEvent.isArena ? '#a855f7' : '#f44'}}>{viewEvent.isArena ? '⚔️ ARENA PVP' : '🛡️ SESSÃO AGENDADA'}</h4>
                             <h3>{viewEvent.missaoNome}</h3>
                             <p><strong>Horário Atual:</strong> {new Date(viewEvent.dataInicio).toLocaleString()}</p>
                             <p><strong>Mestre:</strong> {viewEvent.mestreNome || "Você"}</p>
@@ -182,6 +182,7 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
         .cal-events-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
         .cal-event-pill { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .cal-event-pill.session { background: #7f1d1d; color: #fca5a5; border: 1px solid #f87171; }
+        .cal-event-pill.session.arena { background: #4c1d95; color: #c4b5fd; border-color: #8b5cf6; }
         .cal-event-pill.slot { background: #064e3b; color: #6ee7b7; border: 1px solid #34d399; }
 
         .mini-modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; }
@@ -247,6 +248,19 @@ export default function MestrePage() {
   const [showCalendar, setShowCalendar] = useState(false); // Novo Modal Calendar
   const [showFichasList, setShowFichasList] = useState(false); 
   const [selectedFicha, setSelectedFicha] = useState(null); 
+  
+  // --- ARENA STATES ---
+  const [showArenaModal, setShowArenaModal] = useState(false);
+  const [viewArenaManager, setViewArenaManager] = useState(null);
+  const ARENA_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'];
+  const [arenaForm, setArenaForm] = useState({
+      nomeEvento: '',
+      selectedSlotId: '',
+      equipes: [
+          { id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] },
+          { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }
+      ]
+  });
   
   // Visualizações
   const [showDetails, setShowDetails] = useState(null); 
@@ -465,6 +479,100 @@ export default function MestrePage() {
       }
   };
 
+  // --- ARENA PVP HANDLERS ---
+  const handleAddTeam = () => {
+      if(arenaForm.equipes.length >= 4) return;
+      setArenaForm(prev => ({
+          ...prev,
+          equipes: [...prev.equipes, { id: Date.now(), nome: `Time ${prev.equipes.length + 1}`, lider: '', max: 10, cor: ARENA_COLORS[prev.equipes.length], membros: [] }]
+      }));
+  };
+
+  const handleRemoveTeam = (id) => {
+      setArenaForm(prev => ({
+          ...prev,
+          equipes: prev.equipes.filter(e => e.id !== id)
+      }));
+  };
+
+  const updateTeamField = (teamId, field, value) => {
+      setArenaForm(prev => ({
+          ...prev,
+          equipes: prev.equipes.map(eq => eq.id === teamId ? { ...eq, [field]: value } : eq)
+      }));
+  };
+
+  const criarArena = async (e) => {
+      e.preventDefault();
+      if (!arenaForm.nomeEvento || !arenaForm.selectedSlotId || !currentUser) return alert("Preencha o evento e o horário!");
+      
+      try {
+          const slot = disponibilidades.find(d => d.id === arenaForm.selectedSlotId);
+          if (!slot) return alert("Horário inválido ou já ocupado.");
+
+          const inicio = new Date(slot.start);
+          const fim = new Date(inicio.getTime() + (24 * 60 * 60 * 1000)); 
+
+          const equipesParaSalvar = arenaForm.equipes.map(eq => ({
+              id: eq.id,
+              nome: eq.nome || `Equipe ${eq.id}`,
+              lider: eq.lider,
+              max: Number(eq.max) || 10,
+              cor: eq.cor,
+              membros: eq.lider ? [eq.lider] : []
+          }));
+
+          let todosParticipantes = [];
+          equipesParaSalvar.forEach(eq => {
+              if(eq.lider) todosParticipantes.push(eq.lider);
+          });
+
+          await addDoc(collection(db, "sessoes"), {
+              missaoNome: `⚔️ ARENA: ${arenaForm.nomeEvento}`,
+              mestreId: currentUser.uid,
+              dataInicio: slot.start,
+              expiraEm: fim.toISOString(),
+              participantes: todosParticipantes,
+              equipes: equipesParaSalvar,
+              isArena: true,
+              pvp_mode: true,
+              mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [],
+              connected_players: [], dm_online: false,
+              createdAt: serverTimestamp()
+          });
+
+          await deleteDoc(doc(db, "disponibilidades", arenaForm.selectedSlotId));
+
+          setShowArenaModal(false);
+          setArenaForm({ nomeEvento: '', selectedSlotId: '', equipes: [{ id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] }, { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }] });
+          alert("Arena agendada com sucesso!");
+      } catch (err) {
+          alert("Erro ao criar Arena: " + err.message);
+      }
+  };
+
+  const handleRemovePlayerFromTeam = async (sessaoId, equipeId, jogadorNome) => {
+      if(!window.confirm(`Remover ${jogadorNome} desta equipe?`)) return;
+      
+      const sessaoObj = sessoes.find(s => s.id === sessaoId);
+      if(!sessaoObj) return;
+
+      const novasEquipes = sessaoObj.equipes.map(eq => {
+          if(eq.id === equipeId) {
+              return { ...eq, membros: eq.membros.filter(m => m !== jogadorNome) };
+          }
+          return eq;
+      });
+
+      let novosParticipantes = [];
+      novasEquipes.forEach(eq => novosParticipantes.push(...eq.membros));
+
+      await updateDoc(doc(db, "sessoes", sessaoId), {
+          equipes: novasEquipes,
+          participantes: novosParticipantes
+      });
+  };
+
   const enterVTT = (sessao) => {
       navigate('/mestre-vtt');
   };
@@ -587,11 +695,12 @@ export default function MestrePage() {
 
           {/* COLUNA 3: SESSÕES */}
           <div className="ff-card board-column">
-            <div className="card-header no-border" style={{display:'flex', gap:'5px'}}>
+            <div className="card-header no-border" style={{display:'flex', gap:'5px', flexWrap: 'wrap'}}>
               <h3>SESSÕES DE JOGO</h3>
               <div style={{display:'flex', gap:'5px'}}>
                 <button className="ff-add-btn small-btn" onClick={() => setShowCalendar(true)}>📅 AGENDA</button>
                 <button className="ff-add-btn small-btn" onClick={() => setShowSessionModal(true)}>+ SESSÃO</button>
+                <button className="ff-add-btn small-btn" style={{borderColor: '#a855f7', color: '#a855f7'}} onClick={() => setShowArenaModal(true)}>⚔️ ARENA</button>
               </div>
             </div>
             <div className="mission-scroll">
@@ -599,18 +708,24 @@ export default function MestrePage() {
                    <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
                ) : (
                    sessoes.map(s => (
-                       <div key={s.id} className="sessao-card">
-                           <div className="sessao-status">🔴 AO VIVO / AGENDADA</div>
-                           <h4 className="sessao-title">{s.missaoNome}</h4>
+                       <div key={s.id} className={`sessao-card ${s.isArena ? 'arena-mode' : ''}`}>
+                           <div className={`sessao-status ${s.isArena ? 'arena' : ''}`}>{s.isArena ? '⚔️ ARENA PVP' : '🔴 AO VIVO / AGENDADA'}</div>
+                           <h4 className="sessao-title" style={{color: s.isArena ? '#c4b5fd' : '#fff'}}>{s.missaoNome}</h4>
                            <div className="sessao-info">
                                <span>📅 {new Date(s.dataInicio).toLocaleString()}</span>
                                <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
                            </div>
-                           <div className="sessao-assets-count">
-                               🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
-                           </div>
+                           {!s.isArena && (
+                             <div className="sessao-assets-count">
+                                 🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
+                             </div>
+                           )}
                            <div className="poster-actions" style={{marginTop: '15px'}}>
-                               <button className="btn-cyan" onClick={() => setViewMembers(s)}>👥 MEMBROS</button>
+                               {s.isArena ? (
+                                   <button className="btn-cyan arena-btn" onClick={() => setViewArenaManager(s)}>⚔️ GERENCIAR TIMES</button>
+                               ) : (
+                                   <button className="btn-cyan" onClick={() => setViewMembers(s)}>👥 MEMBROS</button>
+                               )}
                                <button className="btn-play-vtt" onClick={() => enterVTT(s)}>▶ ACESSAR VTT</button>
                                <button className="btn-red" onClick={() => deleteDoc(doc(db, "sessoes", s.id))}>CANCELAR</button>
                            </div>
@@ -628,7 +743,7 @@ export default function MestrePage() {
       </button>
 
       {/* BOTÕES FLUTUANTES DE SISTEMA */}
-      <GuildBoard isMaster={true} /> {/* QUADRO DA GUILDA INSERIDO AQUI */}
+      <GuildBoard isMaster={true} />
       <Bazar isMestre={true} />
       <Forja />
 
@@ -645,7 +760,7 @@ export default function MestrePage() {
         />
       )}
 
-      {/* MODAL DE LISTA DE FICHAS (EXPANDIDO) */}
+      {/* MODAL DE LISTA DE FICHAS */}
       {showFichasList && (
           <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
               <div className="ff-modal-scrollable ff-card fichas-modal-container" onClick={e => e.stopPropagation()}>
@@ -673,6 +788,103 @@ export default function MestrePage() {
             isMaster={true} 
             onClose={() => setSelectedFicha(null)} 
           />
+      )}
+
+      {/* --- MODAL DA ARENA PVP --- */}
+      {showArenaModal && (
+          <div className="ff-modal-overlay-fixed">
+              <div className="ff-modal-scrollable ff-card" style={{border: '2px solid #a855f7'}}>
+                  <h3 className="modal-title-ff" style={{color: '#a855f7', borderBottomColor: '#a855f7'}}>EVENTO PVP (ARENA)</h3>
+                  <form onSubmit={criarArena}>
+                      <div className="modal-input-group">
+                          <label style={{color: '#c4b5fd'}}>NOME DO EVENTO ARENA</label>
+                          <input placeholder="Ex: Torneio de Nibelheim" value={arenaForm.nomeEvento} onChange={e=>setArenaForm({...arenaForm, nomeEvento: e.target.value})} required style={{borderColor: '#8b5cf6'}} />
+                      </div>
+                      <div className="modal-input-group">
+                          <label style={{color: '#c4b5fd'}}>HORÁRIO DA ARENA (AGENDA)</label>
+                          <select className="ff-select-dark" value={arenaForm.selectedSlotId} onChange={e => setArenaForm({...arenaForm, selectedSlotId: e.target.value})} required style={{borderColor: '#8b5cf6'}}>
+                              <option value="">-- Selecione um Horário --</option>
+                              {disponibilidades.filter(d => new Date(d.start) > new Date()).sort((a,b) => new Date(a.start) - new Date(b.start)).map(d => (
+                                  <option key={d.id} value={d.id}>{new Date(d.start).toLocaleString()}</option>
+                              ))}
+                          </select>
+                      </div>
+
+                      <div className="arena-teams-section">
+                          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                              <h4 style={{color: '#fbbf24', margin:0}}>TIMES ({arenaForm.equipes.length}/4)</h4>
+                              <button type="button" className="btn-cyan" onClick={handleAddTeam} style={{padding: '5px 10px'}} disabled={arenaForm.equipes.length >= 4}>+ NOVO TIME</button>
+                          </div>
+                          
+                          {arenaForm.equipes.map((equipe, index) => (
+                              <div key={equipe.id} className="team-setup-box" style={{borderLeft: `4px solid ${equipe.cor}`}}>
+                                  <div className="ts-header">
+                                      <input type="text" value={equipe.nome} onChange={e => updateTeamField(equipe.id, 'nome', e.target.value)} placeholder={`Nome do Time ${index + 1}`} required />
+                                      {arenaForm.equipes.length > 2 && <button type="button" onClick={() => handleRemoveTeam(equipe.id)} className="btn-remove-x">×</button>}
+                                  </div>
+                                  <div className="ts-body">
+                                      <div className="ts-field">
+                                          <label>LÍDER (Obrigatório)</label>
+                                          <select value={equipe.lider} onChange={e => updateTeamField(equipe.id, 'lider', e.target.value)} required>
+                                              <option value="">-- Escolher Líder --</option>
+                                              {personagensDb.map(p => <option key={p.id} value={p.name}>{p.name} ({p.class})</option>)}
+                                          </select>
+                                      </div>
+                                      <div className="ts-field">
+                                          <label>MÁXIMO DE JOGADORES</label>
+                                          <input type="number" min="1" max="20" value={equipe.max} onChange={e => updateTeamField(equipe.id, 'max', e.target.value)} required />
+                                      </div>
+                                      <div className="ts-field">
+                                          <label>COR DO TIME</label>
+                                          <div className="color-picker-grid">
+                                              {ARENA_COLORS.map(c => (
+                                                  <div key={c} className={`color-swatch ${equipe.cor === c ? 'selected' : ''}`} style={{backgroundColor: c}} onClick={() => updateTeamField(equipe.id, 'cor', c)}></div>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+
+                      <div className="btn-group-ff">
+                          <button type="submit" className="btn-forjar-main" style={{background: '#a855f7'}}>CRIAR ARENA</button>
+                          <button type="button" className="btn-cancelar-main" onClick={() => setShowArenaModal(false)}>CANCELAR</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* --- MODAL GERENCIAR TIMES DA ARENA --- */}
+      {viewArenaManager && (
+          <div className="ff-modal-overlay-fixed" onClick={() => setViewArenaManager(null)}>
+              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{border: '2px solid #a855f7', width: '800px'}}>
+                  <h3 className="modal-title-ff" style={{color: '#a855f7', borderBottomColor: '#a855f7'}}>GERENCIAR TIMES - {viewArenaManager.missaoNome}</h3>
+                  <div className="arena-manager-grid">
+                      {viewArenaManager.equipes?.map(equipe => (
+                          <div key={equipe.id} className="arena-team-card" style={{borderColor: equipe.cor}}>
+                              <div className="atc-header" style={{background: `linear-gradient(90deg, ${equipe.cor}40, transparent)`}}>
+                                  <h4 style={{color: equipe.cor}}>{equipe.nome}</h4>
+                                  <span>{equipe.membros.length} / {equipe.max}</span>
+                              </div>
+                              <div className="atc-members">
+                                  {equipe.membros.length === 0 && <span style={{color:'#666', fontStyle:'italic'}}>Vazio</span>}
+                                  {equipe.membros.map((membro, i) => (
+                                      <div key={i} className="atc-member-row">
+                                          <span>{membro === equipe.lider ? '👑' : '👤'} {membro}</span>
+                                          {membro !== equipe.lider && (
+                                              <button className="btn-kick-x" onClick={() => handleRemovePlayerFromTeam(viewArenaManager.id, equipe.id, membro)}>×</button>
+                                          )}
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+                  <button className="btn-cancelar-main" style={{marginTop: '20px', width: '100%'}} onClick={() => setViewArenaManager(null)}>FECHAR</button>
+              </div>
+          </div>
       )}
 
       {/* --- OUTROS MODAIS --- */}
@@ -722,13 +934,12 @@ export default function MestrePage() {
                   <form onSubmit={criarSessao}>
                       <div className="modal-input-group"><label>SELECIONAR MISSÃO</label><select className="ff-select-dark" value={sessionForm.missaoId} onChange={e => setSessionForm({...sessionForm, missaoId: e.target.value})} required><option value="">-- Escolha --</option>{missoes.map(m => <option key={m.id} value={m.id}>{m.nome} (Rank {m.rank})</option>)}</select></div>
                       
-                      {/* --- NOVO SELETOR DE SLOT --- */}
                       <div className="modal-input-group">
                           <label>HORÁRIO DISPONÍVEL (DA AGENDA)</label>
                           <select className="ff-select-dark" value={sessionForm.selectedSlotId} onChange={e => setSessionForm({...sessionForm, selectedSlotId: e.target.value})} required>
                               <option value="">-- Selecione um Horário --</option>
                               {disponibilidades
-                                  .filter(d => new Date(d.start) > new Date()) // Apenas futuros
+                                  .filter(d => new Date(d.start) > new Date())
                                   .sort((a,b) => new Date(a.start) - new Date(b.start))
                                   .map(d => (
                                       <option key={d.id} value={d.id}>
@@ -737,7 +948,6 @@ export default function MestrePage() {
                                   ))
                               }
                           </select>
-                          <small style={{color:'#666', fontStyle:'italic'}}>*Crie horários no botão AGENDA se a lista estiver vazia.</small>
                       </div>
 
                       <div className="player-selector-box-fixed"><label>JOGADORES:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={sessaoDestinatarios.includes(p.name)} onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} /> {p.name} ({p.class})</label>))}</div></div>
@@ -818,11 +1028,9 @@ export default function MestrePage() {
         </div>
       )}
 
-      {/* --- NOVO VISUALIZADOR DA RESENHA ESTILO FINAL FANTASY TACTICS --- */}
       {viewResenha && (
         <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
           <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
-             {/* Lado Esquerdo: Foto e Nome */}
              <div className="fft-portrait-section">
                 <div className="fft-portrait-frame">
                    <img src={sanchezImg} alt="Sanchez" />
@@ -832,7 +1040,6 @@ export default function MestrePage() {
                 </div>
              </div>
 
-             {/* Lado Direito: Conteúdo */}
              <div className="fft-content-section">
                 <h2 className="fft-title">{viewResenha.titulo}</h2>
                 <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
@@ -887,7 +1094,7 @@ export default function MestrePage() {
         .mission-timer { display: block; text-align: center; font-size: 0.8rem; color: #94a3b8; margin: 10px 0; font-weight: bold; }
         
         .poster-actions { display: flex; gap: 5px; justify-content: space-between; }
-        .btn-cyan { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .btn-cyan { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.2s; font-weight: bold; text-transform: uppercase; }
         .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); }
         .btn-red { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .btn-red:hover { background: rgba(239, 68, 68, 0.1); }
@@ -899,21 +1106,44 @@ export default function MestrePage() {
         .resenha-item-card { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 4px; border-left: 3px solid #00f2ff; }
         .resenha-item-card h4 { margin: 0 0 10px 0; color: #e2e8f0; font-size: 1rem; }
         
-        /* SESSÕES */
-        .sessao-card { background: #1e293b; border: 1px solid #fbbf24; padding: 15px; border-radius: 4px; position: relative; }
+        /* SESSÕES E ARENA */
+        .sessao-card { background: #1e293b; border: 1px solid #fbbf24; padding: 15px; border-radius: 4px; position: relative; margin-bottom: 15px; }
+        .sessao-card.arena-mode { border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.2); }
         .sessao-status { position: absolute; top: -10px; left: 10px; background: #fbbf24; color: #000; font-size: 0.6rem; font-weight: bold; padding: 2px 6px; border-radius: 2px; }
+        .sessao-status.arena { background: #a855f7; color: #fff; }
         .sessao-title { margin: 10px 0 5px 0; color: #fff; font-size: 1.1rem; }
         .sessao-info { font-size: 0.8rem; color: #94a3b8; display: flex; flex-direction: column; gap: 2px; }
         .sessao-assets-count { font-size: 0.75rem; color: #cbd5e1; margin-top: 5px; font-style: italic; }
         .btn-play-vtt { background: #fbbf24; color: #000; border: none; padding: 8px; font-weight: bold; cursor: pointer; flex: 2; transition: 0.2s; }
         .btn-play-vtt:hover { background: #f59e0b; box-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
+        .btn-cyan.arena-btn { border-color: #a855f7; color: #a855f7; flex: 2; }
+        .btn-cyan.arena-btn:hover { background: rgba(168, 85, 247, 0.2); color: #fff; }
         .empty-instancia { text-align: center; color: #475569; padding: 20px; font-style: italic; border: 2px dashed #334155; border-radius: 8px; }
+
+        /* ESTILOS DA ARENA (FORMULARIO E GERENCIAMENTO) */
+        .arena-teams-section { background: rgba(0,0,0,0.2); border: 1px solid #333; padding: 15px; border-radius: 6px; margin-top: 15px; }
+        .team-setup-box { background: #1e293b; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .ts-header { display: flex; justify-content: space-between; align-items: center; }
+        .ts-header input { background: transparent; border: none; border-bottom: 1px solid #444; color: #fff; font-size: 14px; font-weight: bold; width: 60%; outline: none; }
+        .ts-body { display: flex; gap: 15px; }
+        .ts-field { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+        .ts-field label { font-size: 10px; color: #aaa; }
+        .ts-field select, .ts-field input[type="number"] { background: #0f172a; border: 1px solid #444; color: #fff; padding: 5px; border-radius: 4px; }
+        .color-picker-grid { display: flex; gap: 5px; flex-wrap: wrap; }
+        .color-swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .color-swatch.selected { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+
+        .arena-manager-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .arena-team-card { background: #1e293b; border-left: 4px solid; border-radius: 4px; overflow: hidden; }
+        .atc-header { padding: 10px; display: flex; justify-content: space-between; border-bottom: 1px solid #333; font-weight: bold; }
+        .atc-header h4 { margin: 0; }
+        .atc-members { padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 80px; }
+        .atc-member-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 3px; }
 
         /* MODAIS GERAIS */
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .ff-modal-scrollable { background: #0f172a; border: 1px solid #fbbf24; width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto; padding: 25px; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
         
-        /* NOVO: CLASSE ESPECÍFICA PARA MODAL DE FICHAS MAIOR */
         .fichas-modal-container { width: 900px; max-width: 95vw; }
         .fichas-grid-large { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-height: 60vh; overflow-y: auto; background: #020617; padding: 15px; border: 1px solid #334155; border-radius: 4px; }
 
@@ -1039,12 +1269,11 @@ export default function MestrePage() {
           line-height: 1.6;
           color: #e0e0e0;
           padding-right: 10px;
-          /* Barra invisível mas funcional */
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none;  /* IE 10+ */
+          scrollbar-width: none; 
+          -ms-overflow-style: none; 
         }
         .fft-scroll-text::-webkit-scrollbar { 
-          display: none; /* Chrome/Safari */
+          display: none; 
         }
 
         .fft-close-btn {
@@ -1071,7 +1300,7 @@ export default function MestrePage() {
           transform: scale(1.1);
         }
 
-        /* DETALHES MISSÃO (MODERN DARK) */
+        /* DETALHES MISSÃO */
         .detail-view-main { width: 800px; height: 600px; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }
         .detail-header-modern { background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-bottom: 1px solid #334155; display: flex; gap: 20px; align-items: center; }
         .detail-rank-badge { font-size: 3rem; font-weight: 900; color: rgba(255,255,255,0.1); text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
@@ -1107,13 +1336,12 @@ export default function MestrePage() {
         .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
         .ficha-row-name strong { display: block; color: #fff; font-size: 1.1rem; }
         .ficha-row-name small { color: #94a3b8; }
-        .btn-cyan { padding: 8px 15px; font-size: 0.8rem; }
         .guild-btn-float {
             top: auto !important;
             left: auto !important;
             transform: none !important;
             bottom: 30px !important;
-            right: 270px !important; /* 30 (Bazar) -> 110 (Forja) -> 190 (Ficha) -> 270 (Guilda) */
+            right: 270px !important;
         }
       `}</style>
     </div>
