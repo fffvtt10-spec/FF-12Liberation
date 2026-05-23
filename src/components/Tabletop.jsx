@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
+import { GiLightningTrio, GiIceCube, GiBlindfold, GiSilenced, GiFlame, GiBallAndChain, GiShatteredSword, GiDeathSkull, GiPoisonBottle } from 'react-icons/gi';
+
+// --- HELPER DE ÍCONES DE STATUS ---
+const getStatusIcon = (id) => {
+    switch(id) {
+        case 'Paralisado': return <GiLightningTrio color="#ffdd00" />;
+        case 'Congelado': return <GiIceCube color="#00ffff" />;
+        case 'Cego': return <GiBlindfold color="#aaaaaa" />;
+        case 'Silêncio': return <GiSilenced color="#dddddd" />;
+        case 'Queimado': return <GiFlame color="#ff4400" />;
+        case 'Imobilizado': return <GiBallAndChain color="#888888" />;
+        case 'Desabilitado': return <GiShatteredSword color="#ff8800" />;
+        case 'Condenado': return <GiDeathSkull color="#ff0000" />;
+        case 'Envenenado': return <GiPoisonBottle color="#00ff00" />;
+        default: return null;
+    }
+};
 
 // --- HELPER: GERAR COR DO JOGADOR ---
 const getPlayerColor = (uid) => {
@@ -14,7 +31,6 @@ const getPlayerColor = (uid) => {
 };
 
 // --- COMPONENTE INTERNO DO PING ---
-// Agora centraliza automaticamente no grid
 const PingMarker = ({ ping, gridSizePx }) => {
     const pxX = ping.gX * gridSizePx + gridSizePx / 2;
     const pxY = ping.gY * gridSizePx + gridSizePx / 2;
@@ -122,6 +138,15 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
                     backgroundPosition: `${bgPosX}% ${bgPosY}%` 
                 }}
             ></div>
+            
+            {/* --- OVERLAY DE STATUS NEGATIVOS --- */}
+            {token.statuses && token.statuses.length > 0 && (
+                <div className="token-status-overlay">
+                    {token.statuses.map(s => (
+                        <div key={s} className="status-icon-badge" title={s}>{getStatusIcon(s)}</div>
+                    ))}
+                </div>
+            )}
             
             {isMaster && (
                 <div className="token-sizer">
@@ -777,6 +802,10 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .token-name { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; font-size: 10px; padding: 2px 5px; border-radius: 4px; white-space: nowrap; pointer-events: none; opacity: 0; transition: 0.2s; z-index: 15; text-shadow: 0 0 3px #000; }
             .vtt-token:hover .token-name { opacity: 1; }
             
+            /* CSS NOVO: OVERLAY DE STATUS NO MAPA */
+            .token-status-overlay { position: absolute; top: -10px; right: -10px; display: flex; flex-wrap: wrap; gap: 2px; width: calc(100% + 20px); justify-content: center; pointer-events: none; z-index: 20; }
+            .status-icon-badge { background: rgba(0,0,0,0.8); border-radius: 50%; padding: 2px; display: flex; align-items: center; justify-content: center; font-size: 12px; box-shadow: 0 0 5px #000; border: 1px solid #444; }
+
             .token-sizer { position: absolute; top: -10px; right: -20px; display: flex; flex-direction: column; opacity: 0; transition: 0.2s; gap: 2px; }
             .vtt-token:hover .token-sizer { opacity: 1; }
             .token-sizer button { width: 15px; height: 15px; background: #000; color: #fff; border: 1px solid #555; border-radius: 50%; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }

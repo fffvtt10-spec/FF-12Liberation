@@ -13,6 +13,21 @@ import SceneryViewer from '../components/SceneryViewer';
 import NPCViewer from '../components/NPCViewer'; 
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
+// --- ÍCONES DE STATUS NEGATIVOS (REACT-ICONS) ---
+import { GiLightningTrio, GiIceCube, GiBlindfold, GiSilenced, GiFlame, GiBallAndChain, GiShatteredSword, GiDeathSkull, GiPoisonBottle } from 'react-icons/gi';
+
+const STATUS_EFFECTS = [
+    { id: 'Paralisado', icon: <GiLightningTrio />, color: '#ffdd00' },
+    { id: 'Congelado', icon: <GiIceCube />, color: '#00ffff' },
+    { id: 'Cego', icon: <GiBlindfold />, color: '#aaaaaa' },
+    { id: 'Silêncio', icon: <GiSilenced />, color: '#dddddd' },
+    { id: 'Queimado', icon: <GiFlame />, color: '#ff4400' },
+    { id: 'Imobilizado', icon: <GiBallAndChain />, color: '#888888' },
+    { id: 'Desabilitado', icon: <GiShatteredSword />, color: '#ff8800' },
+    { id: 'Condenado', icon: <GiDeathSkull />, color: '#ff0000' },
+    { id: 'Envenenado', icon: <GiPoisonBottle />, color: '#00ff00' }
+];
+
 // --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
 const IconTabletop = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -90,6 +105,7 @@ export default function MestreVTTPage() {
   const [showCombatTracker, setShowCombatTracker] = useState(false);
   
   const [viewMonsterDetails, setViewMonsterDetails] = useState(null);
+  const [activeStatusMenu, setActiveStatusMenu] = useState(null); // ID do token com o menu de status aberto
 
   // Estados Tracker Drag
   const [trackerPos, setTrackerPos] = useState({ x: 280, y: 100 });
@@ -223,6 +239,7 @@ export default function MestreVTTPage() {
           x: 0, y: 0, size: 1,
           visible: true, 
           visibleBars: item.visibleBars,
+          statuses: [], // Array novo para status negativos
           stats: { hp: { current: item.hpCurrent, max: item.hpMax }, mp: { current: item.mpCurrent, max: item.mpMax } },
           details: { ...item } 
       };
@@ -235,7 +252,8 @@ export default function MestreVTTPage() {
       if(sessaoAtiva.tokens?.find(t => t.uid === char.uid)) return alert("Jogador já está no mapa!");
       const newToken = {
           id: `player_${char.uid}`, type: 'player', uid: char.uid, name: char.name,
-          img: char.character_sheet?.imgUrl || '', x: 0, y: 0, size: 1, visible: true, controlledBy: char.uid 
+          img: char.character_sheet?.imgUrl || '', x: 0, y: 0, size: 1, visible: true, controlledBy: char.uid,
+          statuses: [] // Array novo para status negativos
       };
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: [...(sessaoAtiva.tokens||[]), newToken] });
       setShowPlayerManager(false); 
@@ -261,6 +279,17 @@ export default function MestreVTTPage() {
           return t;
       });
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
+  };
+
+  // --- HANDLER DE STATUS NEGATIVOS ---
+  const handleToggleStatus = async (token, statusId) => {
+      let currentStatuses = token.statuses || [];
+      if (currentStatuses.includes(statusId)) {
+          currentStatuses = currentStatuses.filter(s => s !== statusId);
+      } else {
+          currentStatuses = [...currentStatuses, statusId];
+      }
+      await handleUpdateTokenInTracker(token, { statuses: currentStatuses });
   };
 
   const onDragStart = (e, originalIndex) => { e.dataTransfer.setData("dragIndex", originalIndex); };
@@ -382,7 +411,6 @@ export default function MestreVTTPage() {
           <div className="status-indicator active"></div>
           <div className="status-info"><h2>SESSÃO ATIVA: {sessaoAtiva.missaoNome}</h2><p>Mestre Online • {connectedPlayers.length} Jogadores Conectados</p></div>
           
-          {/* --- BOTAO MODO PVP GLOBAL --- */}
           <button 
               className={`btn-pvp-toggle ${sessaoAtiva.pvp_mode ? 'active' : ''}`}
               onClick={handleTogglePVPMode}
@@ -438,75 +466,111 @@ export default function MestreVTTPage() {
                       }
 
                       const isVisible = token.visible !== false;
-
-                      // --- IDENTIFICAÇÃO DE COR DO TIME NO PVP ---
                       const isPvP = sessaoAtiva.pvp_mode;
                       const teamColor = isPvP ? getTeamColor(token.name) : null;
                       const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
 
                       return (
-                          <div 
-                            key={token.id} 
-                            className={`tracker-item ${token.type} ${!isVisible ? 'hidden' : ''} ${token.stealth ? 'stealth-active' : ''}`}
-                            draggable
-                            onDragStart={(e) => onDragStart(e, token.originalIndex)}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => onDrop(e, token.originalIndex)}
-                            style={customBorder}
-                          >
-                              <div className="t-col-img">
-                                  <div className="t-index">{token.originalIndex + 1}</div>
-                                  <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`, opacity: isVisible ? 1 : 0.5}}></div>
+                          <div key={token.id} className="tracker-item-wrapper">
+                              <div 
+                                className={`tracker-item ${token.type} ${!isVisible ? 'hidden' : ''} ${token.stealth ? 'stealth-active' : ''}`}
+                                draggable
+                                onDragStart={(e) => onDragStart(e, token.originalIndex)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => onDrop(e, token.originalIndex)}
+                                style={customBorder}
+                              >
+                                  <div className="t-col-img">
+                                      <div className="t-index">{token.originalIndex + 1}</div>
+                                      <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`, opacity: isVisible ? 1 : 0.5}}></div>
+                                  </div>
+                                  
+                                  <div className="t-col-info">
+                                      <div className="t-name" style={teamColor ? {color: teamColor} : {}}>
+                                          {token.name}
+                                          {/* Exibição dos ícones ativos no painel */}
+                                          <span className="t-active-statuses">
+                                              {token.statuses?.map(s => {
+                                                  const effect = STATUS_EFFECTS.find(e => e.id === s);
+                                                  return effect ? <span key={s} style={{color: effect.color}} title={s}>{effect.icon}</span> : null;
+                                              })}
+                                          </span>
+                                      </div>
+                                      <div className="t-stats-row">
+                                          <div className="t-stat hp">
+                                              <label>HP</label>
+                                              {token.type === 'enemy' ? (
+                                                  <input type="number" value={hpVal} onChange={(e) => handleUpdateStatsInTracker(token, 'hp', e.target.value)} />
+                                              ) : <span>{hpVal}</span>}
+                                              <small>/{hpMax}</small>
+                                          </div>
+                                          <div className="t-stat mp">
+                                              <label>MP</label>
+                                              {token.type === 'enemy' ? (
+                                                  <input type="number" value={mpVal} onChange={(e) => handleUpdateStatsInTracker(token, 'mp', e.target.value)} />
+                                              ) : <span>{mpVal}</span>}
+                                              <small>/{mpMax}</small>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <div className="t-col-actions">
+                                      <div className="img-adj-grid">
+                                          <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)-10 })}>▲</button>
+                                          <div style={{display:'flex'}}>
+                                            <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)-10 })}>◄</button>
+                                            <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)+10 })}>►</button>
+                                          </div>
+                                          <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
+                                      </div>
+                                      <div className="act-btns">
+                                          {/* --- NOVO BOTÃO DE STATUS --- */}
+                                          <button 
+                                              className="btn-icon-sm" 
+                                              title="Status Negativos" 
+                                              onClick={() => setActiveStatusMenu(activeStatusMenu === token.id ? null : token.id)} 
+                                              style={{color: '#f44'}}
+                                          >
+                                              🩸
+                                          </button>
+                                          <button 
+                                              className="btn-icon-sm" 
+                                              title={token.stealth ? "Remover Furtividade (Apenas Dono e Mestre veem)" : "Ativar Furtividade (Invisível para adversários)"} 
+                                              onClick={() => handleUpdateTokenInTracker(token, { stealth: !token.stealth })} 
+                                              style={{color: token.stealth ? '#a855f7' : '#666'}}
+                                          >
+                                              🥷
+                                          </button>
+                                          <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
+                                              {isVisible ? '👁️' : '🙈'}
+                                          </button>
+                                          {token.type === 'enemy' && (
+                                              <button className="btn-icon-sm" title="Detalhes" onClick={() => setViewMonsterDetails({ ...token.details, img: token.img })}>📜</button>
+                                          )}
+                                          <button className="btn-icon-sm delete" title="Remover" onClick={() => handleRemoveToken(token.id)}>✕</button>
+                                      </div>
+                                  </div>
                               </div>
                               
-                              <div className="t-col-info">
-                                  <div className="t-name" style={teamColor ? {color: teamColor} : {}}>{token.name}</div>
-                                  <div className="t-stats-row">
-                                      <div className="t-stat hp">
-                                          <label>HP</label>
-                                          {token.type === 'enemy' ? (
-                                              <input type="number" value={hpVal} onChange={(e) => handleUpdateStatsInTracker(token, 'hp', e.target.value)} />
-                                          ) : <span>{hpVal}</span>}
-                                          <small>/{hpMax}</small>
-                                      </div>
-                                      <div className="t-stat mp">
-                                          <label>MP</label>
-                                          {token.type === 'enemy' ? (
-                                              <input type="number" value={mpVal} onChange={(e) => handleUpdateStatsInTracker(token, 'mp', e.target.value)} />
-                                          ) : <span>{mpVal}</span>}
-                                          <small>/{mpMax}</small>
-                                      </div>
+                              {/* --- MENU INLINE DE STATUS --- */}
+                              {activeStatusMenu === token.id && (
+                                  <div className="status-menu-inline fade-in">
+                                      {STATUS_EFFECTS.map(st => {
+                                          const isActive = token.statuses?.includes(st.id);
+                                          return (
+                                              <button 
+                                                  key={st.id} 
+                                                  className={`status-btn ${isActive ? 'active' : ''}`} 
+                                                  title={st.id}
+                                                  onClick={() => handleToggleStatus(token, st.id)}
+                                                  style={{ color: isActive ? st.color : '#555' }}
+                                              >
+                                                  {st.icon}
+                                              </button>
+                                          )
+                                      })}
                                   </div>
-                              </div>
-
-                              <div className="t-col-actions">
-                                  <div className="img-adj-grid">
-                                      <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)-10 })}>▲</button>
-                                      <div style={{display:'flex'}}>
-                                        <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)-10 })}>◄</button>
-                                        <button onClick={() => handleUpdateTokenInTracker(token, { imgX: (token.imgX||50)+10 })}>►</button>
-                                      </div>
-                                      <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
-                                  </div>
-                                  <div className="act-btns">
-                                      <button 
-                                          className="btn-icon-sm" 
-                                          title={token.stealth ? "Remover Furtividade (Apenas Dono e Mestre veem)" : "Ativar Furtividade (Invisível para adversários)"} 
-                                          onClick={() => handleUpdateTokenInTracker(token, { stealth: !token.stealth })} 
-                                          style={{color: token.stealth ? '#a855f7' : '#666'}}
-                                      >
-                                          🥷
-                                      </button>
-                                      <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
-                                          {isVisible ? '👁️' : '🙈'}
-                                      </button>
-                                      <button className="btn-icon-sm" title="Destacar no Mapa" onClick={() => blinkToken(token.id)}>👁️‍🗨️</button>
-                                      {token.type === 'enemy' && (
-                                          <button className="btn-icon-sm" title="Detalhes" onClick={() => setViewMonsterDetails({ ...token.details, img: token.img })}>📜</button>
-                                      )}
-                                      <button className="btn-icon-sm delete" title="Remover" onClick={() => handleRemoveToken(token.id)}>✕</button>
-                                  </div>
-                              </div>
+                              )}
                           </div>
                       );
                   })}
@@ -783,14 +847,26 @@ export default function MestreVTTPage() {
         .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
         .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
         .tracker-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
+        
+        .tracker-item-wrapper { background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; transition: 0.2s; display: flex; flex-direction: column; }
+        .tracker-item-wrapper:hover { border-color: #ffcc00; }
+        .tracker-item { display: flex; align-items: center; padding: 8px 5px; gap: 8px; }
+        
         .tracker-item.object-item { border-style: dashed; }
-        .tracker-item:hover { border-color: #ffcc00; }
+        
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
         .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
         .t-img { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #777; box-shadow: 0 0 5px #000; }
         .t-col-info { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
-        .t-name { font-size: 13px; font-weight: bold; color: #eec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .t-name { font-size: 13px; font-weight: bold; color: #eec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
+        
+        /* STATUS ICONS NA LISTA */
+        .t-active-statuses { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; font-size: 12px; }
+        .status-menu-inline { display: flex; gap: 6px; padding: 8px; background: #080808; border-top: 1px solid #333; flex-wrap: wrap; justify-content: center; border-radius: 0 0 4px 4px; }
+        .status-btn { background: transparent; border: 1px solid #333; font-size: 16px; padding: 6px; cursor: pointer; border-radius: 4px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .status-btn:hover { background: #222; border-color: #666; transform: scale(1.1); }
+        .status-btn.active { border-color: currentColor; background: rgba(255,255,255,0.1); }
+
         .t-stats-row { display: flex; gap: 5px; }
         .t-stat { display: flex; align-items: center; font-size: 11px; background: #080808; padding: 2px 5px; border-radius: 3px; border: 1px solid #333; }
         .t-stat label { margin-right: 4px; font-weight: bold; font-size: 9px; }
@@ -901,6 +977,9 @@ export default function MestreVTTPage() {
         .toggle-row { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 12px; margin-top: 5px; }
         .text-areas-row { display: flex; gap: 10px; }
         .text-areas-row textarea { background: #111; border: 1px solid #444; color: #ccc; padding: 10px; resize: none; margin-bottom: 5px; }
+
+        .fade-in { animation: fadeIn 0.2s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
       `}</style>
