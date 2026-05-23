@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
 
-// --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
+// --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME) ---
 import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask } from 'react-icons/fa';
 
 // --- HELPER DE ÍCONES DE STATUS ---
@@ -188,6 +188,10 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const [currentPaintGroupId, setCurrentPaintGroupId] = useState(null);
   const [tempPaintCells, setTempPaintCells] = useState([]);
   
+  // --- NOVOS ESTADOS PARA A BORRACHA ---
+  const [isErasing, setIsErasing] = useState(false);
+  const [tempEraseCells, setTempEraseCells] = useState([]);
+
   const mapContainerRef = useRef(null);
   const imgRef = useRef(null);
   const lastPingTime = useRef(0);
@@ -329,6 +333,18 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
           });
       }
 
+      // --- LOGICA DA BORRACHA (MOVE) ---
+      if (isErasing && activeTool === 'eraser') {
+          const coords = getLocalCoords(e);
+          const gX = Math.floor(coords.x / gridSizePx);
+          const gY = Math.floor(coords.y / gridSizePx);
+          
+          setTempEraseCells(prev => {
+              if (prev.find(c => c.gX === gX && c.gY === gY)) return prev;
+              return [...prev, { gX, gY }];
+          });
+      }
+
       if (draggingToken) {
           const clientX = e.touches ? e.touches[0].clientX : e.clientX;
           const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -360,6 +376,35 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
               } catch(err) { console.error("Erro ao salvar pintura", err); }
               setTempPaintCells([]);
               setCurrentPaintGroupId(null);
+          }
+      }
+
+      // --- LOGICA DA BORRACHA (UP - SALVAR NO FIREBASE) ---
+      if (isErasing && activeTool === 'eraser') {
+          setIsErasing(false);
+          if (tempEraseCells.length > 0 && sessaoData.painted_groups) {
+              // Clonamos os grupos atuais para manipular
+              let updatedGroups = JSON.parse(JSON.stringify(sessaoData.painted_groups));
+              let groupsChanged = false;
+
+              // Filtra as células apagadas
+              updatedGroups = updatedGroups.map(group => {
+                  const originalLength = group.cells.length;
+                  group.cells = group.cells.filter(cell => 
+                      !tempEraseCells.some(eCell => eCell.gX === cell.gX && eCell.gY === cell.gY)
+                  );
+                  if (group.cells.length !== originalLength) groupsChanged = true;
+                  return group;
+              }).filter(group => group.cells.length > 0); // Remove grupos que ficaram vazios
+
+              if (groupsChanged) {
+                  try {
+                      await updateDoc(doc(db, "sessoes", sessaoData.id), {
+                          painted_groups: updatedGroups
+                      });
+                  } catch(err) { console.error("Erro ao salvar apagamento", err); }
+              }
+              setTempEraseCells([]);
           }
       }
 
@@ -410,6 +455,17 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
           const gX = Math.floor(coords.x / gridSizePx);
           const gY = Math.floor(coords.y / gridSizePx);
           setTempPaintCells([{ gX, gY, color: paintColor }]);
+          return;
+      }
+
+      // --- LOGICA DA BORRACHA (START) ---
+      if (activeTool === 'eraser') {
+          if (e.cancelable) e.preventDefault();
+          setIsErasing(true);
+          const coords = getLocalCoords(e);
+          const gX = Math.floor(coords.x / gridSizePx);
+          const gY = Math.floor(coords.y / gridSizePx);
+          setTempEraseCells([{ gX, gY }]);
           return;
       }
 
@@ -502,7 +558,10 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                 <button className={`tool-btn ${activeTool === 'ruler' ? 'active' : ''}`} onClick={() => setActiveTool('ruler')} title="Régua">📏</button>
                                 <button className={`tool-btn ${activeTool === 'ping' ? 'active' : ''}`} onClick={() => setActiveTool('ping')} title="Ping">🎯</button>
                                 {isMaster && (
-                                    <button className={`tool-btn ${activeTool === 'paint' ? 'active' : ''}`} onClick={() => setActiveTool('paint')} title="Pintar Mapa">🖌️</button>
+                                    <>
+                                        <button className={`tool-btn ${activeTool === 'paint' ? 'active' : ''}`} onClick={() => setActiveTool('paint')} title="Pintar Mapa">🖌️</button>
+                                        <button className={`tool-btn ${activeTool === 'eraser' ? 'active' : ''}`} onClick={() => setActiveTool('eraser')} title="Borracha">🧽</button>
+                                    </>
                                 )}
                                 
                                 {isMaster && activeTool === 'paint' && (
@@ -525,7 +584,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                 {isMaster && sessaoData.painted_groups?.length > 0 && (
                                     <div className="paint-groups-manager">
                                         {sessaoData.painted_groups.map((g, i) => (
-                                            <button key={g.groupId} className="paint-group-btn" onClick={() => handleDeletePaintGroup(g)} title="Apagar Pintura">M{i+1} ✖</button>
+                                            <button key={g.groupId} className="paint-group-btn" onClick={() => handleDeletePaintGroup(g)} title="Apagar Pintura Inteira">M{i+1} ✖</button>
                                         ))}
                                     </div>
                                 )}
@@ -552,7 +611,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                 onTouchCancel={handleUp}
                                 onContextMenu={e => e.preventDefault()}
                                 style={{ 
-                                    cursor: activeTool === 'ruler' ? 'crosshair' : activeTool === 'ping' ? 'copy' : activeTool === 'paint' ? 'cell' : 'default' 
+                                    cursor: activeTool === 'ruler' ? 'crosshair' : activeTool === 'ping' ? 'copy' : activeTool === 'paint' ? 'cell' : activeTool === 'eraser' ? 'not-allowed' : 'default' 
                                 }}
                             >
                                 <img ref={imgRef} src={activeMap.url} alt="Map" className="map-img-element" />
@@ -560,6 +619,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                 {gridSizePx > 0 && (
                                     <>
                                         <div className="paint-layer">
+                                            {/* Renderização das pinturas reais */}
                                             {sessaoData.painted_groups?.map(group => (
                                                 group.cells.map((cell, idx) => (
                                                     <div key={`${group.groupId}-${idx}`} className="painted-grid-cell" style={{
@@ -568,10 +628,17 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                                     }} />
                                                 ))
                                             ))}
+                                            {/* Renderização do traço sendo pintado agora */}
                                             {tempPaintCells.map((cell, idx) => (
-                                                <div key={`temp-${idx}`} className="painted-grid-cell" style={{
+                                                <div key={`temp-paint-${idx}`} className="painted-grid-cell" style={{
                                                     left: cell.gX * gridSizePx, top: cell.gY * gridSizePx, width: gridSizePx, height: gridSizePx,
                                                     backgroundColor: cell.color
+                                                }} />
+                                            ))}
+                                            {/* Renderização do rastro visual da borracha */}
+                                            {tempEraseCells.map((cell, idx) => (
+                                                <div key={`temp-erase-${idx}`} className="erased-grid-cell" style={{
+                                                    left: cell.gX * gridSizePx, top: cell.gY * gridSizePx, width: gridSizePx, height: gridSizePx
                                                 }} />
                                             ))}
                                         </div>
@@ -771,6 +838,16 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                 box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
                 border-radius: 2px;
             }
+
+            /* --- ESTILO PARA A BORRACHA --- */
+            .erased-grid-cell {
+                position: absolute;
+                background-color: rgba(255, 0, 0, 0.4);
+                border: 1px dashed #ff0000;
+                pointer-events: none;
+                z-index: 5;
+            }
+
             @keyframes pulsePaint {
                 0% { filter: brightness(0.8); opacity: 0.6; }
                 100% { filter: brightness(1.2); opacity: 1; }
