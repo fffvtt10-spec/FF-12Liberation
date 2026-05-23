@@ -14,6 +14,23 @@ const SKILL_ICONS = [
     'h-secreta.png'
 ];
 
+// --- FUNÇÕES MATEMÁTICAS DO SISTEMA DE XP ---
+const getLevelCost = (level) => {
+    let cost = 100;
+    for (let i = 2; i <= level; i++) {
+        cost = Math.floor(cost * 1.2 + 25);
+    }
+    return cost;
+};
+
+const getCumulativeCap = (level) => {
+    let cap = 0;
+    for (let i = 1; i <= level; i++) {
+        cap += getLevelCost(i);
+    }
+    return cap;
+};
+
 // --- MODAL DE UPLOAD DE IMAGEM (CENTRALIZADO) ---
 const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
     const [tempUrl, setTempUrl] = useState("");
@@ -40,40 +57,30 @@ const ImageUploadModal = ({ isOpen, onClose, onSave, label }) => {
 };
 
 export default function Ficha({ characterData, isMaster, onClose }) {
-  // Estado local da ficha
   const [sheet, setSheet] = useState(characterData.character_sheet || {});
 
   const [activeTab, setActiveTab] = useState('geral'); 
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); 
   
-  // Estados de Upload
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCallback, setUploadCallback] = useState(null);
 
-  // Estados de Forja
   const [showForgeSelector, setShowForgeSelector] = useState(false); 
   const [forgeItems, setForgeItems] = useState([]); 
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); 
   const [viewItemDetails, setViewItemDetails] = useState(null); 
 
-  // Estado para Drag and Drop de Skills
   const [draggedSkill, setDraggedSkill] = useState(null);
   const [dragSource, setDragSource] = useState(null); 
   
-  // Estado para Seleção de Ícone de Habilidade
-  const [iconSelectorTarget, setIconSelectorTarget] = useState(null); // { listType, skillIndex }
+  const [iconSelectorTarget, setIconSelectorTarget] = useState(null);
 
-  // Ref para level up
-  const prevLevelRef = useRef(sheet.basic_info?.level);
-
-  // Efeito para atualizar a ficha em tempo real e garantir arrays
   useEffect(() => {
     if (characterData && characterData.character_sheet) {
         const loadedSheet = characterData.character_sheet;
         
-        // Garantir que passives e reactions sejam arrays se não existirem
         if (!loadedSheet.job_system.passives) loadedSheet.job_system.passives = [];
         if (!loadedSheet.job_system.reactions) loadedSheet.job_system.reactions = [];
 
@@ -114,7 +121,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setUploadModalOpen(true);
   };
 
-  // --- LÓGICA DE SKILLS (DRAG AND DROP & XP & ICON) ---
   const handleDragStart = (e, skill, source, index) => {
       if (!isMaster) return; 
       setDraggedSkill({ skill, index });
@@ -213,7 +219,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setIconSelectorTarget(null);
   };
 
-  // --- FORJA & EQUIPAMENTOS ---
   const handleOpenForgeSelector = async (slotIndex) => {
       if(!isMaster) return;
       setActiveSlotIndex(slotIndex);
@@ -256,24 +261,29 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setHasUnsavedChanges(true);
   };
 
+  // --- NOVA LÓGICA DE LEVEL UP (CUMULATIVA) ---
   const handleLevelUp = async () => {
     if(!isMaster) return;
     setShowLevelUpAnim(true);
     setTimeout(async () => {
         setShowLevelUpAnim(false);
         const currentLvl = sheet.basic_info.level || 1;
-        const newXpMax = Math.floor(sheet.basic_info.experience.max * 1.5);
+        const nextLevel = currentLvl + 1;
+        
+        // O XP Max agora é o Cap Cumulativo exato para o novo nível
+        const newXpMax = getCumulativeCap(nextLevel);
+        
         const newSheet = JSON.parse(JSON.stringify(sheet));
-        newSheet.basic_info.level = currentLvl + 1;
-        newSheet.basic_info.experience.current = 0;
+        newSheet.basic_info.level = nextLevel;
+        // Não zeramos o experience.current para manter o acumulado
         newSheet.basic_info.experience.max = newXpMax;
+        
         setSheet(newSheet);
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
         await updateDoc(charRef, { character_sheet: newSheet });
     }, 4000);
   };
 
-  // --- RADAR CHART LOGIC ---
   const stats = ['FOR', 'INT', 'SOR', 'CAR', 'VEL', 'CONS'];
   const maxStat = 100;
   const radius = 85; 
@@ -295,7 +305,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       return { backgroundColor: '#111', border: '1px solid #333' }; 
   };
 
-  // Helper para Renderizar Lista de Skills (Genérico)
   const renderSkillList = (listType, skillsArray, isCompact = false) => {
       const listName = {
           'primary': sheet.job_system?.primary_class?.name || "Classe Primária",
@@ -395,7 +404,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       <div className="ficha-container fade-in">
         <button className="close-btn-ficha" onClick={onClose}>✕</button>
         
-        {/* --- CABEÇALHO --- */}
         <div className="ficha-header">
             <div className="header-left-group">
                 <div className="guild-insignia-box">
@@ -481,7 +489,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                         {sheet.equipment?.slots?.[idx]?.item_img ? (
                                             <>
                                                 <div className="item-bg" style={getBgStyle(sheet.equipment.slots[idx].item_img)}></div>
-                                                <button className="btn-eye-item" onClick={() => setViewItemDetails(sheet.equipment.slots[idx])}>👁️</button>
+                                                {/* --- AGORA ENVIAMOS O SLOT INDEX PARA A MODAL DE DETALHES --- */}
+                                                <button className="btn-eye-item" onClick={() => setViewItemDetails({...sheet.equipment.slots[idx], slotIndex: idx})}>👁️</button>
                                                 {isMaster && <button className="btn-return-forge" title="Devolver" onClick={() => handleUnequipItem(idx)}>↩️</button>}
                                             </>
                                         ) : (!isMaster && <span className="empty-text">Vazio</span>)}
@@ -519,10 +528,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     {renderSkillList('secondary', sheet.job_system.secondary_class.skills)}
 
                     <div className="skills-col extra-col">
-                         {/* PASSIVAS */}
                          {renderSkillList('passives', sheet.job_system.passives || [], true)}
-                         
-                         {/* REAÇÕES */}
                          {renderSkillList('reactions', sheet.job_system.reactions || [], true)}
 
                         <div className="extra-abilities-box">
@@ -571,13 +577,32 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             </div>
         )}
 
+        {/* --- MODAL DE DETALHES DO ITEM ATUALIZADA --- */}
         {viewItemDetails && (
             <div className="item-selector-overlay" onClick={() => setViewItemDetails(null)}>
                 <div className="item-details-box" onClick={e => e.stopPropagation()}>
                     <div className="detail-img-large" style={getBgStyle(viewItemDetails.item_img)}></div>
                     <h3>{viewItemDetails.item_name}</h3>
                     <p className="details-desc">{viewItemDetails.description || "Sem descrição"}</p>
-                    <p className="details-effect">Efeito: {viewItemDetails.effect || "Nenhum"}</p>
+                    
+                    {isMaster ? (
+                        <div style={{marginTop: '15px', marginBottom: '15px', textAlign: 'left'}}>
+                            <label style={{color: '#ffcc00', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '5px'}}>Editar Efeito:</label>
+                            <textarea 
+                                style={{width: '100%', background: '#111', border: '1px solid #444', color: '#fff', padding: '8px', borderRadius: '4px', resize: 'vertical', minHeight: '60px', fontFamily: 'sans-serif', fontSize: '12px'}}
+                                placeholder="Descreva o efeito mágico do item..."
+                                value={viewItemDetails.effect || ""}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setViewItemDetails(prev => ({...prev, effect: val}));
+                                    updateField(`equipment.slots.${viewItemDetails.slotIndex}.effect`, val);
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <p className="details-effect">Efeito: {viewItemDetails.effect || "Nenhum"}</p>
+                    )}
+
                     <button className="btn-cancel-modal" onClick={() => setViewItemDetails(null)}>FECHAR</button>
                 </div>
             </div>
