@@ -191,6 +191,7 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
   );
 };
 
+// O Timer mantido apenas para ser usado nas resenhas, se necessário.
 const Timer = ({ expiry }) => {
   const [timeLeft, setTimeLeft] = useState("");
   useEffect(() => {
@@ -336,15 +337,13 @@ export default function MestrePage() {
       }
   }, [personagensDb]);
 
+  // --- ALTERAÇÃO AQUI: Removemos o timer de expiração (expiraEm) das missões ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
     try {
-      const msToAdd = (form.duracao.match(/(\d+)w/) || [0, 0])[1] * 604800000 + 
-                      (form.duracao.match(/(\d+)d/) || [0, 0])[1] * 86400000 + 
-                      (form.duracao.match(/(\d+)h/) || [0, 0])[1] * 3600000;
       await addDoc(collection(db, "missoes"), {
-        ...form, mestreNome: mestreIdentidade, mestreId: currentUser.uid, createdAt: serverTimestamp(), expiraEm: new Date(Date.now() + (msToAdd || 3600000)).toISOString()
+        ...form, mestreNome: mestreIdentidade, mestreId: currentUser.uid, createdAt: serverTimestamp()
       });
       setShowModal(false);
       setForm({ nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
@@ -669,8 +668,9 @@ export default function MestrePage() {
                         </div>
                     )}
 
-                    <Timer expiry={m.expiraEm} />
-                    <div className="poster-actions">
+                    {/* --- TIMER REMOVIDO DAQUI CONFORME SOLICITADO --- */}
+                    
+                    <div className="poster-actions" style={{marginTop: '10px'}}>
                         <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
                         <button className="btn-cyan" onClick={() => setShowDetails(m)}>DETALHES</button>
                         <button className="btn-red" onClick={() => deleteDoc(doc(db, "missoes", m.id))}>EXCLUIR</button>
@@ -691,6 +691,7 @@ export default function MestrePage() {
               {resenhas.map(r => (
                 <div key={r.id} className="resenha-item-card">
                   <h4>{r.titulo}</h4>
+                  {/* --- O TIMER FOI MANTIDO AQUI PARA AS RESENHAS --- */}
                   <Timer expiry={r.expiraEm} />
                   <div className="poster-actions">
                     <button className="btn-cyan" onClick={() => setViewResenha(r)}>VISUALIZAR</button>

@@ -120,6 +120,18 @@ export default function AdminPage() {
     }
   };
 
+  // --- NOVA FUNÇÃO DE RESET DE SENHA ---
+  const handleResetPassword = async (email) => {
+    if (window.confirm(`Enviar e-mail de redefinição de senha para ${email}?`)) {
+      try {
+        await sendPasswordResetEmail(auth, email);
+        alert("E-mail de redefinição enviado com sucesso para o jogador!");
+      } catch (error) {
+        alert("Erro ao enviar e-mail: " + error.message);
+      }
+    }
+  };
+
   const getCharName = (uid) => {
     const char = characters.find(c => c.uid === uid);
     return char ? char : null;
@@ -181,6 +193,7 @@ export default function AdminPage() {
                                 <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
                                     <button className="btn-ban" onClick={() => handleDeleteUser(u.id, u.email)}>BANIR</button>
                                     {charInfo && <button className="btn-ban" style={{borderColor:'#f80', color:'#f80'}} onClick={() => handleDeleteChar(u.id)}>DEL CHAR</button>}
+                                    <button className="btn-reset-pass" onClick={() => handleResetPassword(u.email)}>RESET SENHA</button>
                                 </div>
                             </div>
                         );
@@ -228,6 +241,10 @@ export default function AdminPage() {
         
         .btn-ban { background: transparent; border: 1px solid #f44; color: #f44; font-size: 10px; padding: 4px 8px; cursor: pointer; }
         .btn-ban:hover { background: #f44; color: #fff; }
+
+        /* ESTILO DO BOTÃO DE RESET */
+        .btn-reset-pass { background: #333; border: 1px solid #00f2ff; color: #00f2ff; font-size: 9px; padding: 4px 8px; cursor: pointer; border-radius: 2px; transition: 0.2s; }
+        .btn-reset-pass:hover { background: #00f2ff; color: #000; }
       `}</style>
     </div>
   );

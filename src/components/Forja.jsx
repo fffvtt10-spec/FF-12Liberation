@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
 import forjaIcon from '../assets/forja.png';
 
 export default function Forja({ vttDock }) { // RECEBE vttDock
@@ -8,6 +8,10 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
   const [items, setItems] = useState([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditing, setIsEditing] = useState(null);
+  
+  // --- NOVO ESTADO: FILTRO DE ITENS SEM USO ---
+  const [showOnlyUnused, setShowOnlyUnused] = useState(false);
+
   // Adicionado campo quantidade ao formulário
   const [form, setForm] = useState({ nome: '', descricao: '', imagem: '', quantidade: 1 });
 
@@ -82,7 +86,13 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
 
   const handleEditClick = (item) => { setIsEditing(item.id); setForm({...item, quantidade: 1}); }; // Na edição, qtde é irrelevante visualmente
   const handleCancelEdit = () => { setIsEditing(null); setForm({ nome: '', descricao: '', imagem: '', quantidade: 1 }); };
-  const filteredItems = items.filter(item => item.nome.toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  // --- FILTRO APLICADO ---
+  const filteredItems = items.filter(item => {
+      const matchesSearch = item.nome.toLowerCase().includes(searchTerm.toLowerCase());
+      const isUnused = showOnlyUnused ? !item.ownerId : true; // Se o filtro estiver ativo, mostra apenas itens que não tem dono
+      return matchesSearch && isUnused;
+  });
 
   return (
     <>
@@ -131,8 +141,11 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
                   </div>
                 </form>
             </div>
-            <div className="search-bar-container-forja">
+            <div className="search-bar-container-forja" style={{display: 'flex', gap: '10px'}}>
               <input type="text" placeholder="🔍 Buscar nos arquivos da forja..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input-forja" />
+              <button className="btn-filter-unused" onClick={() => setShowOnlyUnused(!showOnlyUnused)}>
+                  {showOnlyUnused ? 'VER TODOS OS ITENS' : 'FILTRAR: SEM DONO'}
+              </button>
             </div>
             <div className="forja-grid">
               {filteredItems.map(item => (
@@ -154,7 +167,7 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
                   </div>
                 </div>
               ))}
-              {filteredItems.length === 0 && <p className="empty-msg">A forja está fria. Nenhum item no cofre.</p>}
+              {filteredItems.length === 0 && <p className="empty-msg">A forja está fria. Nenhum item encontrado.</p>}
             </div>
           </div>
         </div>
@@ -201,6 +214,11 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
         .btn-cancel { background: #333; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; }
         .search-bar-container-forja { padding: 15px; background: #000; border-bottom: 1px solid #333; }
         .search-input-forja { width: 100%; background: #111; border: 1px solid #522; color: #fff; padding: 12px; border-radius: 20px; text-align: center; outline: none; font-size: 16px; }
+        
+        /* BOTÃO DE FILTRO NA FORJA */
+        .btn-filter-unused { flex-shrink: 0; background: transparent; border: 1px solid #f44; color: #f44; padding: 0 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
+        .btn-filter-unused:hover { background: #f44; color: #fff; }
+
         .forja-grid { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; scrollbar-width: none; -ms-overflow-style: none; }
         .forja-grid::-webkit-scrollbar { display: none; }
         .forja-item-card { background: linear-gradient(90deg, rgba(40,10,10,0.9), rgba(0,0,0,0.8)); border: 1px solid #522; display: flex; align-items: center; padding: 10px; border-radius: 4px; transition: 0.2s; }
