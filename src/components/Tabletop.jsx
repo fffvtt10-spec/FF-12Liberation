@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
-import { GiLightningTrio, GiIceCube, GiBlindfold, GiSilenced, GiFlame, GiBallAndChain, GiShatteredSword, GiDeathSkull, GiPoisonBottle } from 'react-icons/gi';
+
+// --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
+import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask } from 'react-icons/fa';
 
 // --- HELPER DE ÍCONES DE STATUS ---
 const getStatusIcon = (id) => {
     switch(id) {
-        case 'Paralisado': return <GiLightningTrio color="#ffdd00" />;
-        case 'Congelado': return <GiIceCube color="#00ffff" />;
-        case 'Cego': return <GiBlindfold color="#aaaaaa" />;
-        case 'Silêncio': return <GiSilenced color="#dddddd" />;
-        case 'Queimado': return <GiFlame color="#ff4400" />;
-        case 'Imobilizado': return <GiBallAndChain color="#888888" />;
-        case 'Desabilitado': return <GiShatteredSword color="#ff8800" />;
-        case 'Condenado': return <GiDeathSkull color="#ff0000" />;
-        case 'Envenenado': return <GiPoisonBottle color="#00ff00" />;
+        case 'Paralisado': return <FaBolt color="#ffdd00" />;
+        case 'Congelado': return <FaIcicles color="#00ffff" />;
+        case 'Cego': return <FaEyeSlash color="#aaaaaa" />;
+        case 'Silêncio': return <FaVolumeMute color="#dddddd" />;
+        case 'Queimado': return <FaFire color="#ff4400" />;
+        case 'Imobilizado': return <FaLock color="#888888" />;
+        case 'Desabilitado': return <FaBan color="#ff8800" />;
+        case 'Condenado': return <FaSkull color="#ff0000" />;
+        case 'Envenenado': return <FaFlask color="#00ff00" />;
         default: return null;
     }
 };

@@ -13,19 +13,19 @@ import SceneryViewer from '../components/SceneryViewer';
 import NPCViewer from '../components/NPCViewer'; 
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
-// --- ÍCONES DE STATUS NEGATIVOS (REACT-ICONS) ---
-import { GiLightningTrio, GiIceCube, GiBlindfold, GiSilenced, GiFlame, GiBallAndChain, GiShatteredSword, GiDeathSkull, GiPoisonBottle } from 'react-icons/gi';
+// --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
+import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask } from 'react-icons/fa';
 
 const STATUS_EFFECTS = [
-    { id: 'Paralisado', icon: <GiLightningTrio />, color: '#ffdd00' },
-    { id: 'Congelado', icon: <GiIceCube />, color: '#00ffff' },
-    { id: 'Cego', icon: <GiBlindfold />, color: '#aaaaaa' },
-    { id: 'Silêncio', icon: <GiSilenced />, color: '#dddddd' },
-    { id: 'Queimado', icon: <GiFlame />, color: '#ff4400' },
-    { id: 'Imobilizado', icon: <GiBallAndChain />, color: '#888888' },
-    { id: 'Desabilitado', icon: <GiShatteredSword />, color: '#ff8800' },
-    { id: 'Condenado', icon: <GiDeathSkull />, color: '#ff0000' },
-    { id: 'Envenenado', icon: <GiPoisonBottle />, color: '#00ff00' }
+    { id: 'Paralisado', icon: <FaBolt />, color: '#ffdd00' },
+    { id: 'Congelado', icon: <FaIcicles />, color: '#00ffff' },
+    { id: 'Cego', icon: <FaEyeSlash />, color: '#aaaaaa' },
+    { id: 'Silêncio', icon: <FaVolumeMute />, color: '#dddddd' },
+    { id: 'Queimado', icon: <FaFire />, color: '#ff4400' },
+    { id: 'Imobilizado', icon: <FaLock />, color: '#888888' },
+    { id: 'Desabilitado', icon: <FaBan />, color: '#ff8800' },
+    { id: 'Condenado', icon: <FaSkull />, color: '#ff0000' },
+    { id: 'Envenenado', icon: <FaFlask />, color: '#00ff00' }
 ];
 
 // --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
