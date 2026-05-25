@@ -242,7 +242,15 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setSheet(newSheet);
       setHasUnsavedChanges(true);
       const itemRef = doc(db, "game_items", item.id);
-      await updateDoc(itemRef, { status: 'equipped', ownerId: characterData.uid || characterData.id, slotIndex: activeSlotIndex, updatedAt: serverTimestamp() });
+      
+      // AQUI: Salva o buyerName para garantir a redundância no DB e melhorar o visual do mestre
+      await updateDoc(itemRef, { 
+          status: 'equipped', 
+          ownerId: characterData.uid || characterData.id, 
+          buyerName: characterData.name || sheet.basic_info.character_name,
+          slotIndex: activeSlotIndex, 
+          updatedAt: serverTimestamp() 
+      });
       setShowForgeSelector(false);
   };
 
@@ -933,7 +941,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             .stat-row-simple { gap: 5px; }
             .s-box input { font-size: 14px; }
             
-            /* 2. LIBERA O TAMANHO DAS LISTAS DE HABILIDADES/PASSIVAS */
+            /* 2. LIBERA O TAMANHO DAS LISTAS DE Habilidades/PASSIVAS */
             .skills-list, .skills-col, .box-passivas { 
                 max-height: none !important; /* Remove o limite de altura */
                 height: auto !important;     /* Cresce conforme o texto */

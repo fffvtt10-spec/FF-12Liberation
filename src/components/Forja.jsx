@@ -6,6 +6,7 @@ import forjaIcon from '../assets/forja.png';
 export default function Forja({ vttDock }) { // RECEBE vttDock
   const [isOpen, setIsOpen] = useState(false);
   const [items, setItems] = useState([]); 
+  const [characters, setCharacters] = useState([]); // NOVO ESTADO: Armazena os personagens do banco
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditing, setIsEditing] = useState(null);
   
@@ -15,17 +16,23 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
   // Adicionado campo quantidade ao formulário
   const [form, setForm] = useState({ nome: '', descricao: '', imagem: '', quantidade: 1 });
 
+  // Efeito para baixar os Itens da Forja e também a lista de Personagens para cruzar os dados
   useEffect(() => {
     if (!isOpen) return;
-    // Buscamos itens que estão no cofre (vault) OU que já foram comprados (têm ownerId), para o mestre gerenciar
-    const q = query(collection(db, "game_items"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      // Filtramos visualmente o que é pertinente à Forja (Itens no Cofre Global ou Itens Pessoais para gerenciamento)
+
+    // Busca os itens
+    const qItems = query(collection(db, "game_items"), orderBy("createdAt", "desc"));
+    const unsubItems = onSnapshot(qItems, (snap) => {
       const allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Mostra itens que estão no 'vault' (criados e não vendidos ou devolvidos) ou que possuem dono (para o mestre ver)
       setItems(allItems.filter(i => i.status === 'vault' || i.ownerId));
     });
-    return () => unsub();
+
+    // Busca os personagens para identificar de quem é o item
+    const unsubChars = onSnapshot(collection(db, "characters"), (snap) => {
+        setCharacters(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => { unsubItems(); unsubChars(); };
   }, [isOpen]);
 
   const handleSaveItem = async (e) => {
@@ -87,6 +94,14 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
   const handleEditClick = (item) => { setIsEditing(item.id); setForm({...item, quantidade: 1}); }; // Na edição, qtde é irrelevante visualmente
   const handleCancelEdit = () => { setIsEditing(null); setForm({ nome: '', descricao: '', imagem: '', quantidade: 1 }); };
   
+  // Função Helper para pegar o nome do jogador pelo ID
+  const getOwnerName = (ownerId, buyerNameFallback) => {
+      if (!ownerId) return "";
+      const char = characters.find(c => c.uid === ownerId || c.id === ownerId);
+      if (char) return char.name || char.character_sheet?.basic_info?.character_name;
+      return buyerNameFallback || "Jogador";
+  };
+
   // --- FILTRO APLICADO ---
   const filteredItems = items.filter(item => {
       const matchesSearch = item.nome.toLowerCase().includes(searchTerm.toLowerCase());
@@ -153,7 +168,8 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
                   <div className="item-img" style={{backgroundImage: `url(${item.imagem || 'https://via.placeholder.com/150?text=?'})`}}></div>
                   <div className="item-info">
                     <h4>{item.nome}</h4>
-                    {item.ownerId && (<div className="owner-tag">POSSE DE: {item.buyerName || "Jogador"}</div>)}
+                    {/* AQUI ESTÁ A CORREÇÃO DA RENDERIZAÇÃO DO NOME DO DONO */}
+                    {item.ownerId && (<div className="owner-tag">POSSE DE: {getOwnerName(item.ownerId, item.buyerName)}</div>)}
                     <p className="desc">{item.descricao}</p>
                     <small style={{color: '#666'}}>Status: {item.ownerId ? "Cofre Pessoal" : "Cofre Global"}</small>
                   </div>

@@ -201,6 +201,7 @@ const formatSanchezText = (text) => {
 export default function JogadorVttPage() {
   const navigate = useNavigate();
   const [personagem, setPersonagem] = useState(null);
+  const [allPersonagens, setAllPersonagens] = useState([]); // Estado para baixar todos os personagens
   const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
   
@@ -274,7 +275,7 @@ export default function JogadorVttPage() {
   }, []);
 
   useEffect(() => {
-    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {};
+    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {}; let unsubAllChars = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
             const docRef = doc(db, "characters", user.uid);
@@ -289,17 +290,20 @@ export default function JogadorVttPage() {
                     setPersonagem(data); setLoading(false); 
                 } else setLoading(false);
             });
+            
             const qMissoes = query(collection(db, "missoes"));
             const qDisp = query(collection(db, "disponibilidades")); 
             const qArenas = query(collection(db, "sessoes"), where("isArena", "==", true));
+            const qAllChars = query(collection(db, "characters"));
 
             unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubArenas = onSnapshot(qArenas, (snap) => setArenasDisponiveis(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            unsubAllChars = onSnapshot(qAllChars, (snap) => setAllPersonagens(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
         } else { setLoading(false); navigate('/login'); }
     });
-    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); };
+    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); unsubAllChars(); };
   }, [navigate]);
 
   useEffect(() => {
@@ -454,7 +458,7 @@ export default function JogadorVttPage() {
         </div>
 
         {currentVttSession && currentVttSession.active_map && (
-            <Tabletop sessaoData={currentVttSession} isMaster={false} currentUserUid={auth.currentUser?.uid} personagensData={[personagem]} />
+            <Tabletop sessaoData={currentVttSession} isMaster={false} currentUserUid={auth.currentUser?.uid} personagensData={allPersonagens} />
         )}
 
         <SceneryViewer sessaoData={currentVttSession} isMaster={false} />
@@ -487,18 +491,19 @@ export default function JogadorVttPage() {
                         if(!isBaseVisible || isStealthHidden) return null; 
 
                         let imgUrl = token.img;
-                        if(token.uid === auth.currentUser.uid && personagem.character_sheet?.imgUrl) {
-                            imgUrl = personagem.character_sheet.imgUrl;
-                        }
-
                         let hpDisplay = "?", mpDisplay = "?";
                         let hpMax = "?", mpMax = "?";
 
-                        if (token.uid === auth.currentUser.uid) {
-                            hpDisplay = personagem.character_sheet?.status?.hp?.current;
-                            hpMax = personagem.character_sheet?.status?.hp?.max;
-                            mpDisplay = personagem.character_sheet?.status?.mp?.current;
-                            mpMax = personagem.character_sheet?.status?.mp?.max;
+                        // LÓGICA DE HP PARA TODOS OS JOGADORES (E NÃO APENAS O SEU)
+                        if (token.type === 'player') {
+                            const charObj = allPersonagens.find(p => p.uid === token.uid);
+                            if (charObj) {
+                                hpDisplay = charObj.character_sheet?.status?.hp?.current;
+                                hpMax = charObj.character_sheet?.status?.hp?.max;
+                                mpDisplay = charObj.character_sheet?.status?.mp?.current;
+                                mpMax = charObj.character_sheet?.status?.mp?.max;
+                                if(charObj.character_sheet?.imgUrl) imgUrl = charObj.character_sheet.imgUrl;
+                            }
                         } else if (token.type === 'enemy') {
                             hpDisplay = token.stats?.hp?.current;
                             hpMax = token.stats?.hp?.max;
