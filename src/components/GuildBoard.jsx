@@ -370,7 +370,7 @@ const GuildBoard = ({ isMaster }) => {
       `}</style>
 
       {/* Botão Flutuante */}
-      <div className="guild-btn-float" onClick={() => setIsOpen(true)} title="Fraternidade das Lanternas Errantes">
+      <div className="guild-btn-float" onClick={() => setIsOpen(true)} title="Fraternidade dos Lanternas Errantes">
         ★
       </div>
 
@@ -378,7 +378,7 @@ const GuildBoard = ({ isMaster }) => {
       {isOpen && (
         <div className="guild-modal-overlay" onClick={() => setIsOpen(false)}>
           <div className="guild-board-container" onClick={e => e.stopPropagation()}>
-            <h2 className="guild-title">Fraternidade das Lanternas Errantes</h2>
+            <h2 className="guild-title">Fraternidade dos Lanternas Errantes</h2>
             
             <div className="guild-list">
                 {members.map((member, index) => (
