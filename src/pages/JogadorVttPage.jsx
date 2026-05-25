@@ -37,7 +37,7 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
 
   const events = [
     ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
-    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio) }))
+    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio), isArena: s.isArena }))
   ];
 
   const renderDays = () => {
@@ -58,11 +58,11 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
             {dayEvents.map((ev, idx) => (
               <div 
                 key={idx} 
-                className={`cal-event-pill ${ev.type}`} 
+                className={`cal-event-pill ${ev.type} ${ev.isArena ? 'arena' : ''}`} 
                 onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
-                title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
+                title={ev.type === 'session' ? ev.missaoNome : 'Mestre Disponível'}
               >
-                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? '⚔️' : '✅'}
+                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? (ev.isArena ? '⚔️' : '🛡️') : '✅'}
               </div>
             ))}
           </div>
@@ -73,7 +73,7 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
   };
 
   return (
-    <div className="ff-modal-overlay-calendar">
+    <div className="ff-modal-overlay-fixed" style={{zIndex: 10000}}>
       <div className="ff-modal-calendar ff-card">
         <div className="cal-header">
            <button onClick={handlePrevMonth}>◀</button>
@@ -93,23 +93,23 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
                 <div className="mini-modal detail">
                     {viewEvent.type === 'session' ? (
                         <>
-                            <h4 style={{color: '#f44'}}>⚔️ SESSÃO AGENDADA</h4>
+                            <h4 style={{color: viewEvent.isArena ? '#a855f7' : '#f44'}}>{viewEvent.isArena ? '⚔️ ARENA PVP' : '🛡️ SESSÃO AGENDADA'}</h4>
                             <h3>{viewEvent.missaoNome}</h3>
                             <p><strong>Horário:</strong> {new Date(viewEvent.dataInicio).toLocaleString()}</p>
-                            <p><strong>Narrador:</strong> {viewEvent.mestreNome}</p>
+                            <p><strong>Mestre:</strong> {viewEvent.mestreNome || "Desconhecido"}</p>
                             <div className="detail-players">
-                                <strong>Jogadores:</strong>
+                                <strong>Jogadores Convocados:</strong>
                                 {viewEvent.participantes?.join(', ') || "Nenhum"}
                             </div>
                         </>
                     ) : (
                         <>
-                            <h4 style={{color: '#0f0'}}>✅ HORÁRIO DISPONÍVEL</h4>
+                            <h4 style={{color: '#0f0'}}>✅ MESTRE DISPONÍVEL</h4>
                             <p><strong>Data:</strong> {new Date(viewEvent.start).toLocaleString()}</p>
-                            <p>O Mestre está livre neste horário.</p>
+                            <p>O Mestre reservou este horário para futuras sessões.</p>
                         </>
                     )}
-                    <button className="btn-cancelar-main" style={{marginTop:'10px', width:'100%'}} onClick={() => setViewEvent(null)}>FECHAR</button>
+                    <button className="btn-cancelar-main" style={{marginTop:'15px', width:'100%'}} onClick={() => setViewEvent(null)}>FECHAR</button>
                 </div>
             </div>
         )}
@@ -119,153 +119,82 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
         .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 1.5rem; color: #fbbf24; }
         .cal-header button { background: transparent; border: 1px solid #fbbf24; color: #fbbf24; cursor: pointer; padding: 5px 15px; font-weight: bold; }
         .btn-close-cal { background: #f44 !important; border-color: #f44 !important; color: #fff !important; }
+        
         .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; color: #94a3b8; font-weight: bold; margin-bottom: 10px; }
         .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; flex: 1; overflow-y: auto; }
-        .cal-day { background: #1e293b; border: 1px solid #334155; padding: 5px; min-height: 100px; position: relative; display: flex; flex-direction: column; }
-        .cal-day.empty { background: transparent; border: none; }
+        
+        .cal-day { background: #1e293b; border: 1px solid #334155; padding: 5px; min-height: 100px; position: relative; transition: 0.2s; display: flex; flex-direction: column; }
+        .cal-day:hover { background: #334155; }
+        .cal-day.empty { background: transparent; border: none; cursor: default; }
         .cal-day-number { font-weight: bold; color: #64748b; font-size: 0.9rem; align-self: flex-end; }
+        
         .cal-events-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
         .cal-event-pill { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .cal-event-pill.session { background: #7f1d1d; color: #fca5a5; border: 1px solid #f87171; }
+        .cal-event-pill.session.arena { background: #4c1d95; color: #c4b5fd; border-color: #8b5cf6; }
         .cal-event-pill.slot { background: #064e3b; color: #6ee7b7; border: 1px solid #34d399; }
+
         .mini-modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; }
         .mini-modal { background: #020617; border: 1px solid #fbbf24; padding: 20px; width: 300px; border-radius: 8px; box-shadow: 0 0 20px #000; }
         .mini-modal.detail { width: 400px; }
         .mini-modal h4 { color: #fbbf24; margin: 0 0 10px 0; }
-        
-        .ff-modal-overlay-calendar { 
-          position: fixed; 
-          top: 0; 
-          left: 0; 
-          width: 100vw; 
-          height: 100vh; 
-          background: rgba(0,0,0,0.95); 
-          z-index: 99999; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          backdrop-filter: blur(5px); 
-        }
       `}</style>
     </div>
   );
 };
 
-const CountdownTimer = ({ targetDate }) => {
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    const calculateTime = () => {
-      const now = new Date().getTime();
-      const distance = new Date(targetDate).getTime() - now;
-      if (distance < 0) setTimeLeft("AGORA");
-      else {
-        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const secs = Math.floor((distance % (1000 * 60)) / 1000);
-        setTimeLeft(`${days}d ${hours}h ${mins}m ${secs}s`);
-      }
-    };
-    calculateTime();
-    const interval = setInterval(calculateTime, 1000);
-    return () => clearInterval(interval);
-  }, [targetDate]);
-  return <span className="countdown-text">{timeLeft}</span>;
-};
-
-const CombatIcon = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
-      <path d="M13 19l6-6" />
-      <path d="M16 16l4 4" />
-      <path d="M19 21l2-2" />
-    </svg>
-);
-
-const BookIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-  </svg>
-);
-
 const formatSanchezText = (text) => {
-    if (!text) return { __html: "" };
-    let formatted = text
-      .replace(/\*(.*?)\*/g, '<strong>$1</strong>') 
-      .replace(/_(.*?)_/g, '<em>$1</em>')           
-      .replace(/\n/g, '<br />');                    
-    return { __html: formatted };
-  };
+  if (!text) return { __html: "" };
+  let formatted = text
+    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+    .replace(/_(.*?)_/g, '<em>$1</em>')
+    .replace(/\n/g, '<br />');
+  return { __html: formatted };
+};
 
 export default function JogadorVttPage() {
   const navigate = useNavigate();
-  const [personagem, setPersonagem] = useState(null);
-  const [allPersonagens, setAllPersonagens] = useState([]); // Estado para baixar todos os personagens
-  const [loading, setLoading] = useState(true);
+
+  const [currentUser, setCurrentUser] = useState(null);
+  const [characterData, setCharacterData] = useState(null);
+  
   const [missoes, setMissoes] = useState([]);
-  
-  // Arenas Disponíveis para Inscrição
-  const [arenasDisponiveis, setArenasDisponiveis] = useState([]);
-  const [showArenaModal, setShowArenaModal] = useState(false);
-  const [showArenaDetails, setShowArenaDetails] = useState(null);
-
-  const [allSessoes, setAllSessoes] = useState([]); 
-  const [sessoesAtivas, setSessoesAtivas] = useState([]); 
-  const [sessoesFuturas, setSessoesFuturas] = useState([]); 
-  const [hasJoinedSession, setHasJoinedSession] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  const [showMissionModal, setShowMissionModal] = useState(false);
-  const [showMissionDetails, setShowMissionDetails] = useState(null); 
-  const [viewImage, setViewImage] = useState(null); 
   const [resenhas, setResenhas] = useState([]);
-  const [showResenhasList, setShowResenhasList] = useState(false);
-  const [viewResenha, setViewResenha] = useState(null);
-  const [vttStatus, setVttStatus] = useState(null); 
-  const [currentVttSession, setCurrentVttSession] = useState(null);
-  const [showFicha, setShowFicha] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [disponibilidades, setDisponibilidades] = useState([]);
-  
-  const [showCombatTracker, setShowCombatTracker] = useState(false);
-  const [viewMonsterDetails, setViewMonsterDetails] = useState(null); 
-  const [trackerPos, setTrackerPos] = useState({ x: 280, y: 100 });
-  const [isDraggingTracker, setIsDraggingTracker] = useState(false);
-  const [dragOffsetTracker, setDragOffsetTracker] = useState({ x: 0, y: 0 });
+  const [sessoes, setSessoes] = useState([]);
+  const [disponibilidades, setDisponibilidades] = useState([]); 
 
-  const [detailsPos, setDetailsPos] = useState({ x: 620, y: 100 });
-  const [isDraggingDetails, setIsDraggingDetails] = useState(false);
-  const [dragOffsetDetails, setDragOffsetDetails] = useState({ x: 0, y: 0 });
+  const [showFicha, setShowFicha] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // States para modais e visualizações
+  const [showDetails, setShowDetails] = useState(null); 
+  const [viewResenha, setViewResenha] = useState(null);
+  const [viewImage, setViewImage] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false); 
+
+  const [sessaoAtiva, setSessaoAtiva] = useState(null);
+  const [showMapManager, setShowMapManager] = useState(false);
+  const [showSceneryManager, setShowSceneryManager] = useState(false); 
+  const [showNPCManager, setShowNPCManager] = useState(false); 
+
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  
+  const [showLevelUpScreen, setShowLevelUpScreen] = useState(false);
+  const [levelUpData, setLevelUpData] = useState(null);
 
   const [showDiceSelector, setShowDiceSelector] = useState(false);
-  const [rollResult, setRollResult] = useState(null);
+  const [rollResult, setRollResult] = useState(null); 
   const dismissedRollTimestamp = useRef(0);
-  const [unreadResenhas, setUnreadResenhas] = useState(0);
-  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
-  const prevLevelRef = useRef(null); 
-  const audioRef = useRef(new Audio(levelUpMusic)); 
-  
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
+  // Adicionando track de XP para a animação
+  const prevXpRef = useRef(0);
+
+  // Parar a música da landing page ao montar
   useEffect(() => {
-    if (backgroundMusic) { backgroundMusic.pause(); backgroundMusic.currentTime = 0; }
+    if (backgroundMusic) {
+      backgroundMusic.pause();
+    }
   }, []);
-
-  useEffect(() => {
-    audioRef.current.volume = 0.2;
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const ativas = []; const futuras = [];
-    allSessoes.forEach(s => {
-        const inicio = new Date(s.dataInicio); const fim = new Date(s.expiraEm);
-        if (currentTime >= inicio && currentTime <= fim) ativas.push(s); else if (currentTime < inicio) futuras.push(s);
-    });
-    setSessoesAtivas(ativas); setSessoesFuturas(futuras);
-  }, [currentTime, allSessoes]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -275,150 +204,170 @@ export default function JogadorVttPage() {
   }, []);
 
   useEffect(() => {
-    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {}; let unsubAllChars = () => {};
+    let unsubMissoes = () => {};
+    let unsubResenhas = () => {};
+    let unsubChar = () => {};
+    let unsubSessoes = () => {};
+    let unsubDisponibilidades = () => {};
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-        if (user) {
-            const docRef = doc(db, "characters", user.uid);
-            unsubChar = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    const currentLevel = data.character_sheet?.basic_info?.level || 1;
-                    if (prevLevelRef.current !== null && currentLevel > prevLevelRef.current) {
-                        setShowLevelUpModal(true); audioRef.current.currentTime = 0; audioRef.current.play().catch(console.error);
-                    }
-                    prevLevelRef.current = currentLevel;
-                    setPersonagem(data); setLoading(false); 
-                } else setLoading(false);
-            });
+      if (user) {
+        setCurrentUser(user);
+        
+        // Puxa personagem
+        const qChar = query(collection(db, "characters"), where("uid", "==", user.uid));
+        unsubChar = onSnapshot(qChar, (snap) => {
+          if (!snap.empty) {
+            const data = { id: snap.docs[0].id, ...snap.docs[0].data() };
             
-            const qMissoes = query(collection(db, "missoes"));
-            const qDisp = query(collection(db, "disponibilidades")); 
-            const qArenas = query(collection(db, "sessoes"), where("isArena", "==", true));
-            const qAllChars = query(collection(db, "characters"));
+            // --- LÓGICA DE DETECÇÃO DE LEVEL UP ---
+            const currentLevel = data.character_sheet?.basic_info?.level || 1;
+            const currentXp = data.character_sheet?.basic_info?.experience?.current || 0;
+            const maxXp = data.character_sheet?.basic_info?.experience?.max || 100;
+            const charImg = data.character_sheet?.imgUrl || '';
 
-            unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            unsubArenas = onSnapshot(qArenas, (snap) => setArenasDisponiveis(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            unsubAllChars = onSnapshot(qAllChars, (snap) => setAllPersonagens(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-        } else { setLoading(false); navigate('/login'); }
-    });
-    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); unsubAllChars(); };
-  }, [navigate]);
-
-  useEffect(() => {
-      if (!personagem) return;
-      const qSessoes = query(collection(db, "sessoes"), where("participantes", "array-contains", personagem.name));
-      const unsubSessoes = onSnapshot(qSessoes, (snap) => {
-        const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAllSessoes(todas);
-        if (currentVttSession) {
-            const sessionUpdated = todas.find(s => s.id === currentVttSession.id);
-            if (sessionUpdated) {
-                setCurrentVttSession(sessionUpdated);
-                if (sessionUpdated.latest_roll) {
-                      const roll = sessionUpdated.latest_roll;
-                      if (roll.timestamp > dismissedRollTimestamp.current) {
-                        setRollResult(prev => { if (!prev || prev.timestamp !== roll.timestamp) return roll; return prev; });
-                      }
-                }
-                const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
-                setVttStatus(playerInList ? 'connected' : 'waiting');
+            // Verifica se o XP atual atingiu o MAX e se o XP antigo era menor que o MAX (para não ficar abrindo toda hora)
+            if (currentXp >= maxXp && currentXp > 0 && prevXpRef.current < maxXp && !showLevelUpScreen) {
+                setLevelUpData({ level: currentLevel, name: data.name, class: data.class, imgUrl: charImg });
+                setShowLevelUpScreen(true);
+                
+                // Toca a música de Level Up do FFT
+                const audio = new Audio(levelUpMusic);
+                audio.volume = 0.5;
+                audio.play().catch(e => console.log("Áudio bloqueado pelo navegador", e));
             }
-        }
-      });
-      const qResenhas = query(collection(db, "resenhas"), where("destinatarios", "array-contains", personagem.name));
-      const unsubResenhas = onSnapshot(qResenhas, (snap) => {
-        const validas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => new Date(r.expiraEm) > new Date());
-        setResenhas(validas);
-        const lastSeen = parseInt(localStorage.getItem('sanchez_last_read_count') || '0');
-        if (validas.length > lastSeen) setUnreadResenhas(validas.length - lastSeen); else setUnreadResenhas(0);
-      });
-      return () => { unsubSessoes(); unsubResenhas(); };
-  }, [personagem, currentVttSession?.id]); 
-
-  useEffect(() => {
-      if (!currentVttSession || !auth.currentUser) return;
-      const sessionRef = doc(db, "sessoes", currentVttSession.id);
-      const userId = auth.currentUser.uid;
-      updateDoc(sessionRef, { connected_players: arrayUnion(userId) }).catch(console.error);
-      const handleBeforeUnload = () => {};
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      return () => {
-          window.removeEventListener('beforeunload', handleBeforeUnload);
-          updateDoc(sessionRef, { connected_players: arrayRemove(userId) }).catch(console.error);
-      };
-  }, [currentVttSession?.id]); 
-
-  const handleConfirmLevelUp = () => { setShowLevelUpModal(false); audioRef.current.pause(); };
-  
-  const handleCandidatar = async (missao) => {
-    if (!personagem) return;
-    if (missao.candidatos?.some(c => c.uid === auth.currentUser.uid)) return alert("Já candidatado!");
-    const isLeader = !missao.candidatos || missao.candidatos.length === 0;
-    const candidatoObj = { uid: auth.currentUser.uid, nome: personagem.name, classe: personagem.class, isLeader, dataCandidatura: new Date().toISOString() };
-    try {
-      await updateDoc(doc(db, "missoes", missao.id), { candidatos: arrayUnion(candidatoObj) });
-      alert(isLeader ? "Você é o LÍDER DO GRUPO!" : "Candidatura realizada!");
-    } catch (e) { console.error(e); alert("Erro ao candidatar."); }
-  };
-
-  const handleJoinArenaTeam = async (arena, equipeId) => {
-      if (!personagem) return;
-      if (arena.participantes?.includes(personagem.name)) return alert("Você já está inscrito nesta Arena!");
-
-      const novaEquipe = arena.equipes.find(e => e.id === equipeId);
-      if (novaEquipe.membros.length >= novaEquipe.max) return alert("Este time já está cheio!");
-
-      const novasEquipes = arena.equipes.map(eq => {
-          if (eq.id === equipeId) {
-              return { ...eq, membros: [...eq.membros, personagem.name] };
+            
+            prevXpRef.current = currentXp; // Atualiza o ref
+            setCharacterData(data);
           }
-          return eq;
+          setLoading(false);
+        });
+
+        // Missões
+        const qMissoes = query(collection(db, "missoes"));
+        unsubMissoes = onSnapshot(qMissoes, (snap) => {
+          setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+        // Resenhas
+        const qResenhas = query(collection(db, "resenhas"));
+        unsubResenhas = onSnapshot(qResenhas, (snap) => {
+          setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+        // Sessões
+        const qSessoes = query(collection(db, "sessoes"));
+        unsubSessoes = onSnapshot(qSessoes, (snap) => {
+            const allSessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setSessoes(allSessoes);
+            
+            // Verifica qual sessão está ativa E o player faz parte
+            // Checa expiração (só ativa se expiraEm for maior que agora)
+            const ativa = allSessoes.find(s => {
+                const agora = new Date();
+                const fim = new Date(s.expiraEm);
+                return agora <= fim; 
+            });
+
+            if (ativa && characterData && ativa.participantes?.includes(characterData.name)) {
+                 setSessaoAtiva(ativa);
+                 
+                 // Puxa rolagem de dados da sessão se houver
+                 if (ativa.latest_roll) {
+                     const roll = ativa.latest_roll;
+                     if (roll.timestamp > dismissedRollTimestamp.current) {
+                        setRollResult(prev => {
+                            if (!prev || prev.timestamp !== roll.timestamp) {
+                                return roll;
+                            }
+                            return prev;
+                        });
+                     }
+                 }
+            } else {
+                 setSessaoAtiva(null);
+            }
+        });
+
+        // Disponibilidades do Calendário
+        const qDisp = query(collection(db, "disponibilidades"));
+        unsubDisponibilidades = onSnapshot(qDisp, (snap) => {
+            setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+      } else {
+        setLoading(false);
+        navigate('/login');
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubMissoes();
+      unsubResenhas();
+      unsubChar();
+      unsubSessoes();
+      unsubDisponibilidades();
+    };
+  }, [navigate, characterData?.name, showLevelUpScreen]);
+
+  // Player entra/sai da sessão (Presença Online)
+  useEffect(() => {
+    if (sessaoAtiva && sessaoAtiva.id && currentUser) {
+        const sessaoRef = doc(db, "sessoes", sessaoAtiva.id);
+        updateDoc(sessaoRef, { connected_players: arrayUnion(currentUser.uid) }).catch(e => console.log(e));
+        
+        return () => {
+             updateDoc(sessaoRef, { connected_players: arrayRemove(currentUser.uid) }).catch(e => console.log(e));
+        };
+    }
+  }, [sessaoAtiva?.id, currentUser?.uid]);
+
+  const handleApplyMission = async (missaoId, missaoCandidatos) => {
+    if (!characterData) return;
+    const isAlreadyCandidate = missaoCandidatos?.find(c => c.uid === characterData.uid);
+    if (isAlreadyCandidate) return alert("Você já se candidatou para esta missão!");
+
+    const candidatar = window.confirm("Deseja se candidatar como membro ou LÍDER do grupo?\n\n[OK] para LÍDER\n[Cancelar] para Membro Comum");
+    
+    const candidateObj = {
+      uid: characterData.uid,
+      nome: characterData.name,
+      classe: characterData.class,
+      isLeader: candidatar
+    };
+
+    try {
+      const missaoRef = doc(db, "missoes", missaoId);
+      await updateDoc(missaoRef, {
+        candidatos: arrayUnion(candidateObj)
       });
+      alert("Candidatura enviada ao Mestre!");
+    } catch (e) {
+      alert("Erro ao candidatar: " + e.message);
+    }
+  };
 
-      const novosParticipantes = [...(arena.participantes || []), personagem.name];
+  const handleLeaveMission = async (missaoId, missaoCandidatos) => {
+      if (!characterData) return;
+      const myCandidature = missaoCandidatos?.find(c => c.uid === characterData.uid);
+      if (!myCandidature) return;
 
-      try {
-          await updateDoc(doc(db, "sessoes", arena.id), {
-              equipes: novasEquipes,
-              participantes: novosParticipantes
-          });
-          alert(`Você entrou no time ${novaEquipe.nome}!`);
-          setShowArenaDetails(null);
-      } catch(e) {
-          alert("Erro ao entrar no time.");
+      if(window.confirm("Deseja retirar sua candidatura desta missão?")) {
+          try {
+              const missaoRef = doc(db, "missoes", missaoId);
+              await updateDoc(missaoRef, {
+                  candidatos: arrayRemove(myCandidature)
+              });
+          } catch(e) {
+              alert("Erro ao sair da missão: " + e.message);
+          }
       }
   };
 
-  const enterVTT = (sessao) => { setCurrentVttSession(sessao); setHasJoinedSession(true); setVttStatus(new Date() >= new Date(sessao.dataInicio) ? 'connected' : 'waiting'); };
-  const handleOpenSanchez = () => { setShowResenhasList(true); localStorage.setItem('sanchez_last_read_count', resenhas.length.toString()); setUnreadResenhas(0); };
-  
-  const handleOpenBook = () => {
-    window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
-  };
-
-  const handleTrackerMouseDown = (e) => {
-      setIsDraggingTracker(true);
-      setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
-  };
-  const handleDetailsMouseDown = (e) => {
-      setIsDraggingDetails(true);
-      setDragOffsetDetails({ x: e.clientX - detailsPos.x, y: e.clientY - detailsPos.y });
-  };
-  const handleWindowMouseMove = (e) => {
-      if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
-      if (isDraggingDetails) { setDetailsPos({ x: e.clientX - dragOffsetDetails.x, y: e.clientY - dragOffsetDetails.y }); }
-  };
-  const handleWindowMouseUp = () => { setIsDraggingTracker(false); setIsDraggingDetails(false); };
-
-  // --- HELPER: BUSCAR COR DO TIME NO MODO PVP ---
-  const getTeamColor = (tokenName) => {
-      if (!currentVttSession || !currentVttSession.equipes) return null;
-      for (let eq of currentVttSession.equipes) {
-          if (eq.membros.includes(tokenName)) return eq.cor;
-      }
-      return null;
+  const handleCloseLevelUp = () => {
+      setShowLevelUpScreen(false);
+      setLevelUpData(null);
   };
 
   if (loading || !minTimeElapsed) {
@@ -427,522 +376,360 @@ export default function JogadorVttPage() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         height: '100vh', width: '100vw', 
         background: 'radial-gradient(circle at center, #001a33 0%, #000000 100%)', 
-        color: '#ffcc00', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
+        color: '#00f2ff', fontFamily: 'Cinzel, serif', zIndex: 9999, position: 'fixed', top: 0, left: 0
       }}>
-        <img src={chocoboGif} alt="Carregando..." style={{ width: '100px', marginBottom: '20px' }} />
+        <img src={chocoboGif} alt="Carregando..." style={{ width: '120px', marginBottom: '20px' }} />
         <p style={{ 
-          fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
+          fontSize: '18px', letterSpacing: '4px', textTransform: 'uppercase',
           animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
         <style>{`
           @keyframes pulseText { 
-            0% { opacity: 0.3; } 
-            50% { opacity: 1; } 
-            100% { opacity: 0.3; } 
+            0% { opacity: 0.4; transform: scale(0.98); } 
+            50% { opacity: 1; transform: scale(1.02); } 
+            100% { opacity: 0.4; transform: scale(0.98); } 
           }
         `}</style>
       </div>
     );
   }
 
-  if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
+  const myResenhas = resenhas.filter(r => r.destinatarios?.includes(characterData?.name));
 
   return (
-    <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
-      <div className="background-layer" style={{ backgroundImage: `url(${fundoJogador})` }} />
-      <div className="content-layer">
+    <div className="jogador-container">
+      <div className="jogador-bg-image-full" style={{backgroundImage: `url(${fundoJogador})`}}></div>
 
-        <div className="char-hud clickable-hud" onClick={() => setShowFicha(true)} title="Abrir Ficha">
-          <div className="char-avatar"><div className="avatar-circle"><span className="hud-level">{personagem.character_sheet?.basic_info?.level || 1}</span></div></div>
-          <div className="char-info"><h2 className="char-name">{personagem.name}</h2><span className="char-meta">{personagem.race} // {personagem.class}</span></div>
+      <div className="jogador-content">
+        <div className="top-bar-flex">
+            <h1 className="ff-title">GUILDA DOS AVENTUREIROS</h1>
+            
+            {characterData && (
+                <div className="char-identity-box ff-card fade-in" onClick={() => setShowFicha(true)} style={{cursor: 'pointer'}}>
+                    <div className="char-avatar-mini" style={{backgroundImage: `url(${characterData.character_sheet?.imgUrl})`}}></div>
+                    <div className="char-info-mini">
+                        <span className="char-name-mini">{characterData.name}</span>
+                        <span className="char-class-mini">LVL {characterData.character_sheet?.basic_info?.level || 1} • {characterData.class}</span>
+                    </div>
+                </div>
+            )}
         </div>
 
-        {currentVttSession && currentVttSession.active_map && (
-            <Tabletop sessaoData={currentVttSession} isMaster={false} currentUserUid={auth.currentUser?.uid} personagensData={allPersonagens} />
-        )}
-
-        <SceneryViewer sessaoData={currentVttSession} isMaster={false} />
-        <NPCViewer sessaoData={currentVttSession} isMaster={false} />
-        {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
-        {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
-        
-        {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP E CORES DO TIME --- */}
-        {showCombatTracker && currentVttSession && (
-            <div 
-                className="combat-tracker-panel player-view fade-in"
-                style={{ top: trackerPos.y, left: trackerPos.x, zIndex: 2100 }}
-            >
-                <div 
-                    className="tracker-header"
-                    onMouseDown={handleTrackerMouseDown}
-                    style={{cursor: 'grab'}}
-                >
-                    <h3 className="tracker-title">COMBATE</h3>
+        {/* --- AVISO DE SESSÃO ATIVA --- */}
+        {sessaoAtiva && (
+            <div className={`active-session-banner fade-in ${sessaoAtiva.isArena ? 'arena-banner' : ''}`}>
+                <div className="banner-pulse"></div>
+                <div className="banner-info">
+                    <h3>{sessaoAtiva.isArena ? '⚔️ ARENA PVP ATIVA' : '🔴 SESSÃO EM ANDAMENTO'}</h3>
+                    <p>{sessaoAtiva.missaoNome}</p>
                 </div>
-                <div className="tracker-list">
-                    {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
-                        
-                        // LÓGICA DE VISIBILIDADE (INCLUI FURTIVIDADE)
-                        const isBaseVisible = token.visible !== false;
-                        const isOwner = token.uid === auth.currentUser.uid;
-                        const isPvP = currentVttSession.pvp_mode;
-                        const isStealthHidden = isPvP && token.stealth && !isOwner;
-
-                        if(!isBaseVisible || isStealthHidden) return null; 
-
-                        let imgUrl = token.img;
-                        let hpDisplay = "?", mpDisplay = "?";
-                        let hpMax = "?", mpMax = "?";
-
-                        // LÓGICA DE HP PARA TODOS OS JOGADORES (E NÃO APENAS O SEU)
-                        if (token.type === 'player') {
-                            const charObj = allPersonagens.find(p => p.uid === token.uid);
-                            if (charObj) {
-                                hpDisplay = charObj.character_sheet?.status?.hp?.current;
-                                hpMax = charObj.character_sheet?.status?.hp?.max;
-                                mpDisplay = charObj.character_sheet?.status?.mp?.current;
-                                mpMax = charObj.character_sheet?.status?.mp?.max;
-                                if(charObj.character_sheet?.imgUrl) imgUrl = charObj.character_sheet.imgUrl;
-                            }
-                        } else if (token.type === 'enemy') {
-                            hpDisplay = token.stats?.hp?.current;
-                            hpMax = token.stats?.hp?.max;
-                            mpDisplay = token.stats?.mp?.current;
-                            mpMax = token.stats?.mp?.max;
-                        } else if (token.visibleBars) {
-                            hpDisplay = token.stats?.hp?.current;
-                            hpMax = token.stats?.hp?.max;
-                            mpDisplay = token.stats?.mp?.current;
-                            mpMax = token.stats?.mp?.max;
-                        }
-
-                        // --- ADICIONA A COR DO TIME NA BORDA SE O MODO PVP ESTIVER ATIVADO ---
-                        const teamColor = isPvP ? getTeamColor(token.name) : null;
-                        const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
-
-                        return (
-                            <div 
-                                key={token.id} 
-                                className={`tracker-item readonly ${isPvP && token.stealth && isOwner ? 'tracker-stealth-self' : ''}`}
-                                style={customBorder}
-                            >
-                                <div className="t-col-img">
-                                    <div className="t-index">{token.originalIndex + 1}</div>
-                                    <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
-                                </div>
-                                <div className="t-col-info">
-                                    <div className="t-name" style={teamColor ? {color: teamColor} : {}}>{token.name}</div>
-                                    <div className="t-stats-row">
-                                        <div className="t-stat hp">
-                                            <label>HP</label>
-                                            <span>{hpDisplay}</span>
-                                            {hpMax !== "?" && <small>/{hpMax}</small>}
-                                        </div>
-                                        <div className="t-stat mp">
-                                            <label>MP</label>
-                                            <span>{mpDisplay}</span>
-                                            {mpMax !== "?" && <small>/{mpMax}</small>}
-                                        </div>
-                                    </div>
-                                </div>
-                                {token.type === 'enemy' && (
-                                    <div className="t-col-actions">
-                                        <button className="btn-icon-sm" title="Detalhes" onClick={() => setViewMonsterDetails({...token.details, img: token.img})}>📜</button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {currentVttSession.tokens?.some(t => t.type === 'object') && (
-                        <>
-                            <div className="tracker-divider">OBJETOS</div>
-                            {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type === 'object').map((token) => {
-                                const isVisible = token.visible !== false;
-                                if(!isVisible) return null; 
-
-                                return (
-                                    <div key={token.id} className="tracker-item object-item readonly">
-                                        <div className="t-col-img">
-                                            <div className="t-index">{token.originalIndex + 1}</div>
-                                            <div className="t-img" style={{backgroundImage: `url(${token.img})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
-                                        </div>
-                                        <div className="t-col-info">
-                                            <div className="t-name" style={{color: '#ffcc00'}}>{token.name} <small>(Obj)</small></div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </>
-                    )}
-
-                    {(!currentVttSession.tokens || currentVttSession.tokens.length === 0) && <div className="empty-tracker">Mesa Vazia</div>}
+                <div className="banner-actions">
+                    <button className="btn-cyan action-btn" onClick={() => setShowMapManager(true)}>MAPA (VTT)</button>
+                    <button className="btn-cyan action-btn" onClick={() => setShowSceneryManager(true)}>CENÁRIOS</button>
+                    <button className="btn-cyan action-btn" onClick={() => setShowNPCManager(true)}>NPCS</button>
+                    <button className="btn-cyan action-btn" onClick={() => setShowDiceSelector(true)}>🎲 ROLAR DADOS</button>
                 </div>
             </div>
         )}
 
-        {viewMonsterDetails && (
-            <div 
-                className="monster-detail-card draggable-card fade-in" 
-                style={{ position: 'absolute', top: detailsPos.y, left: detailsPos.x, zIndex: 2200 }}
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="md-header" onMouseDown={handleDetailsMouseDown} style={{cursor: 'grab'}}>
-                    <div className="md-title-row">
-                        <h2>{viewMonsterDetails.name}</h2>
-                        <div className="md-stars">
-                            {[...Array(viewMonsterDetails.stars || 1)].map((_,i) => <span key={i}>★</span>)}
-                            {viewMonsterDetails.difficultyQ && <span className="md-boss-mark">?</span>}
+        <div className="player-dashboard-grid">
+            
+          {/* COLUNA 1: QUADRO DE MISSÕES GERAL */}
+          <div className="ff-card board-column">
+            <div className="card-header no-border">
+              <h3>QUADRO DE MISSÕES</h3>
+              <button className="btn-cyan-text" onClick={() => setShowCalendar(true)}>📅 AGENDA</button>
+            </div>
+            <div className="mission-scroll">
+              {missoes.map(m => {
+                const maxGroup = parseInt(m.grupo) || 0;
+                const currentGroup = m.candidatos ? m.candidatos.length : 0;
+                const fillPercent = maxGroup > 0 ? (currentGroup / maxGroup) * 100 : 0;
+                const isFull = currentGroup >= maxGroup && maxGroup > 0;
+                const isCandidate = m.candidatos?.find(c => c.uid === characterData?.uid);
+
+                return (
+                  <div key={m.id} className={`mission-poster rank-${m.rank} ${isCandidate ? 'applied' : ''}`}>
+                    <div className="poster-rank-label-fixed">{m.rank}</div>
+                    <span className="mestre-tag">Narrador: {m.mestreNome}</span>
+                    <h4>{m.nome}</h4>
+                    <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
+                    
+                    <div className="vagas-container">
+                        <div className="vagas-labels">
+                            <span>JOGADORES:</span>
+                            <span style={{color: isFull ? '#f44' : '#0f0'}}>{currentGroup} / {maxGroup}</span>
+                        </div>
+                        <div className="vagas-track">
+                            <div className="vagas-fill" style={{width: `${fillPercent}%`, background: isFull ? '#f44' : '#00f2ff'}}></div>
                         </div>
                     </div>
-                    <div className="md-sub">Nível de Ameaça</div>
-                </div>
-                <div className="md-body">
-                    <div className="md-img-col">
-                        <div className="md-portrait" style={{backgroundImage: `url(${viewMonsterDetails.img})`}}></div>
-                    </div>
-                    <div className="md-info-col custom-scrollbar">
-                        <div className="md-block">
-                            <label>DESCRIÇÃO</label>
-                            <p>{viewMonsterDetails.description || "Sem dados disponíveis."}</p>
-                        </div>
-                        {viewMonsterDetails.drops && (
-                            <div className="md-block">
-                                <label>DROPS CONHECIDOS</label>
-                                <p>{viewMonsterDetails.drops}</p>
-                            </div>
+
+                    {isCandidate && <div className="candidature-badge">VOCÊ ESTÁ NA MISSÃO</div>}
+                    
+                    <div className="poster-actions" style={{marginTop: '10px'}}>
+                        <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
+                        <button className="btn-cyan" onClick={() => setShowDetails(m)}>DETALHES</button>
+                        
+                        {isCandidate ? (
+                            <button className="btn-red" onClick={() => handleLeaveMission(m.id, m.candidatos)}>DESISTIR</button>
+                        ) : (
+                            <button className="btn-gold-action" disabled={isFull} onClick={() => handleApplyMission(m.id, m.candidatos)}>
+                                {isFull ? 'LOTAÇÃO MÁXIMA' : 'CANDIDATAR-SE'}
+                            </button>
                         )}
                     </div>
-                </div>
-                <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
+                  </div>
+                );
+              })}
+              {missoes.length === 0 && <p style={{textAlign:'center', color:'#64748b'}}>Nenhum cartaz no momento.</p>}
             </div>
-        )}
+          </div>
 
-        {showLevelUpModal && (
-            <div className="levelup-global-overlay">
-                <div className="levelup-content">
-                    <h1 className="levelup-title">LEVEL UP!</h1>
-                    <button className="levelup-confirm-btn" onClick={handleConfirmLevelUp}>CONFIRMAR</button>
-                </div>
+          {/* COLUNA 2: RESENHAS DO SANCHEZ (APENAS DIRECIONADAS AO PLAYER) */}
+          <div className="ff-card sanchez-card board-column">
+            <div className="sanchez-header-top no-border">
+              <h3>CRÔNICAS PARA VOCÊ</h3>
             </div>
-        )}
-        
-        {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && !hasJoinedSession && <div className="upcoming-sessions-banner"><h3>A SESSÃO VAI COMEÇAR EM BREVE</h3>{sessoesFuturas.map(s => <div key={s.id} className="countdown-row"><span className="sessao-nome-future">{s.missaoNome}</span><CountdownTimer targetDate={s.dataInicio} /></div>)}</div>}
-        {sessoesAtivas.length > 0 && !hasJoinedSession && <div className="active-sessions-banner fade-in"><h3>SESSÃO EM ANDAMENTO!</h3>{sessoesAtivas.map(s => <div key={s.id} className="session-entry-row"><span className="sessao-nome-active">{s.missaoNome}</span><button className="btn-enter-session" onClick={() => enterVTT(s)}>ENTRAR AGORA</button></div>)}</div>}
-        {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
+            <div className="mission-scroll">
+              {myResenhas.length === 0 ? (
+                  <p style={{textAlign:'center', color:'#64748b', fontStyle:'italic', marginTop:'20px'}}>Sanches não escreveu nada sobre suas aventuras ainda...</p>
+              ) : (
+                  myResenhas.map(r => (
+                    <div key={r.id} className="resenha-item-card">
+                      <h4>{r.titulo}</h4>
+                      <p style={{fontSize:'0.7rem', color:'#94a3b8', margin:'5px 0'}}>Escrito por: {r.mestre}</p>
+                      <button className="btn-cyan" style={{width:'100%', marginTop:'10px'}} onClick={() => setViewResenha(r)}>LER CRÔNICA</button>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
 
-        <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
-        <button className="floating-calendar-btn" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
-        
-        {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
-        {vttStatus === 'connected' && <button className="floating-dice-btn" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
-        {resenhas.length > 0 && <button className="floating-sanchez-btn" onClick={handleOpenSanchez} title="Resenhas"><div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
-        <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
-        
-        <button className="floating-arena-btn" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
+        </div>
+      </div>
 
-        <Bazar isMestre={false} playerData={personagem} />
-        
-        <GuildBoard isMaster={false} />
+      <GuildBoard isMaster={false} />
+      <Bazar isMestre={false} playerData={characterData} />
 
-        {showCalendar && (
-          <CalendarSystemPlayer 
+      {/* --- RENDERIZAÇÃO DOS COMPONENTES DO VTT (OCULTOS POR PADRÃO) --- */}
+      {sessaoAtiva && (
+          <>
+             {/* MapManager no Jogador só mostra o Tabletop que o mestre ativou (controlado internamente pelo Tabletop) */}
+             <Tabletop 
+                 sessaoData={sessaoAtiva} 
+                 isMaster={false} 
+                 showManager={showMapManager} 
+                 onCloseManager={() => setShowMapManager(false)}
+                 currentUserUid={currentUser?.uid}
+             />
+             <SceneryViewer 
+                 sessaoData={sessaoAtiva} 
+                 isMaster={false} 
+                 showManager={showSceneryManager} 
+                 onCloseManager={() => setShowSceneryManager(false)} 
+             />
+             <NPCViewer 
+                 sessaoData={sessaoAtiva} 
+                 isMaster={false} 
+                 showManager={showNPCManager} 
+                 onCloseManager={() => setShowNPCManager(false)} 
+             />
+          </>
+      )}
+
+      {showDiceSelector && sessaoAtiva && (
+          <DiceSelector 
+              sessaoId={sessaoAtiva.id} 
+              playerName={characterData?.name || "Aventureiro"} 
+              onClose={() => setShowDiceSelector(false)} 
+          />
+      )}
+      
+      {rollResult && (
+          <DiceResult 
+              rollData={rollResult} 
+              onClose={() => {
+                  dismissedRollTimestamp.current = rollResult.timestamp;
+                  setRollResult(null);
+              }} 
+          />
+      )}
+
+      {showFicha && characterData && (
+        <Ficha 
+          characterData={characterData} 
+          isMaster={false} 
+          onClose={() => setShowFicha(false)} 
+        />
+      )}
+
+      {showCalendar && (
+         <CalendarSystemPlayer 
             onClose={() => setShowCalendar(false)} 
             disponibilidades={disponibilidades}
-            sessoes={allSessoes} 
-          />
-        )}
-        
-        {/* MODAL DE LISTA DE MISSÕES */}
-        {showMissionModal && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}><div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-compact"><h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3><button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button></div><div className="missions-grid-compact">{missoes.map(m => (<div key={m.id} className={`mission-card-compact rank-${m.rank}`}><div className="mc-left"><span className="mc-rank">{m.rank}</span></div><div className="mc-center"><h4 className="mc-title">{m.nome}</h4><span className="mc-reward">💰 {m.gilRecompensa} Gil</span></div><div className="mc-right"><button className="btn-details-mini" onClick={() => setShowMissionDetails(m)}>Ver Detalhes</button><button className="btn-accept-mini" onClick={() => handleCandidatar(m)}>ACEITAR</button></div></div>))}</div></div></div>)}
-        
-        {/* MODAL DE DETALHES DA MISSÃO */}
-        {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
-        
-        {/* --- MODAIS DA ARENA --- */}
-        {showArenaModal && (
-            <div className="ff-modal-overlay-flex" onClick={() => setShowArenaModal(false)}>
-                <div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header-compact">
-                        <h3 className="modal-title-ff" style={{color:'#a855f7'}}>ARENAS DISPONÍVEIS</h3>
-                        <button className="btn-close-x" onClick={() => setShowArenaModal(false)}>✕</button>
-                    </div>
-                    <div className="missions-grid-compact">
-                        {arenasDisponiveis.filter(a => new Date(a.expiraEm) > new Date()).map(arena => (
-                            <div key={arena.id} className="mission-card-compact" style={{borderColor: '#a855f7'}}>
-                                <div className="mc-left" style={{color:'#a855f7'}}>⚔️</div>
-                                <div className="mc-center">
-                                    <h4 className="mc-title">{arena.missaoNome}</h4>
-                                    <span className="mc-reward">Equipes: {arena.equipes?.length || 0}</span>
-                                </div>
-                                <div className="mc-right">
-                                    <button className="btn-details-mini" style={{borderColor: '#a855f7', color: '#a855f7'}} onClick={() => setShowArenaDetails(arena)}>VER TIMES</button>
-                                </div>
-                            </div>
-                        ))}
-                        {arenasDisponiveis.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhuma arena disponível no momento.</p>}
-                    </div>
+            sessoes={sessoes.filter(s => s.participantes?.includes(characterData?.name))} 
+         />
+      )}
+
+      {showDetails && (
+        <div className="ff-modal-overlay-fixed" onClick={() => setShowDetails(null)}>
+          <div className="ff-modal ff-card detail-view-main" onClick={e => e.stopPropagation()}>
+            <div className="detail-header-modern"><div className={`detail-rank-badge rank-${showDetails.rank}`}>{showDetails.rank}</div><div className="detail-title-col"><h2>{showDetails.nome}</h2><span className="detail-narrator">Narrador: {showDetails.mestreNome}</span></div></div>
+            <div className="detail-body-grid">
+              <div className="detail-info-row"><div className="info-item"><label>🌍 LOCAL</label><span>{showDetails.local || "Desconhecido"}</span></div><div className="info-item"><label>👤 CONTRATANTE</label><span>{showDetails.contratante || "Anônimo"}</span></div></div>
+              <div className="detail-section">
+                <label className="section-label">VAGAS</label>
+                <div style={{background: '#111', padding: '10px', borderRadius: '4px'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', color:'#aaa', marginBottom:'5px'}}>
+                    <span>STATUS DO GRUPO</span>
+                    <span>{showDetails.candidatos ? showDetails.candidatos.length : 0} / {showDetails.grupo || '?'}</span>
+                  </div>
+                  <div style={{width: '100%', height: '6px', background: '#333', borderRadius:'3px'}}>
+                    <div style={{ width: `${Math.min(((showDetails.candidatos?.length || 0) / (parseInt(showDetails.grupo) || 1)) * 100, 100)}%`, height:'100%', background: (showDetails.candidatos?.length >= parseInt(showDetails.grupo)) ? '#f44' : '#00f2ff' }}></div>
+                  </div>
                 </div>
+              </div>
+              <div className="detail-section"><label className="section-label">📜 DESCRIÇÃO</label><p className="section-text">{showDetails.descricaoMissao}</p></div>
+              <div className="detail-section"><label className="section-label">⚔️ OBJETIVOS</label><p className="section-text">{showDetails.objetivosMissao}</p></div>
+              <div className="detail-section"><label className="section-label">⚡ REQUISITOS</label><p className="section-text">{showDetails.requisitos}</p></div>
+              <div className="detail-section reward-section"><label className="section-label">💎 RECOMPENSAS</label><div className="reward-content-box"><div className="gil-display-row"><span className="gil-icon">💰</span> <span className="gil-value">{showDetails.gilRecompensa || 0} GIL</span></div>{showDetails.recompensa && (<div className="extra-rewards-list">{showDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div></div>
             </div>
-        )}
+            <button className="ff-final-close-btn" onClick={() => setShowDetails(null)}>FECHAR RELATÓRIO</button>
+          </div>
+        </div>
+      )}
 
-        {showArenaDetails && (
-            <div className="ff-modal-overlay-flex" onClick={() => setShowArenaDetails(null)} style={{zIndex: 100000}}>
-                <div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()} style={{border: '2px solid #a855f7', height: 'auto', maxHeight: '90vh'}}>
-                    <div className="detail-wide-header" style={{background: 'linear-gradient(90deg, #3b0764, #000)'}}>
-                        <div className="dw-rank-badge" style={{color: '#a855f7', textShadow: 'none'}}>⚔️</div>
-                        <div className="dw-title-box">
-                            <h2>{showArenaDetails.missaoNome}</h2>
-                            <span className="dw-narrator">Mestre: {showArenaDetails.mestreNome || "Narrador"}</span>
-                        </div>
-                    </div>
-                    <div className="detail-wide-body" style={{flexDirection: 'column', overflowY: 'auto', padding: '20px'}}>
-                        <h3 style={{color:'#fbbf24', textAlign:'center', marginBottom: '20px'}}>INSCRIÇÃO DE TIMES</h3>
-                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px'}}>
-                            {showArenaDetails.equipes?.map(eq => {
-                                const isFull = eq.membros.length >= eq.max;
-                                const isMinhaEquipe = eq.membros.includes(personagem?.name);
-                                const jaEmOutraEquipe = showArenaDetails.participantes?.includes(personagem?.name) && !isMinhaEquipe;
+      {viewImage && (
+        <div className="ff-modal-overlay-fixed" onClick={() => setViewImage(null)}>
+          <div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div>
+        </div>
+      )}
 
-                                return (
-                                    <div key={eq.id} style={{background:'#111', borderLeft:`4px solid ${eq.cor}`, borderRadius:'4px', padding:'15px', position: 'relative'}}>
-                                        <div style={{display:'flex', justifyContent:'space-between', borderBottom:'1px solid #333', paddingBottom:'10px', marginBottom:'10px'}}>
-                                            <h4 style={{margin:0, color: eq.cor}}>{eq.nome}</h4>
-                                            <span style={{fontSize:'12px', color: isFull ? '#f44' : '#0f0'}}>{eq.membros.length} / {eq.max}</span>
-                                        </div>
-                                        <div style={{minHeight:'80px', marginBottom:'15px', fontSize:'12px', color:'#ccc'}}>
-                                            <strong>Líder:</strong> <span style={{color:'#ffcc00'}}>👑 {eq.lider}</span><br/><br/>
-                                            <strong>Membros:</strong><br/>
-                                            {eq.membros.filter(m => m !== eq.lider).map((m, i) => <div key={i}>• {m}</div>)}
-                                        </div>
-                                        {isMinhaEquipe ? (
-                                            <button disabled style={{width:'100%', padding:'10px', background: eq.cor, color:'#000', fontWeight:'bold', border:'none', borderRadius:'4px', opacity: 0.8}}>SEU TIME</button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => handleJoinArenaTeam(showArenaDetails, eq.id)}
-                                                disabled={isFull || jaEmOutraEquipe}
-                                                style={{
-                                                    width:'100%', padding:'10px', background: isFull || jaEmOutraEquipe ? '#333' : 'transparent', 
-                                                    color: isFull || jaEmOutraEquipe ? '#666' : eq.cor, 
-                                                    border:`1px solid ${isFull || jaEmOutraEquipe ? '#444' : eq.cor}`, 
-                                                    fontWeight:'bold', cursor: isFull || jaEmOutraEquipe ? 'not-allowed' : 'pointer', borderRadius:'4px'
-                                                }}
-                                            >
-                                                {isFull ? 'LOTAÇÃO MÁXIMA' : jaEmOutraEquipe ? 'INSCRITO EM OUTRO TIME' : 'ENTRAR NESTE TIME'}
-                                            </button>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                    <button className="dw-close-btn" onClick={() => setShowArenaDetails(null)}>FECHAR</button>
+      {viewResenha && (
+        <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
+          <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
+             <div className="fft-portrait-section">
+                <div className="fft-portrait-frame">
+                   <img src={sanchezImg} alt="Sanchez" />
                 </div>
-            </div>
-        )}
-
-        {viewImage && (<div className="ff-modal-overlay-flex" style={{zIndex: 100001}} onClick={() => setViewImage(null)}><div className="lightbox-wrap"><button className="close-lightbox" onClick={() => setViewImage(null)}>×</button><img src={viewImage} alt="Cartaz" className="cartaz-full-view" /></div></div>)}
-        {showResenhasList && (<div className="ff-modal-overlay-flex" onClick={() => setShowResenhasList(false)}><div className="ff-modal-content ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-row"><h3 className="modal-title-ff">RESENHAS</h3><button className="btn-close-x" onClick={() => setShowResenhasList(false)}>✕</button></div><div className="resenhas-list-container">{resenhas.map(r => (<div key={r.id} className="resenha-row-player" onClick={() => { setViewResenha(r); setShowResenhasList(false); }}><h4>{r.titulo}</h4></div>))}</div></div></div>)}
-        
-        {viewResenha && (
-            <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
-            <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
-                <div className="fft-portrait-section">
-                    <div className="fft-portrait-frame">
-                    <img src={sanchezImg} alt="Sanchez" />
-                    </div>
-                    <div className="fft-name-plate">
-                    SANCHEZ
-                    </div>
+                <div className="fft-name-plate">
+                   SANCHEZ
                 </div>
+             </div>
 
-                <div className="fft-content-section">
-                    <h2 className="fft-title">{viewResenha.titulo}</h2>
-                    <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
-                </div>
+             <div className="fft-content-section">
+                <h2 className="fft-title">{viewResenha.titulo}</h2>
+                <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
+             </div>
 
-                <button className="fft-close-btn" onClick={() => setViewResenha(null)}>X</button>
-            </div>
-            </div>
-        )}
-        
-        {showFicha && personagem && <Ficha characterData={personagem} isMaster={false} onClose={() => setShowFicha(false)} />}
+             <button className="fft-close-btn" onClick={() => setViewResenha(null)}>X</button>
+          </div>
+        </div>
+      )}
 
-      </div>
+      {/* --- LEVEL UP MODAL --- */}
+      {showLevelUpScreen && levelUpData && (
+          <div className="level-up-fullscreen-modal">
+              <div className="levelup-content-wrapper">
+                  <div className="levelup-portrait" style={{backgroundImage: `url(${levelUpData.imgUrl})`}}></div>
+                  <div className="levelup-info">
+                      <h1 className="levelup-title-anim">LEVEL UP!</h1>
+                      <h2 className="levelup-char-name">{levelUpData.name}</h2>
+                      <p className="levelup-class-info">{levelUpData.class}</p>
+                      <div className="levelup-stats-box">
+                          <p>O personagem atingiu o nível de poder necessário para evoluir.</p>
+                          <div className="lvl-badge-big">NÍVEL {levelUpData.level}</div>
+                      </div>
+                      <button className="levelup-confirm-btn" onClick={handleCloseLevelUp}>AVANÇAR</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <style>{`
-        .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
-        .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
-        .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
+        .jogador-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #020617; font-family: 'Cinzel', serif; color: #e2e8f0; }
+        .jogador-bg-image-full { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.2; z-index: 0; animation: slowPan 60s infinite alternate; }
+        @keyframes slowPan { from { transform: scale(1.0); } to { transform: scale(1.1); } }
         
-        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; }
-        .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
-        .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; }
-        .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
-        .char-meta { font-size: 12px; color: #00f2ff; }
+        .jogador-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .ff-title { font-size: 2rem; color: #00f2ff; text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); letter-spacing: 4px; margin: 0; }
         
-        .floating-mission-btn { position: fixed; bottom: 30px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
+        .char-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.6); border: 1px solid #00f2ff; border-radius: 4px; transition: 0.2s; }
+        .char-identity-box:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); }
+        .char-avatar-mini { width: 40px; height: 40px; border-radius: 50%; border: 1px solid #fff; background-size: cover; background-position: center; }
+        .char-info-mini { display: flex; flex-direction: column; }
+        .char-name-mini { font-size: 1rem; color: #fbbf24; font-weight: bold; }
+        .char-class-mini { font-size: 0.7rem; color: #94a3b8; }
 
-        .floating-dice-btn { position: fixed; bottom: 90px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; background: #111; color: #fff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-dice-btn:hover { border-color: #ffcc00; transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
+        .active-session-banner { background: rgba(0, 242, 255, 0.1); border: 1px solid #00f2ff; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); }
+        .active-session-banner.arena-banner { background: rgba(168, 85, 247, 0.1); border-color: #a855f7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.2); }
+        .banner-pulse { position: absolute; left: 0; top: 0; height: 100%; width: 4px; background: #00f2ff; animation: pulseBorder 1.5s infinite; }
+        .active-session-banner.arena-banner .banner-pulse { background: #a855f7; }
+        @keyframes pulseBorder { 0% { opacity: 0.5; } 50% { opacity: 1; box-shadow: 0 0 10px #00f2ff; } 100% { opacity: 0.5; } }
         
-        .floating-combat-btn { position: fixed; bottom: 150px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #f44; background: #111; color: #f44; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-combat-btn:hover { border-color: #fff; color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #f44; }
+        .banner-info h3 { margin: 0 0 5px 0; color: #00f2ff; font-size: 1.2rem; letter-spacing: 2px; }
+        .active-session-banner.arena-banner .banner-info h3 { color: #c4b5fd; }
+        .banner-info p { margin: 0; color: #e2e8f0; font-size: 0.9rem; }
+        .banner-actions { display: flex; gap: 10px; }
+        .action-btn { font-size: 0.8rem; padding: 10px 20px; }
+        .active-session-banner.arena-banner .action-btn { border-color: #a855f7; color: #c4b5fd; }
+        .active-session-banner.arena-banner .action-btn:hover { background: rgba(168, 85, 247, 0.2); color: #fff; }
 
-        .floating-sanchez-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-sanchez-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
-
-        .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-book-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
-
-        .floating-calendar-btn { position: fixed; bottom: 330px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; background: #000; color: #22c55e; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 24px; }
-        .floating-calendar-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
-
-        .floating-arena-btn { position: fixed; bottom: 390px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 20px; }
-        .floating-arena-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-
-        .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
-        .floating-sanchez-btn:hover .sanchez-icon-face { opacity: 1; }
-        .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
+        .player-dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; flex: 1; min-height: 0; }
         
-        .combat-tracker-panel { 
-            position: absolute; 
-            width: 300px; 
-            max-height: 70vh; 
-            background: linear-gradient(180deg, #0d0d10 0%, #000 100%);
-            border: 2px solid #b8860b; 
-            border-radius: 6px; 
-            z-index: 2100; 
-            display: flex; flex-direction: column; 
-            box-shadow: 0 0 25px rgba(0,0,0,0.9);
-        }
-        .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
-        .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
-        .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
-        .tracker-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .board-column { display: flex; flex-direction: column; height: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; overflow: hidden; backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card-header { padding: 15px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
+        .card-header h3 { margin: 0; color: #e2e8f0; font-size: 1rem; letter-spacing: 2px; }
+        .no-border { border-bottom: none !important; }
         
-        .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
-        .tracker-item.object-item { border-style: dashed; }
-        .tracker-item:hover { border-color: #ffcc00; }
+        .mission-scroll { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; scrollbar-width: thin; scrollbar-color: #00f2ff #0f172a; }
+        .mission-scroll::-webkit-scrollbar { width: 6px; }
+        .mission-scroll::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 3px; }
+
+        .mission-poster { background: #1e293b; border: 1px solid #334155; padding: 15px; border-radius: 4px; position: relative; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .mission-poster:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-color: #00f2ff; }
+        .mission-poster.applied { border-color: #fbbf24; background: rgba(251, 191, 36, 0.05); }
         
-        /* NOVO: FEEDBACK VISUAL SE O PRÓPRIO JOGADOR ESTIVER EM FURTIVIDADE */
-        .tracker-item.tracker-stealth-self { border-color: #a855f7; border-style: dashed; opacity: 0.8; box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.3); }
-
-        .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
-        .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
-        .t-img { width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 1px solid #777; box-shadow: 0 0 5px #000; }
-        .t-col-info { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
-        .t-name { font-size: 13px; font-weight: bold; color: #eec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .t-stats-row { display: flex; gap: 5px; }
-        .t-stat { display: flex; align-items: center; font-size: 11px; background: #080808; padding: 2px 5px; border-radius: 3px; border: 1px solid #333; }
-        .t-stat label { margin-right: 4px; font-weight: bold; font-size: 9px; }
-        .t-stat.hp label { color: #f44; } .t-stat.mp label { color: #00f2ff; }
-        .t-stat span { color: #fff; font-weight: bold; }
-        .t-stat small { color: #555; margin-left: 2px; font-size: 9px; }
-        .t-col-actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
-        .btn-icon-sm { background: #222; border: 1px solid #555; color: #ccc; width: 22px; height: 22px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 3px; }
-        .btn-icon-sm:hover { border-color: #ffcc00; color: #fff; }
-        .empty-tracker { text-align: center; padding: 30px; color: #666; font-style: italic; font-size: 12px; font-family: 'serif'; }
-
-        .monster-detail-card { width: 500px; max-width: 95vw; background: #0d0d10 url('https://www.transparenttextures.com/patterns/dark-matter.png'); border: 2px solid #b8860b; box-shadow: 0 0 50px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
-        .draggable-card { box-shadow: 0 10px 40px rgba(0,0,0,0.9); }
-        .md-header { background: linear-gradient(90deg, #15100a, #000); padding: 15px 20px; border-bottom: 1px solid #b8860b; cursor: grab; }
-        .md-header:active { cursor: grabbing; }
-        .md-title-row { display: flex; justify-content: space-between; align-items: center; }
-        .md-title-row h2 { margin: 0; font-family: 'Cinzel', serif; color: #ffcc00; font-size: 20px; letter-spacing: 2px; }
-        .md-stars { color: #ffd700; font-size: 14px; text-shadow: 0 0 5px #ffd700; }
-        .md-boss-mark { color: #f44; font-weight: bold; margin-left: 5px; font-size: 16px; }
-        .md-sub { font-size: 12px; color: #888; margin-top: 5px; font-style: italic; }
-        .md-body { display: flex; padding: 20px; gap: 20px; min-height: 250px; }
-        .md-img-col { width: 120px; flex-shrink: 0; }
-        .md-portrait { width: 120px; height: 120px; border: 2px solid #444; border-radius: 4px; background-size: cover; background-position: center; box-shadow: 0 0 15px #000; }
-        .md-info-col { flex: 1; overflow-y: auto; max-height: 400px; padding-right: 5px; }
-        .md-block { margin-bottom: 15px; }
-        .md-block label { display: block; color: #b8860b; font-size: 10px; font-weight: bold; border-bottom: 1px solid #333; margin-bottom: 5px; }
-        .md-block p { margin: 0; font-size: 13px; color: #ccc; line-height: 1.4; white-space: pre-wrap; }
-        .md-close-btn { width: 100%; padding: 15px; background: #111; color: #fff; border: none; border-top: 1px solid #b8860b; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .md-close-btn:hover { background: #b8860b; color: #000; }
-
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 999; width: 200px; }
-        .vtt-status-widget.waiting { border-color: #ffcc00; }
-        .vtt-status-widget.connected { border-color: #0f0; }
-        .status-indicator { width: 15px; height: 15px; border-radius: 50%; background: #fff; }
-        .waiting .status-indicator { background: #ffcc00; }
-        .connected .status-indicator { background: #0f0; }
-        .status-text h4 { margin: 0; font-size: 14px; color: #fff; }
-        .status-text small { font-size: 11px; color: #ccc; }
+        .mission-poster h4 { margin: 25px 0 5px 0; color: #00f2ff; font-size: 1.1rem; text-transform: uppercase; }
+        .mission-poster.applied h4 { color: #fbbf24; }
+        .poster-rank-label-fixed { position: absolute; top: 10px; right: 10px; font-weight: 900; font-size: 1.5rem; opacity: 0.3; color: #fff; }
+        .mestre-tag { font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 5px; }
+        .gil-recompensa { font-size: 0.9rem; color: #fcd34d; font-weight: bold; margin-bottom: 10px; }
         
-        .upcoming-sessions-banner { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(13, 13, 21, 0.95); border: 2px solid #ffcc00; padding: 30px 50px; border-radius: 8px; text-align: center; z-index: 80; min-width: 400px; }
-        .upcoming-sessions-banner h3 { color: #ffcc00; margin: 0 0 15px 0; font-size: 20px; letter-spacing: 2px; }
-        .countdown-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 10px; }
-        .sessao-nome-future { font-size: 16px; color: #fff; text-transform: uppercase; }
-        .countdown-text { color: #00f2ff; font-family: monospace; font-size: 24px; font-weight: bold; }
-
-        .active-sessions-banner { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, rgba(20, 0, 0, 0.95), rgba(0,0,0,0.95)); border: 2px solid #f44; padding: 30px 50px; border-radius: 12px; text-align: center; z-index: 80; min-width: 450px; animation: pulseBanner 2s infinite; }
-        @keyframes pulseBanner { 0% { box-shadow: 0 0 20px rgba(255,0,0,0.2); } 50% { box-shadow: 0 0 50px rgba(255,0,0,0.5); } 100% { box-shadow: 0 0 20px rgba(255,0,0,0.2); } }
-        .session-entry-row { display: flex; justify-content: space-between; align-items: center; gap: 30px; }
-        .sessao-nome-active { font-size: 18px; color: #fff; font-weight: bold; text-transform: uppercase; }
-        .btn-enter-session { background: #f00; color: #fff; border: none; padding: 12px 30px; cursor: pointer; font-weight: bold; font-size: 16px; border-radius: 4px; }
+        .vagas-container { background: #0f172a; padding: 8px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
+        .vagas-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #cbd5e1; margin-bottom: 4px; }
+        .vagas-track { height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
+        .vagas-fill { height: 100%; transition: width 0.3s ease; }
         
-        .ff-modal-overlay-flex { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; align-items: center; justify-content: center; }
-        .ff-modal-content { width: 600px; background: #0d0d15; border: 2px solid #ffcc00; padding: 25px; border-radius: 8px; }
-        .modal-header-row { display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; }
-        .modal-title-ff { color: #ffcc00; margin: 0; }
-        .btn-close-x { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; }
+        .candidature-badge { background: #fbbf24; color: #000; text-align: center; font-size: 0.7rem; font-weight: bold; padding: 4px; border-radius: 2px; margin-bottom: 10px; letter-spacing: 1px; }
         
-        .ff-modal-compact { width: 650px; background: #050505; border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; max-height: 80vh; display: flex; flex-direction: column; }
-        .modal-header-compact { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; align-items: center; }
-        .missions-grid-compact { overflow-y: auto; padding-right: 5px; display: grid; grid-template-columns: 1fr; gap: 10px; }
-        .mission-card-compact { display: flex; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 4px; padding: 10px; align-items: center; transition: 0.2s; }
-        .mission-card-compact:hover { border-color: #ffcc00; background: rgba(255,204,0,0.05); }
-        .mc-left { width: 50px; display: flex; justify-content: center; font-size: 24px; font-weight: bold; color: #444; }
-        .mc-center { flex: 1; padding: 0 15px; }
-        .mc-title { margin: 0; font-size: 16px; color: #fff; text-transform: uppercase; }
-        .mc-reward { font-size: 12px; color: #ffcc00; }
-        .mc-right { display: flex; gap: 10px; }
-        .btn-details-mini { background: transparent; border: 1px solid #00f2ff; color: #00f2ff; padding: 5px 10px; font-size: 10px; cursor: pointer; text-transform: uppercase; }
-        .btn-accept-mini { background: #00f2ff; color: #000; border: none; padding: 5px 15px; font-size: 10px; font-weight: bold; cursor: pointer; }
+        .poster-actions { display: flex; gap: 5px; justify-content: space-between; }
+        .btn-cyan { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.2s; font-weight: bold; text-transform: uppercase; }
+        .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); }
+        .btn-cyan-text { background: transparent; border: none; color: #00f2ff; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
+        .btn-cyan-text:hover { color: #fff; }
+        .btn-red { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .btn-red:hover { background: rgba(239, 68, 68, 0.1); }
+        .btn-gold-action { flex: 2; padding: 6px; font-size: 0.7rem; background: #fbbf24; border: 1px solid #fbbf24; color: #000; cursor: pointer; transition: 0.2s; font-weight: bold; text-transform: uppercase; }
+        .btn-gold-action:hover:not(:disabled) { background: #f59e0b; }
+        .btn-gold-action:disabled { background: #334155; border-color: #334155; color: #94a3b8; cursor: not-allowed; }
 
-        .ff-modal-details-wide { width: 800px; height: 500px; background: #000814; border: 2px solid #ffcc00; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 0 50px #000; border-radius: 6px; }
-        .detail-wide-header { height: 70px; background: linear-gradient(90deg, #111, #000); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
-        .dw-rank-badge { font-size: 36px; font-weight: bold; color: #333; text-shadow: -1px -1px 0 #ffcc00; }
-        .dw-title-box h2 { margin: 0; color: #fff; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
-        .dw-narrator { font-size: 11px; color: #00f2ff; text-transform: uppercase; }
-        .dw-vagas-box { flex: 1; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
-        .dw-vagas-label { font-size: 10px; color: #888; margin-bottom: 3px; }
-        .dw-vagas-bar { width: 120px; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
-        .dw-vagas-bar div { height: 100%; background: #0f0; transition: width 0.3s; }
-        .detail-wide-body { flex: 1; display: flex; overflow: hidden; }
-        .dw-col-left { width: 300px; background: rgba(255,255,255,0.02); border-right: 1px solid #333; padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
-        .dw-info-item label { display: block; font-size: 10px; color: #ffcc00; font-weight: bold; margin-bottom: 3px; }
-        .dw-info-item span { font-size: 13px; color: #fff; }
-        .dw-reward-box { background: rgba(255,204,0,0.05); padding: 15px; border: 1px solid rgba(255,204,0,0.1); border-radius: 4px; }
-        .dw-reward-box label { display: block; font-size: 10px; color: #ffcc00; font-weight: bold; border-bottom: 1px solid rgba(255,204,0,0.2); padding-bottom: 5px; margin-bottom: 8px; }
-        .dw-gil-row { display: flex; align-items: center; gap: 8px; font-size: 16px; color: #fff; font-weight: bold; }
-        .dw-extra-rewards { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
-        .reward-pill { font-size: 11px; color: #ccc; font-style: italic; }
-        .dw-candidates-box label { font-size: 10px; color: #666; font-weight: bold; display: block; margin-bottom: 8px; }
-        .dw-cand-list { display: flex; flex-direction: column; gap: 5px; }
-        .dw-cand-item { font-size: 12px; }
-        .btn-cartaz-full { width: 100%; background: #000; border: 1px solid #00f2ff; color: #00f2ff; padding: 10px; font-size: 11px; font-weight: bold; cursor: pointer; margin-top: auto; }
-        .btn-cartaz-full:hover { background: #00f2ff; color: #000; }
-        .dw-col-right { flex: 1; padding: 25px; overflow-y: auto; }
-        .dw-text-block { margin-bottom: 20px; }
-        .dw-text-block label { color: #ffcc00; font-size: 11px; font-weight: bold; border-bottom: 1px solid #333; display: block; padding-bottom: 5px; margin-bottom: 8px; }
-        .dw-text-block p { color: #ddd; font-size: 14px; line-height: 1.5; white-space: pre-wrap; margin: 0; }
-        .dw-close-btn { width: 100%; background: #111; border: none; border-top: 1px solid #333; color: #fff; padding: 12px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .dw-close-btn:hover { background: #222; color: #ffcc00; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
-        .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center; }
-        .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
-        .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
-        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 15px; background: transparent; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
-        .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
+        .sanchez-card { border-color: #00f2ff; }
+        .sanchez-header-top { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f2ff; background: rgba(0, 242, 255, 0.05); }
+        .sanchez-header-top h3 { color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); margin: 0; letter-spacing: 2px;}
+        .resenha-item-card { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 4px; border-left: 3px solid #00f2ff; }
+        .resenha-item-card h4 { margin: 0 0 10px 0; color: #e2e8f0; font-size: 1rem; }
 
+        /* MODAIS GERAIS */
+        .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .ff-card { background: #0f172a; border: 1px solid #fbbf24; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        
+        .btn-cancelar-main { background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-family: 'Cinzel', serif; }
+        .btn-cancelar-main:hover { border-color: #fff; color: #fff; }
+
+        /* --- FINAL FANTASY TACTICS MODAL STYLE --- */
         .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         
         .fft-dialog-box {
@@ -950,6 +737,7 @@ export default function JogadorVttPage() {
           width: 800px;
           max-width: 95vw;
           height: 450px;
+          max-height: 90vh;
           background: linear-gradient(180deg, #001a4d 0%, #000022 100%);
           border: 4px solid #b8860b;
           border-radius: 8px;
@@ -1055,30 +843,90 @@ export default function JogadorVttPage() {
           transform: scale(1.1);
         }
 
-        .levelup-global-overlay {
+        /* DETALHES MISSÃO (MODAL NOVO) */
+        .detail-view-main { width: 800px; max-width: 95vw; height: 600px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }
+        .detail-header-modern { background: linear-gradient(90deg, #1e293b, #0f172a); padding: 20px; border-bottom: 1px solid #334155; display: flex; gap: 20px; align-items: center; }
+        .detail-rank-badge { font-size: 3rem; font-weight: 900; color: rgba(255,255,255,0.1); text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+        .detail-rank-badge.rank-S, .detail-rank-badge.rank-SS { color: #fbbf24; opacity: 1; }
+        .detail-title-col h2 { margin: 0; font-size: 2rem; color: #f1f5f9; letter-spacing: 2px; }
+        .detail-narrator { color: #00f2ff; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        .detail-body-grid { flex: 1; overflow-y: auto; padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .detail-info-row { grid-column: 1 / -1; display: flex; gap: 40px; border-bottom: 1px solid #334155; padding-bottom: 20px; }
+        .info-item label { color: #fbbf24; font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 5px; }
+        .info-item span { color: #fff; font-size: 1.1rem; }
+        .detail-section { margin-bottom: 10px; }
+        .section-label { display: block; color: #94a3b8; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px; border-left: 3px solid #fbbf24; padding-left: 8px; }
+        .section-text { color: #cbd5e1; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; }
+        .reward-section { grid-column: 1 / -1; background: rgba(251, 191, 36, 0.05); padding: 15px; border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 6px; }
+        .reward-content-box { display: flex; justify-content: space-between; align-items: center; }
+        .gil-display-row { font-size: 1.5rem; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .gil-value { color: #fcd34d; }
+        .extra-rewards-list { text-align: right; color: #fbbf24; font-size: 0.9rem; font-style: italic; }
+        .ff-final-close-btn { width: 100%; padding: 20px; background: #020617; color: #fff; border: none; border-top: 1px solid #334155; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 2px; }
+        .ff-final-close-btn:hover { background: #fbbf24; color: #000; }
+
+        /* LIGHTBOX */
+        .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
+        .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #00f2ff; box-shadow: 0 0 50px #000; }
+        .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
+
+        /* --- TELA DE LEVEL UP ESTILO FINAL FANTASY TACTICS --- */
+        .level-up-fullscreen-modal {
             position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.8);
-            z-index: 200000;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.9);
+            z-index: 999999;
             display: flex;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(10px);
+            animation: fadeInLevelUp 1s ease-out forwards;
         }
 
-        .levelup-content {
+        @keyframes fadeInLevelUp {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .levelup-content-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 50px;
+            background: linear-gradient(135deg, rgba(20, 30, 60, 0.9), rgba(0, 0, 0, 0.95));
+            border: 2px solid #b8860b;
+            padding: 50px;
+            border-radius: 12px;
+            box-shadow: 0 0 50px rgba(255, 204, 0, 0.2), inset 0 0 100px rgba(0, 0, 0, 0.8);
+            animation: zoomIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .levelup-portrait {
+            width: 250px;
+            height: 350px;
+            background-size: cover;
+            background-position: center;
+            border: 4px solid #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 30px #00f2ff;
+        }
+
+        .levelup-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
-            animation: zoomIn 0.5s ease-out;
+            color: #fff;
+            font-family: 'Cinzel', serif;
         }
 
-        .levelup-title {
-            font-family: 'Cinzel', serif;
-            font-size: 80px;
-            font-weight: bold;
+        .levelup-title-anim {
+            font-size: 60px;
             color: #ffcc00;
-            text-transform: uppercase;
+            margin: 0 0 10px 0;
             letter-spacing: 10px;
-            margin: 0 0 30px 0;
             text-shadow: 
                 3px 3px 0 #000,
                 -1px -1px 0 #000,  
@@ -1088,6 +936,47 @@ export default function JogadorVttPage() {
                 0 0 20px #ffcc00,
                 0 0 40px #ffcc00;
             animation: pulseText 1.5s infinite alternate;
+        }
+
+        .levelup-char-name {
+            font-size: 30px;
+            color: #00f2ff;
+            margin: 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .levelup-class-info {
+            font-size: 16px;
+            color: #aaa;
+            margin: 5px 0 30px 0;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            width: 100%;
+        }
+
+        .levelup-stats-box {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #444;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .levelup-stats-box p {
+            margin: 0 0 15px 0;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .lvl-badge-big {
+            font-size: 40px;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 0 0 15px #00f2ff;
         }
 
         .levelup-confirm-btn {
@@ -1112,15 +1001,32 @@ export default function JogadorVttPage() {
         }
 
         @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes pulseText { from { text-shadow: 0 0 20px #ffcc00; } to { text-shadow: 0 0 40px #ffcc00, 0 0 10px #fff; } }
-        
-        .guild-btn-float {
-            top: auto !important;
-            left: auto !important;
-            transform: none !important;
-            bottom: 30px !important;
-            right: 110px !important; 
-            z-index: 2000 !important;
+
+        /* --- RESPONSIVIDADE MOBILE --- */
+        @media (max-width: 850px) {
+            .detail-body-grid { grid-template-columns: 1fr; gap: 15px; padding: 15px; }
+            .detail-info-row { flex-direction: column; gap: 10px; }
+            .detail-header-modern { flex-direction: column; text-align: center; gap: 10px; padding: 15px; }
+            .reward-content-box { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .extra-rewards-list { text-align: left; }
+            
+            /* Ajustes gerais do painel do jogador para mobile */
+            .player-dashboard-grid { grid-template-columns: 1fr; }
+            .top-bar-flex { flex-direction: column; gap: 15px; text-align: center; }
+            .char-identity-box { width: 100%; justify-content: center; }
+            .card-header { flex-direction: column; gap: 10px; text-align: center; }
+            .btn-group-ff { flex-direction: column; }
+            
+            .fft-dialog-box { flex-direction: column; height: auto; max-height: 90vh; align-items: center; padding: 20px; }
+            .fft-portrait-section { width: 100px; }
+            .fft-portrait-frame { width: 100px; height: 130px; }
+            .fft-title { font-size: 1.4rem; text-align: center; }
+            
+            .levelup-content-wrapper { flex-direction: column; padding: 20px; text-align: center; gap: 20px; }
+            .levelup-portrait { width: 150px; height: 200px; }
+            .levelup-title-anim { font-size: 40px; }
+            .levelup-char-name { font-size: 24px; }
+            .lvl-badge-big { font-size: 30px; }
         }
       `}</style>
     </div>
