@@ -1122,6 +1122,35 @@ export default function JogadorVttPage() {
             right: 110px !important; 
             z-index: 2000 !important;
         }
+
+        /* --- RESPONSIVIDADE ADICIONADA --- */
+        @media (max-width: 850px) {
+            /* Ajustes do Dashboard Principal */
+            .player-dashboard-grid { grid-template-columns: 1fr; }
+            .top-bar-flex { flex-direction: column; gap: 15px; text-align: center; }
+            .char-identity-box { width: 100%; justify-content: center; }
+            
+            /* Ajustes Modais de Missão (Compacto e Detalhes) */
+            .ff-modal-compact { width: 95vw; max-height: 90vh; padding: 15px; }
+            .missions-grid-compact { grid-template-columns: 1fr; }
+            .mc-right { flex-direction: column; gap: 5px; align-items: stretch; }
+            
+            .ff-modal-details-wide { width: 95vw; height: auto; max-height: 90vh; }
+            .detail-wide-header { flex-direction: column; height: auto; padding: 15px; text-align: center; gap: 10px; }
+            .dw-vagas-box { align-items: center; width: 100%; }
+            .detail-wide-body { flex-direction: column; overflow-y: auto; }
+            .dw-col-left { width: 100%; border-right: none; border-bottom: 1px solid #333; overflow-y: visible; }
+            .dw-col-right { width: 100%; padding: 15px; overflow-y: visible; }
+            
+            /* Ajuste Modal Arena */
+            .detail-wide-body > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+            
+            /* Ajustes Modal Sanchez (FFT) */
+            .fft-dialog-box { flex-direction: column; height: auto; max-height: 90vh; align-items: center; padding: 20px; }
+            .fft-portrait-section { width: 100px; }
+            .fft-portrait-frame { width: 100px; height: 130px; }
+            .fft-title { font-size: 1.4rem; text-align: center; }
+        }
       `}</style>
     </div>
   );
