@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { doc, collection, query, where, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, collection, query, where, onSnapshot, updateDoc, arrayUnion, arrayRemove, addDoc, orderBy, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom';
 import fundoJogador from '../assets/fundo-jogador.jpg';
@@ -246,6 +246,23 @@ export default function JogadorVttPage() {
   const prevLevelRef = useRef(null); 
   const audioRef = useRef(new Audio(levelUpMusic)); 
   
+  // --- ESTADOS DO CHAT DE EQUIPE (PVP) ---
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInputText, setChatInputText] = useState("");
+  const [unreadChatMessages, setUnreadChatMessages] = useState(0);
+  const [lastOpenedChat, setLastOpenedChat] = useState(Date.now());
+  const chatEndRef = useRef(null);
+
+  const [chatPos, setChatPos] = useState({ x: 300, y: 150 });
+  const [isDraggingChat, setIsDraggingChat] = useState(false);
+  const [dragOffsetChat, setDragOffsetChat] = useState({ x: 0, y: 0 });
+
+  const handleChatMouseDown = (e) => {
+      setIsDraggingChat(true);
+      setDragOffsetChat({ x: e.clientX - chatPos.x, y: e.clientY - chatPos.y });
+  };
+
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
@@ -410,8 +427,72 @@ export default function JogadorVttPage() {
   const handleWindowMouseMove = (e) => {
       if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
       if (isDraggingDetails) { setDetailsPos({ x: e.clientX - dragOffsetDetails.x, y: e.clientY - dragOffsetDetails.y }); }
+      if (isDraggingChat) { setChatPos({ x: e.clientX - dragOffsetChat.x, y: e.clientY - dragOffsetChat.y }); }
   };
-  const handleWindowMouseUp = () => { setIsDraggingTracker(false); setIsDraggingDetails(false); };
+  const handleWindowMouseUp = () => { 
+      setIsDraggingTracker(false); 
+      setIsDraggingDetails(false); 
+      setIsDraggingChat(false);
+  };
+
+  // --- LOGICA E LISTENERS DO CHAT DE EQUIPE (PVP) ---
+  const myTeam = currentVttSession?.pvp_mode && currentVttSession?.equipes?.find(eq => eq.membros.includes(personagem?.name));
+  const showTeamChat = vttStatus === 'connected' && currentVttSession?.pvp_mode && myTeam;
+
+  useEffect(() => {
+    if (!showTeamChat || !myTeam) {
+      setChatMessages([]);
+      setUnreadChatMessages(0);
+      return;
+    }
+
+    const messagesQuery = query(
+      collection(db, "sessoes", currentVttSession.id, "team_chats", myTeam.id.toString(), "messages"),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setChatMessages(msgs);
+
+      if (!chatOpen) {
+        const newMsgs = msgs.filter(m => {
+          const mTime = m.createdAt ? m.createdAt.toDate().getTime() : Date.now();
+          return mTime > lastOpenedChat;
+        });
+        setUnreadChatMessages(newMsgs.length);
+      } else {
+        setUnreadChatMessages(0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [showTeamChat, myTeam?.id, chatOpen, lastOpenedChat, currentVttSession?.id]);
+
+  useEffect(() => {
+    if (chatOpen && chatEndRef.current) {
+        chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, chatOpen]);
+
+  const handleSendChatMessage = async (e) => {
+      if (e) e.preventDefault();
+      if (!chatInputText.trim() || !showTeamChat || !myTeam) return;
+
+      const text = chatInputText;
+      setChatInputText("");
+
+      try {
+          await addDoc(collection(db, "sessoes", currentVttSession.id, "team_chats", myTeam.id.toString(), "messages"), {
+              senderName: personagem.name,
+              senderUid: auth.currentUser.uid,
+              content: text,
+              createdAt: serverTimestamp()
+          });
+      } catch (err) {
+          console.error("Erro ao enviar mensagem:", err);
+      }
+  };
 
   // --- HELPER: BUSCAR COR DO TIME NO MODO PVP ---
   const getTeamColor = (tokenName) => {
@@ -487,7 +568,23 @@ export default function JogadorVttPage() {
                         const isBaseVisible = token.visible !== false;
                         const isOwner = token.uid === auth.currentUser.uid;
                         const isPvP = currentVttSession.pvp_mode;
-                        const isStealthHidden = isPvP && token.stealth && !isOwner;
+                        
+                        let isStealthHidden = false;
+                        let isMyStealth = false;
+
+                        if (token.stealth) {
+                            if (isPvP) {
+                                const myTeam = currentVttSession.equipes?.find(eq => eq.membros.includes(personagem?.name));
+                                const isTeammate = myTeam && myTeam.membros.includes(token.name);
+                                if (isOwner || isTeammate) {
+                                    isMyStealth = true;
+                                } else {
+                                    isStealthHidden = true;
+                                }
+                            } else {
+                                isMyStealth = true;
+                            }
+                        }
 
                         if(!isBaseVisible || isStealthHidden) return null; 
 
@@ -524,7 +621,7 @@ export default function JogadorVttPage() {
                         return (
                             <div 
                                 key={token.id} 
-                                className={`tracker-item readonly ${isPvP && token.stealth && isOwner ? 'tracker-stealth-self' : ''}`}
+                                className={`tracker-item readonly ${isMyStealth ? 'tracker-stealth-self' : ''}`}
                                 style={customBorder}
                             >
                                 <div className="t-col-img">
@@ -641,6 +738,27 @@ export default function JogadorVttPage() {
         <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
         
         <button className="floating-arena-btn" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
+
+        {showTeamChat && (
+            <button 
+                className="floating-team-chat-btn" 
+                onClick={() => {
+                    setChatOpen(!chatOpen);
+                    if (!chatOpen) {
+                        setLastOpenedChat(Date.now());
+                        setUnreadChatMessages(0);
+                    }
+                }} 
+                title="Chat de Equipe"
+                style={{
+                    border: `2px solid ${myTeam.cor || '#22c55e'}`,
+                    boxShadow: chatOpen ? `0 0 15px ${myTeam.cor || '#22c55e'}` : 'none'
+                }}
+            >
+                💬
+                {unreadChatMessages > 0 && <span className="notification-badge">{unreadChatMessages}</span>}
+            </button>
+        )}
 
         <Bazar isMestre={false} playerData={personagem} />
         
@@ -768,6 +886,90 @@ export default function JogadorVttPage() {
         )}
         
         {showFicha && personagem && <Ficha characterData={personagem} isMaster={false} onClose={() => setShowFicha(false)} />}
+
+        {showTeamChat && chatOpen && (
+            <div 
+                className="team-chat-panel fade-in"
+                style={{ 
+                    top: chatPos.y, 
+                    left: chatPos.x, 
+                    zIndex: 2100,
+                    '--team-color': myTeam.cor || '#a855f7',
+                    '--team-color-alpha': `${myTeam.cor || '#a855f7'}66`,
+                    '--team-color-faded': `${myTeam.cor || '#a855f7'}22`
+                }}
+            >
+                <div 
+                    className="chat-header"
+                    onMouseDown={handleChatMouseDown}
+                    style={{ cursor: 'grab' }}
+                >
+                    <h3>💬 CHAT: {myTeam.nome}</h3>
+                    <div className="chat-header-actions">
+                        <button 
+                            type="button" 
+                            onClick={() => {
+                                setChatOpen(false);
+                                setLastOpenedChat(Date.now());
+                                setUnreadChatMessages(0);
+                            }}
+                            title="Minimizar"
+                        >
+                            ➖
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="chat-messages-container custom-scrollbar">
+                    {chatMessages.map((msg) => {
+                        const isMe = msg.senderUid === auth.currentUser?.uid;
+                        const senderChar = allPersonagens.find(p => p.name === msg.senderName);
+                        const avatarUrl = senderChar?.character_sheet?.imgUrl || '';
+
+                        let timeStr = "";
+                        if (msg.createdAt) {
+                            const date = msg.createdAt.toDate();
+                            timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        } else {
+                            timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        }
+
+                        return (
+                            <div key={msg.id} className={`chat-message-bubble ${isMe ? 'me' : 'other'}`}>
+                                {avatarUrl ? (
+                                    <div 
+                                        className="chat-avatar-mini" 
+                                        style={{ backgroundImage: `url(${avatarUrl})` }}
+                                        title={msg.senderName}
+                                    />
+                                ) : (
+                                    <div className="chat-avatar-mini-default" title={msg.senderName}>
+                                        {msg.senderName ? msg.senderName.substring(0, 2).toUpperCase() : '?'}
+                                    </div>
+                                )}
+                                <div className="chat-bubble-content">
+                                    {!isMe && <span className="chat-sender-name">{msg.senderName}</span>}
+                                    <span className="chat-message-text">{msg.content}</span>
+                                    <span className="chat-message-time">{timeStr}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <div ref={chatEndRef} />
+                </div>
+                
+                <form className="chat-input-area" onSubmit={handleSendChatMessage}>
+                    <input 
+                        type="text" 
+                        className="chat-input-field" 
+                        placeholder="Mensagem para equipe..." 
+                        value={chatInputText}
+                        onChange={(e) => setChatInputText(e.target.value)}
+                    />
+                    <button type="submit" className="chat-send-btn">➤</button>
+                </form>
+            </div>
+        )}
 
       </div>
       <style>{`
@@ -1151,6 +1353,209 @@ export default function JogadorVttPage() {
             .fft-portrait-section { width: 100px; }
             .fft-portrait-frame { width: 100px; height: 130px; }
             .fft-title { font-size: 1.4rem; text-align: center; }
+        }
+
+        /* --- TEAM CHAT STYLES --- */
+        .floating-team-chat-btn { 
+            position: fixed; 
+            bottom: 450px; 
+            left: 15px; 
+            width: 50px; 
+            height: 50px; 
+            border-radius: 50%; 
+            background: #000; 
+            color: #fff; 
+            font-size: 20px; 
+            cursor: pointer; 
+            z-index: 2000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: 0.3s; 
+        }
+        .floating-team-chat-btn:hover { 
+            transform: scale(1.1); 
+        }
+
+        .team-chat-panel {
+            position: absolute;
+            width: 320px;
+            height: 420px;
+            background: rgba(10, 10, 12, 0.95);
+            border: 2px solid var(--team-color, #a855f7);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: rgba(20, 20, 25, 0.9);
+            border-bottom: 2px solid var(--team-color, #a855f7);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h3 {
+            margin: 0;
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            letter-spacing: 1px;
+            color: var(--team-color, #fff);
+            text-shadow: 0 0 8px var(--team-color-alpha, rgba(168, 85, 247, 0.4));
+        }
+
+        .chat-header-actions button {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            opacity: 0.7;
+            transition: 0.2s;
+            margin-left: 10px;
+        }
+
+        .chat-header-actions button:hover {
+            opacity: 1;
+        }
+
+        .chat-messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-message-bubble {
+            display: flex;
+            gap: 8px;
+            max-width: 85%;
+        }
+
+        .chat-message-bubble.me {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .chat-message-bubble.other {
+            align-self: flex-start;
+        }
+
+        .chat-avatar-mini {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid #555;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+
+        .chat-avatar-mini-default {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #444;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            border: 1px solid #555;
+            flex-shrink: 0;
+        }
+
+        .chat-bubble-content {
+            background: rgba(30, 30, 35, 0.95);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 6px 10px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .chat-message-bubble.me .chat-bubble-content {
+            background: var(--team-color-faded, rgba(168, 85, 247, 0.2));
+            border-color: var(--team-color, #a855f7);
+        }
+
+        .chat-sender-name {
+            font-size: 9px;
+            font-weight: bold;
+            color: #ffcc00;
+            margin-bottom: 2px;
+        }
+
+        .chat-message-text {
+            font-size: 12px;
+            color: #e2e8f0;
+            line-height: 1.4;
+            word-break: break-word;
+            font-family: sans-serif;
+        }
+
+        .chat-message-time {
+            font-size: 8px;
+            color: #888;
+            align-self: flex-end;
+            margin-top: 3px;
+        }
+
+        .chat-input-area {
+            padding: 10px;
+            background: #0d0d10;
+            border-top: 1px solid #222;
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input-field {
+            flex: 1;
+            background: #181820;
+            border: 1px solid #444;
+            border-radius: 20px;
+            padding: 6px 14px;
+            color: #fff;
+            font-size: 12px;
+            outline: none;
+            font-family: sans-serif;
+            transition: 0.2s;
+        }
+
+        .chat-input-field:focus {
+            border-color: var(--team-color, #a855f7);
+            box-shadow: 0 0 5px var(--team-color-alpha, rgba(168, 85, 247, 0.3));
+        }
+
+        .chat-send-btn {
+            background: var(--team-color, #a855f7);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        .chat-send-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 8px var(--team-color, #a855f7);
         }
       `}</style>
     </div>

@@ -55,7 +55,7 @@ const PingMarker = ({ ping, gridSizePx }) => {
 };
 
 // --- COMPONENTE INTERNO DO TOKEN ---
-const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighlighted, currentUserUid, isPvPMode, teamColor }) => {
+const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighlighted, currentUserUid, isPvPMode, teamColor, equipes, personagensData }) => {
     const [flash, setFlash] = useState('');
     const prevHp = useRef(token.stats?.hp?.current);
 
@@ -95,11 +95,22 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
     let isStealthHidden = false;
     let isMyStealth = false;
 
-    if (isPvPMode && token.stealth) {
-        if (isMaster || isOwner) {
-            isMyStealth = true; // Mestre ou Dono veem com filtro visual de furtividade
+    if (token.stealth) {
+        if (isPvPMode) {
+            // PvP ativo: visibilidade apenas para mestre, dono e mesmo time
+            const clientChar = personagensData?.find(p => p.uid === currentUserUid);
+            const clientCharName = clientChar ? clientChar.name : '';
+            const clientTeam = equipes?.find(eq => eq.membros.includes(clientCharName));
+            const isTeammate = clientTeam && clientTeam.membros.includes(token.name);
+
+            if (isMaster || isOwner || isTeammate) {
+                isMyStealth = true; // Mestre, dono ou aliado veem translúcido
+            } else {
+                isStealthHidden = true; // Inimigos não veem nada
+            }
         } else {
-            isStealthHidden = true; // Demais jogadores não veem nada
+            // PvP inativo: todos veem translúcido
+            isMyStealth = true;
         }
     }
 
@@ -532,6 +543,40 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       return null;
   };
 
+  const isPvP = sessaoData?.pvp_mode && sessaoData?.equipes && sessaoData?.equipes.length > 0;
+  
+  // Acha o nome do personagem do jogador atual (cliente)
+  let currentPlayerCharName = "";
+  if (!isMaster) {
+      const char = personagensData?.find(p => p.uid === currentUserUid);
+      if (char) currentPlayerCharName = char.name;
+  }
+
+  // Acha a equipe do jogador atual
+  const currentPlayerTeam = isPvP && !isMaster 
+      ? sessaoData.equipes?.find(eq => eq.membros.includes(currentPlayerCharName))
+      : null;
+
+  const visiblePings = pings.filter(ping => {
+      // Mestre vê tudo
+      if (isMaster) return true;
+      // Se o PvP estiver desligado ou não houver equipes, todos veem todos os pings
+      if (!isPvP) return true;
+      // Se for ping do Mestre, todos veem
+      if (ping.isMaster) return true;
+      
+      // Acha a equipe do dono do ping
+      const pingSenderTeam = sessaoData.equipes?.find(eq => eq.membros.includes(ping.userName));
+      
+      // Se o dono estiver em uma equipe, só exibe para o jogador atual se ele for do mesmo time
+      if (pingSenderTeam) {
+          return currentPlayerTeam && currentPlayerTeam.id === pingSenderTeam.id;
+      }
+      
+      // Pings de usuários sem equipe (se existirem) são visíveis
+      return true;
+  });
+
   if (!activeMap && !isMaster && !showManager) return null;
 
   return (
@@ -659,6 +704,8 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                                         currentUserUid={currentUserUid}
                                                         isPvPMode={sessaoData.pvp_mode}
                                                         teamColor={getTeamColor(t.name)}
+                                                        equipes={sessaoData.equipes}
+                                                        personagensData={personagensData}
                                                     />
                                                 )
                                             ))}
@@ -677,7 +724,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                         </div>
                                         
                                         <div className="pings-layer">
-                                            {pings.map(p => (
+                                            {visiblePings.map(p => (
                                                 <PingMarker key={p.id} ping={p} gridSizePx={gridSizePx} />
                                             ))}
                                         </div>
