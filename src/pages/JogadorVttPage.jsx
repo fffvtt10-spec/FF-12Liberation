@@ -318,8 +318,9 @@ export default function JogadorVttPage() {
                 setCurrentVttSession(sessionUpdated);
                 if (sessionUpdated.latest_roll) {
                       const roll = sessionUpdated.latest_roll;
-                      if (roll.timestamp > dismissedRollTimestamp.current) {
-                        setRollResult(prev => { if (!prev || prev.timestamp !== roll.timestamp) return roll; return prev; });
+                      const rollId = roll.id || roll.timestamp;
+                      if (rollId !== dismissedRollTimestamp.current) {
+                        setRollResult(prev => { if (!prev || (prev.id || prev.timestamp) !== rollId) return roll; return prev; });
                       }
                 }
                 const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
@@ -463,7 +464,7 @@ export default function JogadorVttPage() {
 
         <SceneryViewer sessaoData={currentVttSession} isMaster={false} />
         <NPCViewer sessaoData={currentVttSession} isMaster={false} />
-        {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
+        {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
         {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP E CORES DO TIME --- */}

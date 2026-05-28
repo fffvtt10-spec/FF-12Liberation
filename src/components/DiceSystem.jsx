@@ -61,6 +61,7 @@ export const DiceSelector = ({ sessaoId, playerName, onClose }) => {
 
     // 4. Objeto da Rolagem
     const rollPayload = {
+        id: `roll_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
         playerName: playerName,
         rolls: details,
         modifier: modValue,

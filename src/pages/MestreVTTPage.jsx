@@ -165,8 +165,9 @@ export default function MestreVTTPage() {
                 setConnectedPlayers(ativa.connected_players || []); 
                 if (ativa.latest_roll) {
                      const roll = ativa.latest_roll;
-                     if (roll.timestamp > dismissedRollTimestamp.current) {
-                        setRollResult(prev => { if (!prev || prev.timestamp !== roll.timestamp) return roll; return prev; });
+                     const rollId = roll.id || roll.timestamp;
+                     if (rollId !== dismissedRollTimestamp.current) {
+                        setRollResult(prev => { if (!prev || (prev.id || prev.timestamp) !== rollId) return roll; return prev; });
                      }
                 }
               }
@@ -430,7 +431,7 @@ export default function MestreVTTPage() {
       
       <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} />
       <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showNPCManager} onCloseManager={() => setShowNPCManager(false)} />
-      {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.timestamp; setRollResult(null); }} />}
+      {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
       {showDiceSelector && <DiceSelector sessaoId={sessaoAtiva.id} playerName="MESTRE" onClose={() => setShowDiceSelector(false)} />}
 
       {/* --- COMBAT TRACKER --- */}
