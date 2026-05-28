@@ -342,6 +342,14 @@ export default function JogadorVttPage() {
                 }
                 const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
                 setVttStatus(playerInList ? 'connected' : 'waiting');
+            } else {
+                setCurrentVttSession(null);
+                setHasJoinedSession(false);
+                setVttStatus(null);
+                setChatOpen(false);
+                setChatMessages([]);
+                setUnreadChatMessages(0);
+                alert("A sessão de jogo foi encerrada.");
             }
         }
       });

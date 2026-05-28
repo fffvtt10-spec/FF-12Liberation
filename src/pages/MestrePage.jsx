@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove, updateDoc } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove, updateDoc, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom'; 
 import { backgroundMusic } from './LandingPage'; 
@@ -585,6 +585,26 @@ export default function MestrePage() {
       navigate('/mestre-vtt');
   };
 
+  const handleDeleteSession = async (sessao) => {
+      if (!window.confirm(`Tem certeza que deseja cancelar a sessão "${sessao.missaoNome}"?`)) return;
+      
+      try {
+          // Se for uma arena PvP com equipes, tenta limpar a subcoleção de chats de cada equipe no Firestore
+          if (sessao.equipes) {
+              for (let eq of sessao.equipes) {
+                  const msgsRef = collection(db, "sessoes", sessao.id, "team_chats", eq.id.toString(), "messages");
+                  const msgsSnap = await getDocs(msgsRef);
+                  const deletePromises = msgsSnap.docs.map(docSnap => deleteDoc(docSnap.ref));
+                  await Promise.all(deletePromises);
+              }
+          }
+          // Exclui o documento principal da sessão
+          await deleteDoc(doc(db, "sessoes", sessao.id));
+      } catch (err) {
+          console.error("Erro ao deletar sessão e chats:", err);
+      }
+  };
+
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -734,7 +754,7 @@ export default function MestrePage() {
                                    <button className="btn-cyan" onClick={() => setViewMembers(s)}>👥 MEMBROS</button>
                                )}
                                <button className="btn-play-vtt" onClick={() => enterVTT(s)}>▶ ACESSAR VTT</button>
-                               <button className="btn-red" onClick={() => deleteDoc(doc(db, "sessoes", s.id))}>CANCELAR</button>
+                               <button className="btn-red" onClick={() => handleDeleteSession(s)}>CANCELAR</button>
                            </div>
                        </div>
                    ))
