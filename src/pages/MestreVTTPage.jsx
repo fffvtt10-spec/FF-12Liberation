@@ -692,7 +692,7 @@ export default function MestreVTTPage() {
                       )}
                       {viewMonsterDetails.tips && (
                           <div className="md-block tips">
-                              <label>DICAS DO SANCHEZ (GM)</label>
+                              <label>DICAS DO SANCHES (GM)</label>
                               <p>{viewMonsterDetails.tips}</p>
                           </div>
                       )}
@@ -774,7 +774,7 @@ export default function MestreVTTPage() {
                               {bestiaryTab === 'monsters' && (
                                   <>
                                       <textarea style={{height:'60px'}} placeholder="Drops (Use Enter para tópicos)" value={monsterForm.drops} onChange={(e) => setMonsterForm({...monsterForm, drops: e.target.value})} />
-                                      <textarea style={{height:'60px'}} placeholder="Dicas do Sanchez (Secreto)" value={monsterForm.tips} onChange={e => setMonsterForm({...monsterForm, tips: e.target.value})} />
+                                      <textarea style={{height:'60px'}} placeholder="Dicas do Sanches (Secreto)" value={monsterForm.tips} onChange={e => setMonsterForm({...monsterForm, tips: e.target.value})} />
                                   </>
                               )}
                           </div>

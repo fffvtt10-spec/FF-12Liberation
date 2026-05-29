@@ -194,7 +194,7 @@ const BookIcon = () => (
   </svg>
 );
 
-const formatSanchezText = (text) => {
+const formatSanchesText = (text) => {
     if (!text) return { __html: "" };
     let formatted = text
       .replace(/\*(.*?)\*/g, '<strong>$1</strong>') 
@@ -376,7 +376,7 @@ export default function JogadorVttPage() {
       const unsubResenhas = onSnapshot(qResenhas, (snap) => {
         const validas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => new Date(r.expiraEm) > new Date());
         setResenhas(validas);
-        const lastSeen = parseInt(localStorage.getItem('sanchez_last_read_count') || '0');
+        const lastSeen = parseInt(localStorage.getItem('sanches_last_read_count') || '0');
         if (validas.length > lastSeen) setUnreadResenhas(validas.length - lastSeen); else setUnreadResenhas(0);
       });
       return () => { unsubSessoes(); unsubResenhas(); };
@@ -437,7 +437,7 @@ export default function JogadorVttPage() {
   };
 
   const enterVTT = (sessao) => { setCurrentVttSession(sessao); setHasJoinedSession(true); setVttStatus(new Date() >= new Date(sessao.dataInicio) ? 'connected' : 'waiting'); };
-  const handleOpenSanchez = () => { setShowResenhasList(true); localStorage.setItem('sanchez_last_read_count', resenhas.length.toString()); setUnreadResenhas(0); };
+  const handleOpenSanches = () => { setShowResenhasList(true); localStorage.setItem('sanches_last_read_count', resenhas.length.toString()); setUnreadResenhas(0); };
   
   const handleOpenBook = () => {
     window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
@@ -761,7 +761,7 @@ export default function JogadorVttPage() {
         
         {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
         {vttStatus === 'connected' && <button className="floating-dice-btn" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
-        {resenhas.length > 0 && <button className="floating-sanchez-btn" onClick={handleOpenSanchez} title="Resenhas"><div className="sanchez-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
+        {resenhas.length > 0 && <button className="floating-sanches-btn" onClick={handleOpenSanches} title="Resenhas"><div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
         <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
         
         <button className="floating-arena-btn" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
@@ -895,16 +895,16 @@ export default function JogadorVttPage() {
             <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
                 <div className="fft-portrait-section">
                     <div className="fft-portrait-frame">
-                    <img src={sanchezImg} alt="Sanchez" />
+                    <img src={sanchezImg} alt="Sanches" />
                     </div>
                     <div className="fft-name-plate">
-                    SANCHEZ
+                    SANCHES
                     </div>
                 </div>
 
                 <div className="fft-content-section">
                     <h2 className="fft-title">{viewResenha.titulo}</h2>
-                    <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
+                    <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchesText(viewResenha.conteudo)}></div>
                 </div>
 
                 <button className="fft-close-btn" onClick={() => setViewResenha(null)}>X</button>
@@ -1019,8 +1019,8 @@ export default function JogadorVttPage() {
         .floating-combat-btn { position: fixed; bottom: 150px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #f44; background: #111; color: #f44; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-combat-btn:hover { border-color: #fff; color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #f44; }
 
-        .floating-sanchez-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-sanchez-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
+        .floating-sanches-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-sanches-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
 
         .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-book-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
@@ -1031,8 +1031,8 @@ export default function JogadorVttPage() {
         .floating-arena-btn { position: fixed; bottom: 390px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 20px; }
         .floating-arena-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
 
-        .sanchez-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
-        .floating-sanchez-btn:hover .sanchez-icon-face { opacity: 1; }
+        .sanches-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
+        .floating-sanches-btn:hover .sanches-icon-face { opacity: 1; }
         .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
         
         .combat-tracker-panel { 
@@ -1375,7 +1375,7 @@ export default function JogadorVttPage() {
             /* Ajuste Modal Arena */
             .detail-wide-body > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
             
-            /* Ajustes Modal Sanchez (FFT) */
+            /* Ajustes Modal Sanches (FFT) */
             .fft-dialog-box { flex-direction: column; height: auto; max-height: 90vh; align-items: center; padding: 20px; }
             .fft-portrait-section { width: 100px; }
             .fft-portrait-frame { width: 100px; height: 130px; }
@@ -1592,8 +1592,8 @@ export default function JogadorVttPage() {
         onChange={setWallpaper}
         storageKey="jogador_wallpaper"
         side="right"
-        bottom={22}
-        sideOffset={22}
+        bottom={30}
+        sideOffset={170}
       />
     </div>
   );
