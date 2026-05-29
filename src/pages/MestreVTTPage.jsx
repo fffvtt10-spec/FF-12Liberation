@@ -4,7 +4,13 @@ import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom';
 import fundoMestre from '../assets/fundo-mestre.jpg';
+import fundoJogador from '../assets/fundo-jogador.jpg';
+import fundoJogador1 from '../assets/fundo-jogador1.jpeg';
+import fundoJogador2 from '../assets/fundo-jogador2.jpeg';
+import fundoJogador3 from '../assets/fundo-jogador3.jpeg';
+import fundoJogador4 from '../assets/fundo-jogador4.jpeg';
 import chocoboGif from '../assets/chocobo-loading.gif';
+import WallpaperPicker from '../components/WallpaperPicker';
 import Ficha from '../components/Ficha';
 import Bazar from '../components/Bazar';
 import Forja from '../components/Forja';
@@ -86,9 +92,24 @@ const IconBook = () => (
   </svg>
 );
 
+const MESTRE_WALLPAPERS = [
+  { label: 'Padrão',      src: fundoMestre   },
+  { label: 'Wallpaper 2', src: fundoJogador  },
+  { label: 'Wallpaper 3', src: fundoJogador1 },
+  { label: 'Wallpaper 4', src: fundoJogador2 },
+  { label: 'Wallpaper 5', src: fundoJogador3 },
+  { label: 'Wallpaper 6', src: fundoJogador4 },
+];
+
 export default function MestreVTTPage() {
   const navigate = useNavigate();
   
+  // Wallpaper state
+  const [wallpaper, setWallpaper] = useState(() => {
+    const saved = localStorage.getItem('mestre_wallpaper');
+    return saved || fundoMestre;
+  });
+
   // Estados Principais
   const [sessaoAtiva, setSessaoAtiva] = useState(null);
   const [loading, setLoading] = useState(true); 
@@ -386,7 +407,7 @@ export default function MestreVTTPage() {
 
   return (
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
-      <div className="mestre-bg-layer" style={{ backgroundImage: `url(${fundoMestre})` }} />
+      <div className="mestre-bg-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
       
       {/* SIDEBAR */}
       <div className="dm-players-sidebar">
@@ -984,6 +1005,16 @@ export default function MestreVTTPage() {
 
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
       `}</style>
+
+      <WallpaperPicker
+        wallpapers={MESTRE_WALLPAPERS}
+        current={wallpaper}
+        onChange={setWallpaper}
+        storageKey="mestre_wallpaper"
+        side="left"
+        bottom={22}
+        sideOffset={22}
+      />
     </div>
   );
 }

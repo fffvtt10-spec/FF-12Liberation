@@ -4,6 +4,11 @@ import { doc, collection, query, where, onSnapshot, updateDoc, arrayUnion, array
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom';
 import fundoJogador from '../assets/fundo-jogador.jpg';
+import fundoJogador1 from '../assets/fundo-jogador1.jpeg';
+import fundoJogador2 from '../assets/fundo-jogador2.jpeg';
+import fundoJogador3 from '../assets/fundo-jogador3.jpeg';
+import fundoJogador4 from '../assets/fundo-jogador4.jpeg';
+import WallpaperPicker from '../components/WallpaperPicker';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import papiroImg from '../assets/papiro.png'; 
 import levelUpMusic from '../assets/level-up.mp3'; 
@@ -198,12 +203,26 @@ const formatSanchezText = (text) => {
     return { __html: formatted };
   };
 
+const JOGADOR_WALLPAPERS = [
+  { label: 'Padrão',      src: fundoJogador  },
+  { label: 'Wallpaper 2', src: fundoJogador1 },
+  { label: 'Wallpaper 3', src: fundoJogador2 },
+  { label: 'Wallpaper 4', src: fundoJogador3 },
+  { label: 'Wallpaper 5', src: fundoJogador4 },
+];
+
 export default function JogadorVttPage() {
   const navigate = useNavigate();
   const [personagem, setPersonagem] = useState(null);
-  const [allPersonagens, setAllPersonagens] = useState([]); // Estado para baixar todos os personagens
+  const [allPersonagens, setAllPersonagens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
+
+  // Wallpaper state
+  const [wallpaper, setWallpaper] = useState(() => {
+    const saved = localStorage.getItem('jogador_wallpaper');
+    return saved || fundoJogador;
+  });
   
   // Arenas Disponíveis para Inscrição
   const [arenasDisponiveis, setArenasDisponiveis] = useState([]);
@@ -539,7 +558,7 @@ export default function JogadorVttPage() {
 
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
-      <div className="background-layer" style={{ backgroundImage: `url(${fundoJogador})` }} />
+      <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
       <div className="content-layer">
 
         <div className="char-hud clickable-hud" onClick={() => setShowFicha(true)} title="Abrir Ficha">
@@ -1566,6 +1585,16 @@ export default function JogadorVttPage() {
             box-shadow: 0 0 8px var(--team-color, #a855f7);
         }
       `}</style>
+
+      <WallpaperPicker
+        wallpapers={JOGADOR_WALLPAPERS}
+        current={wallpaper}
+        onChange={setWallpaper}
+        storageKey="jogador_wallpaper"
+        side="right"
+        bottom={22}
+        sideOffset={22}
+      />
     </div>
   );
 }
