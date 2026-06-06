@@ -10,7 +10,6 @@ import fundoJogador3 from '../assets/fundo-jogador3.jpeg';
 import fundoJogador4 from '../assets/fundo-jogador4.jpeg';
 import WallpaperPicker from '../components/WallpaperPicker';
 import sanchezImg from '../assets/sanchez.jpeg'; 
-import papiroImg from '../assets/papiro.png'; 
 import levelUpMusic from '../assets/level-up.mp3'; 
 import Bazar from '../components/Bazar';
 import Ficha from '../components/Ficha';
@@ -21,6 +20,7 @@ import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
+import treeData from '../data/tree.json'; // IMPORTANDO O JSON CRIADO
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -137,20 +137,7 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
         .mini-modal { background: #020617; border: 1px solid #fbbf24; padding: 20px; width: 300px; border-radius: 8px; box-shadow: 0 0 20px #000; }
         .mini-modal.detail { width: 400px; }
         .mini-modal h4 { color: #fbbf24; margin: 0 0 10px 0; }
-        
-        .ff-modal-overlay-calendar { 
-          position: fixed; 
-          top: 0; 
-          left: 0; 
-          width: 100vw; 
-          height: 100vh; 
-          background: rgba(0,0,0,0.95); 
-          z-index: 99999; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          backdrop-filter: blur(5px); 
-        }
+        .ff-modal-overlay-calendar { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
       `}</style>
     </div>
   );
@@ -218,13 +205,11 @@ export default function JogadorVttPage() {
   const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
 
-  // Wallpaper state
   const [wallpaper, setWallpaper] = useState(() => {
     const saved = localStorage.getItem('jogador_wallpaper');
     return saved || fundoJogador;
   });
   
-  // Arenas Disponíveis para Inscrição
   const [arenasDisponiveis, setArenasDisponiveis] = useState([]);
   const [showArenaModal, setShowArenaModal] = useState(false);
   const [showArenaDetails, setShowArenaDetails] = useState(null);
@@ -410,7 +395,6 @@ export default function JogadorVttPage() {
       };
   }, [currentVttSession?.id]); 
 
-  // --- NOVO EFEITO: ESCUTAR MERCADO DE TROCAS ---
   useEffect(() => {
       if (!currentVttSession || !personagem) return;
       const qMercado = query(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"));
@@ -421,7 +405,6 @@ export default function JogadorVttPage() {
       return () => unsubMercado();
   }, [currentVttSession?.id, personagem?.uid]);
 
-  // --- NOVO EFEITO: CHECK VITÓRIA BÊNÇÃO ---
   useEffect(() => {
       if(currentVttSession?.bencao_deuses?.active && currentVttSession.bencao_deuses.vencedores?.includes(personagem?.name)) {
           setBencaoVencedorAtivo(true);
@@ -479,13 +462,13 @@ export default function JogadorVttPage() {
   };
 
   // --- HANDLERS TROCAS (JOGADOR) ---
-  const toggleItemTroca = (slot) => {
+  const toggleItemTroca = (itemIndex, itemName) => {
       setTrocaForm(prev => {
-          const isSelected = prev.itensSelecionados.find(i => i.slot_id === slot.slot_id);
+          const isSelected = prev.itensSelecionados.find(i => i.index === itemIndex);
           if (isSelected) {
-              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.slot_id !== slot.slot_id) };
+              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.index !== itemIndex) };
           } else {
-              return { ...prev, itensSelecionados: [...prev.itensSelecionados, slot] };
+              return { ...prev, itensSelecionados: [...prev.itensSelecionados, { index: itemIndex, name: itemName }] };
           }
       });
   };
@@ -498,10 +481,9 @@ export default function JogadorVttPage() {
       if (!target) return alert("Destinatário não encontrado.");
       
       const itensFormatados = trocaForm.itensSelecionados.map(i => ({ 
-          name: i.item_name, 
+          name: i.name, 
           quantidade: 1, 
-          slot_id: i.slot_id,
-          effect: i.effect || ''
+          index: i.index
       }));
 
       try {
@@ -533,7 +515,7 @@ export default function JogadorVttPage() {
       } catch(err) { alert("Erro ao apostar: " + err.message); }
   };
 
-  // --- HANDLERS ARRASTAR MOUSE/TOUCH (TREE, CHAT, TRACKER, DETAILS) ---
+  // --- HANDLERS ARRASTAR ---
   const startDragTree = (clientX, clientY) => {
       setIsDraggingTree(true);
       setDragOffsetTree({ x: clientX - treePos.x, y: clientY - treePos.y });
@@ -544,9 +526,6 @@ export default function JogadorVttPage() {
   };
   
   const handleTreeMouseDown = (e) => startDragTree(e.clientX, e.clientY);
-  const handleTreeMouseMove = (e) => onDragMoveTree(e.clientX, e.clientY);
-  const handleTreeMouseUp = () => setIsDraggingTree(false);
-
   const handleTreeTouchStart = (e) => startDragTree(e.touches[0].clientX, e.touches[0].clientY);
   const handleTreeTouchMove = (e) => {
       if(isDraggingTree) e.preventDefault(); 
@@ -575,7 +554,6 @@ export default function JogadorVttPage() {
       setIsDraggingTree(false); 
   };
 
-  // --- LOGICA E LISTENERS DO CHAT DE EQUIPE (PVP) ---
   const myTeam = currentVttSession?.pvp_mode && currentVttSession?.equipes?.find(eq => eq.membros.includes(personagem?.name));
   const showTeamChat = vttStatus === 'connected' && currentVttSession?.pvp_mode && myTeam;
 
@@ -585,16 +563,10 @@ export default function JogadorVttPage() {
       setUnreadChatMessages(0);
       return;
     }
-
-    const messagesQuery = query(
-      collection(db, "sessoes", currentVttSession.id, "team_chats", myTeam.id.toString(), "messages"),
-      orderBy("createdAt", "asc")
-    );
-
+    const messagesQuery = query(collection(db, "sessoes", currentVttSession.id, "team_chats", myTeam.id.toString(), "messages"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setChatMessages(msgs);
-
       if (!chatOpen) {
         const newMsgs = msgs.filter(m => {
           const mTime = m.createdAt ? m.createdAt.toDate().getTime() : Date.now();
@@ -605,7 +577,6 @@ export default function JogadorVttPage() {
         setUnreadChatMessages(0);
       }
     });
-
     return () => unsubscribe();
   }, [showTeamChat, myTeam?.id, chatOpen, lastOpenedChat, currentVttSession?.id]);
 
@@ -634,7 +605,6 @@ export default function JogadorVttPage() {
       }
   };
 
-  // --- HELPER: BUSCAR COR DO TIME NO MODO PVP ---
   const getTeamColor = (tokenName) => {
       if (!currentVttSession || !currentVttSession.equipes) return null;
       for (let eq of currentVttSession.equipes) {
@@ -643,42 +613,38 @@ export default function JogadorVttPage() {
       return null;
   };
 
-  // --- RENDER ÁRVORE VISUAL ---
+  // --- RENDER ÁRVORE VISUAL DINÂMICA (Baseada no tree.json) ---
   const renderClassTree = () => {
-      if (treeTab === 'Bangaa') {
-          return (
-              <div className="flowchart-css">
-                  <div className="fc-col"><div className="fc-node base">Guerreiro</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Gladiador</div><div className="fc-arrow">➔</div><div className="fc-node max">Viking</div></div><div className="fc-row"><div className="fc-node adv">Lanceiro</div><div className="fc-arrow">➔</div><div className="fc-node max">Bangalor</div></div></div></div>
-                  <hr className="fc-div"/>
-                  <div className="fc-col"><div className="fc-node base">Monge</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Artista Marcial</div><div className="fc-arrow">➔</div><div className="fc-node max">Mestre Artes</div></div><div className="fc-row"><div className="fc-node adv">Lutador Rua</div><div className="fc-arrow">➔</div><div className="fc-node max">Brutamontes</div></div></div></div>
-                  <hr className="fc-div"/>
-                  <div className="fc-row"><div className="fc-node special">Cavaleiro Dragão</div><div className="fc-arrow">➔</div><div className="fc-node legendary">Dragonslayer</div></div>
-              </div>
-          );
-      }
-      if (treeTab === 'Elvaan') {
-          return (
-              <div className="flowchart-css">
-                  <div className="fc-col"><div className="fc-node base">Soldado</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Paladino</div><div className="fc-arrow">➔</div><div className="fc-node max">Templário</div></div><div className="fc-row"><div className="fc-node adv">Lâminas Mágicas</div><div className="fc-arrow">➔</div><div className="fc-node max">Saber</div></div></div></div>
-                  <hr className="fc-div"/>
-                  <div className="fc-col"><div className="fc-node base">Espadachim</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Duelista</div><div className="fc-arrow">➔</div><div className="fc-node max">Ronin</div></div><div className="fc-row"><div className="fc-node adv" style={{opacity:0.5}}>Lâminas Mágicas</div><div className="fc-arrow" style={{opacity:0.5}}>➔</div><div className="fc-node max" style={{opacity:0.5}}>Saber</div></div></div></div>
-              </div>
-          );
-      }
-      if (treeTab === 'Viera') {
-          return (
-              <div className="flowchart-css">
-                  <div className="fc-row"><div className="fc-node base">Arqueira</div><div className="fc-arrow">➔</div><div className="fc-node adv">Caçadora</div><div className="fc-arrow">➔</div><div className="fc-node max">Patrulheira</div></div>
-                  <hr className="fc-div"/>
-                  <div className="fc-col"><div className="fc-node base">Curandeiro</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Espiritualista</div><div className="fc-arrow">➔</div><div className="fc-node max">Tecelã</div></div><div className="fc-row"><div className="fc-node adv">Maga Vermelha</div><div className="fc-arrow">➔</div><div className="fc-node max">Spellblade</div></div></div></div>
-                  <hr className="fc-div"/>
-                  <div className="fc-col"><div className="fc-node base">Esgrimista</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv" style={{opacity:0.5}}>Maga Vermelha</div><div className="fc-arrow" style={{opacity:0.5}}>➔</div><div className="fc-node max" style={{opacity:0.5}}>Spellblade</div></div><div className="fc-row"><div className="fc-node adv">Floretista</div><div className="fc-arrow">➔</div><div className="fc-node max">Mosqueteira</div></div></div></div>
-                  <hr className="fc-div"/>
-                  <div className="fc-row"><div className="fc-node special">Exilado</div><div className="fc-arrow">➔</div><div className="fc-node adv">Mercenário</div><div className="fc-arrow">➔</div><div className="fc-node legendary">Mestre Armas</div></div>
-              </div>
-          );
-      }
-      return null;
+      const raceData = treeData[treeTab];
+      if (!raceData) return <p style={{color:'#666', textAlign:'center'}}>Dados de classe não encontrados para esta raça.</p>;
+
+      return (
+          <div className="tree-container">
+              {raceData.map((line, idx) => (
+                  <div key={idx} className="tree-line">
+                      <div className={`fc-node ${line.special ? 'special' : line.isolated ? 'legendary' : 'base'}`}>
+                          {line.base}
+                      </div>
+                      {line.paths && line.paths.length > 0 && (
+                          <div className="tree-paths">
+                              {line.paths.map((path, i) => (
+                                  <div key={i} className="tree-path">
+                                      <div className="fc-arrow">↓</div>
+                                      <div className="fc-node adv">{path.adv}</div>
+                                      {path.max && (
+                                          <>
+                                              <div className="fc-arrow">↓</div>
+                                              <div className="fc-node max">{path.max}</div>
+                                          </>
+                                      )}
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              ))}
+          </div>
+      );
   };
 
   if (loading || !minTimeElapsed) {
@@ -695,11 +661,7 @@ export default function JogadorVttPage() {
           animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
         <style>{`
-          @keyframes pulseText { 
-            0% { opacity: 0.3; } 
-            50% { opacity: 1; } 
-            100% { opacity: 0.3; } 
-          }
+          @keyframes pulseText { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
         `}</style>
       </div>
     );
@@ -708,7 +670,7 @@ export default function JogadorVttPage() {
   if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
   const isBencaoWinner = currentVttSession?.bencao_deuses?.vencedores?.includes(personagem?.name);
-  const meuInventario = personagem?.character_sheet?.inventory?.slots?.filter(s => s && s.item_name && s.item_name.trim() !== '') || [];
+  const meuInventario = personagem?.character_sheet?.inventory?.items?.filter(i => i && i.name && i.name.trim() !== '') || [];
   const meuGil = personagem?.character_sheet?.inventory?.gil || 0;
 
   return (
@@ -741,7 +703,7 @@ export default function JogadorVttPage() {
         {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
-        {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP E CORES DO TIME --- */}
+        {/* --- COMBAT TRACKER --- */}
         {showCombatTracker && currentVttSession && (
             <div 
                 className="combat-tracker-panel player-view fade-in"
@@ -756,8 +718,6 @@ export default function JogadorVttPage() {
                 </div>
                 <div className="tracker-list">
                     {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
-                        
-                        // LÓGICA DE VISIBILIDADE (INCLUI FURTIVIDADE)
                         const isBaseVisible = token.visible !== false;
                         const isOwner = token.uid === auth.currentUser.uid;
                         const isPvP = currentVttSession.pvp_mode;
@@ -785,7 +745,6 @@ export default function JogadorVttPage() {
                         let hpDisplay = "?", mpDisplay = "?";
                         let hpMax = "?", mpMax = "?";
 
-                        // LÓGICA DE HP PARA TODOS OS JOGADORES (E NÃO APENAS O SEU)
                         if (token.type === 'player') {
                             const charObj = allPersonagens.find(p => p.uid === token.uid);
                             if (charObj) {
@@ -807,7 +766,6 @@ export default function JogadorVttPage() {
                             mpMax = token.stats?.mp?.max;
                         }
 
-                        // --- ADICIONA A COR DO TIME NA BORDA SE O MODO PVP ESTIVER ATIVADO ---
                         const teamColor = isPvP ? getTeamColor(token.name) : null;
                         const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
 
@@ -922,28 +880,29 @@ export default function JogadorVttPage() {
         {sessoesAtivas.length > 0 && !hasJoinedSession && <div className="active-sessions-banner fade-in"><h3>SESSÃO EM ANDAMENTO!</h3>{sessoesAtivas.map(s => <div key={s.id} className="session-entry-row"><span className="sessao-nome-active">{s.missaoNome}</span><button className="btn-enter-session" onClick={() => enterVTT(s)}>ENTRAR AGORA</button></div>)}</div>}
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
 
-        <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
-        
-        {/* NOVOS BOTÕES FLUTUANTES - QUEUE 01 */}
-        <button className="floating-trocas-btn" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
-            🏮
-            {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
-        </button>
-        <button className={`floating-bencao-btn ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
-        <button className="floating-tree-btn" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
+        {/* --- BOTÕES FLUTUANTES (ALINHADOS EM DUAS COLUNAS NO CSS) --- */}
+        <button className="floating-mission-btn hud-col-1 pos-1" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
+        {vttStatus === 'connected' && <button className="floating-dice-btn hud-col-1 pos-2" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
+        {vttStatus === 'connected' && <button className="floating-combat-btn hud-col-1 pos-3" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
+        {resenhas.length > 0 && <button className="floating-sanches-btn hud-col-1 pos-4" onClick={handleOpenSanches} title="Resenhas"><div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
+        <button className="floating-book-btn hud-col-1 pos-5" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
+        <button className="floating-calendar-btn hud-col-1 pos-6" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
+        <button className="floating-arena-btn hud-col-1 pos-7" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
 
-        <button className="floating-calendar-btn" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
-        
-        {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
-        {vttStatus === 'connected' && <button className="floating-dice-btn" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
-        {resenhas.length > 0 && <button className="floating-sanches-btn" onClick={handleOpenSanches} title="Resenhas"><div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
-        <button className="floating-book-btn" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
-        
-        <button className="floating-arena-btn" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
+        {currentVttSession && (
+            <button className="floating-trocas-btn hud-col-2 pos-1" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
+                🏮
+                {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
+            </button>
+        )}
+        {currentVttSession && (
+            <button className={`floating-bencao-btn hud-col-2 pos-2 ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
+        )}
+        <button className="floating-tree-btn hud-col-2 pos-3" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
 
         {showTeamChat && (
             <button 
-                className="floating-team-chat-btn" 
+                className="floating-team-chat-btn hud-col-2 pos-4" 
                 onClick={() => {
                     setChatOpen(!chatOpen);
                     if (!chatOpen) {
@@ -963,15 +922,10 @@ export default function JogadorVttPage() {
         )}
 
         <Bazar isMestre={false} playerData={personagem} />
-        
         <GuildBoard isMaster={false} />
 
         {showCalendar && (
-          <CalendarSystemPlayer 
-            onClose={() => setShowCalendar(false)} 
-            disponibilidades={disponibilidades}
-            sessoes={allSessoes} 
-          />
+          <CalendarSystemPlayer onClose={() => setShowCalendar(false)} disponibilidades={disponibilidades} sessoes={allSessoes} />
         )}
         
         {/* MODAL DE LISTA DE MISSÕES */}
@@ -1139,15 +1093,9 @@ export default function JogadorVttPage() {
                         return (
                             <div key={msg.id} className={`chat-message-bubble ${isMe ? 'me' : 'other'}`}>
                                 {avatarUrl ? (
-                                    <div 
-                                        className="chat-avatar-mini" 
-                                        style={{ backgroundImage: `url(${avatarUrl})` }}
-                                        title={msg.senderName}
-                                    />
+                                    <div className="chat-avatar-mini" style={{ backgroundImage: `url(${avatarUrl})` }} title={msg.senderName} />
                                 ) : (
-                                    <div className="chat-avatar-mini-default" title={msg.senderName}>
-                                        {msg.senderName ? msg.senderName.substring(0, 2).toUpperCase() : '?'}
-                                    </div>
+                                    <div className="chat-avatar-mini-default" title={msg.senderName}>{msg.senderName ? msg.senderName.substring(0, 2).toUpperCase() : '?'}</div>
                                 )}
                                 <div className="chat-bubble-content">
                                     {!isMe && <span className="chat-sender-name">{msg.senderName}</span>}
@@ -1172,8 +1120,6 @@ export default function JogadorVttPage() {
                 </form>
             </div>
         )}
-
-        {/* --- MODAIS QUEUE 01 --- */}
 
         {/* MODAL: SISTEMA DE TROCAS */}
         {showTrocas && (
@@ -1200,10 +1146,10 @@ export default function JogadorVttPage() {
                                     <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>SEUS ITENS DISPONÍVEIS</label>
                                     <div className="itens-troca-lista custom-scrollbar">
                                         {meuInventario.length === 0 && <p style={{color:'#666', fontSize:'12px', fontStyle:'italic'}}>Seu inventário está vazio.</p>}
-                                        {meuInventario.map(slot => (
-                                            <label key={slot.slot_id} className="item-checkbox-label">
-                                                <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.slot_id === slot.slot_id)} onChange={() => toggleItemTroca(slot)} />
-                                                {slot.item_name}
+                                        {meuInventario.map((item, idx) => (
+                                            <label key={idx} className="item-checkbox-label">
+                                                <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.index === idx)} onChange={() => toggleItemTroca(idx, item.name)} />
+                                                {item.name} (Qtd: {item.quantity})
                                             </label>
                                         ))}
                                     </div>
@@ -1286,7 +1232,7 @@ export default function JogadorVttPage() {
         {showClassTree && (
             <div 
                 className="draggable-card fade-in" 
-                style={{ position: 'absolute', top: treePos.y, left: treePos.x, zIndex: 3000, width: '600px', background: '#0d0d10', border: '2px solid #00f2ff', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.9)' }}
+                style={{ position: 'absolute', top: treePos.y, left: treePos.x, zIndex: 3000, width: '700px', background: '#0d0d10', border: '2px solid #00f2ff', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.9)' }}
                 onClick={e => e.stopPropagation()}
             >
                 <div 
@@ -1301,13 +1247,12 @@ export default function JogadorVttPage() {
                     <button onClick={() => setShowClassTree(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}>✕</button>
                 </div>
                 <div style={{ padding: '15px' }}>
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
-                        {['Bangaa', 'Elvaan', 'Viera'].map(r => (
+                    <div className="tree-tabs-container">
+                        {Object.keys(treeData).map(r => (
                             <button 
                                 key={r} 
-                                className={treeTab === r ? 'active' : ''} 
+                                className={`tree-tab-btn ${treeTab === r ? 'active' : ''}`} 
                                 onClick={() => setTreeTab(r)} 
-                                style={{ background: 'transparent', border: 'none', color: treeTab === r ? '#00f2ff' : '#aaa', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', paddingBottom: '5px', borderBottom: treeTab === r ? '2px solid #00f2ff' : 'none' }}
                             >
                                 {r}
                             </button>
@@ -1330,52 +1275,39 @@ export default function JogadorVttPage() {
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
         .char-meta { font-size: 12px; color: #00f2ff; }
         
-        .floating-mission-btn { position: fixed; bottom: 30px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
+        /* BOTÕES FLUTUANTES - COLUNA 1 */
+        .hud-col-1 { position: fixed; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 2000; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; }
+        .hud-col-1.pos-1 { bottom: 30px; border: 2px solid #ffcc00; color: #fff; }
+        .hud-col-1.pos-1:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
+        .hud-col-1.pos-2 { bottom: 90px; border: 2px solid #fff; color: #fff; background: #111; }
+        .hud-col-1.pos-2:hover { border-color: #ffcc00; transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
+        .hud-col-1.pos-3 { bottom: 150px; border: 2px solid #f44; color: #f44; background: #111; }
+        .hud-col-1.pos-3:hover { border-color: #fff; color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #f44; }
+        .hud-col-1.pos-4 { bottom: 210px; border: 2px solid #00f2ff; }
+        .hud-col-1.pos-4:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
+        .hud-col-1.pos-5 { bottom: 270px; border: 2px solid #fff; color: #fff; }
+        .hud-col-1.pos-5:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
+        .hud-col-1.pos-6 { bottom: 330px; border: 2px solid #22c55e; color: #22c55e; font-size: 24px; }
+        .hud-col-1.pos-6:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
+        .hud-col-1.pos-7 { bottom: 390px; border: 2px solid #a855f7; color: #a855f7; }
+        .hud-col-1.pos-7:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
 
-        /* NOVOS BOTÕES FLUTUANTES - QUEUE 01 */
-        .floating-trocas-btn { position: fixed; bottom: 30px; left: 75px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-trocas-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-
-        .floating-bencao-btn { position: fixed; bottom: 90px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #ffcc00; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-bencao-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
-
-        .floating-tree-btn { position: fixed; bottom: 150px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; color: #00f2ff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-tree-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; color: #fff; border-color: #fff; }
-
-        .floating-dice-btn { position: fixed; bottom: 90px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; background: #111; color: #fff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-dice-btn:hover { border-color: #ffcc00; transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
-        
-        .floating-combat-btn { position: fixed; bottom: 150px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #f44; background: #111; color: #f44; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-combat-btn:hover { border-color: #fff; color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #f44; }
-
-        .floating-sanches-btn { position: fixed; bottom: 210px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-sanches-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
-
-        .floating-book-btn { position: fixed; bottom: 270px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-book-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
-
-        .floating-calendar-btn { position: fixed; bottom: 330px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #22c55e; background: #000; color: #22c55e; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 24px; }
-        .floating-calendar-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
-
-        .floating-arena-btn { position: fixed; bottom: 390px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; font-size: 20px; }
-        .floating-arena-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
+        /* BOTÕES FLUTUANTES - COLUNA 2 */
+        .hud-col-2 { position: fixed; left: 85px; width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 2000; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; }
+        .hud-col-2.pos-1 { bottom: 30px; border: 2px solid #a855f7; color: #a855f7; font-size: 24px; }
+        .hud-col-2.pos-1:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
+        .hud-col-2.pos-2 { bottom: 90px; border: 2px solid #ffcc00; color: #ffcc00; }
+        .hud-col-2.pos-2:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
+        .hud-col-2.pos-3 { bottom: 150px; border: 2px solid #00f2ff; color: #00f2ff; }
+        .hud-col-2.pos-3:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; color: #fff; border-color: #fff; }
+        .hud-col-2.pos-4 { bottom: 210px; color: #fff; }
+        .hud-col-2.pos-4:hover { transform: scale(1.1); }
 
         .sanches-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
         .floating-sanches-btn:hover .sanches-icon-face { opacity: 1; }
         .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
         
-        .combat-tracker-panel { 
-            position: absolute; 
-            width: 300px; 
-            max-height: 70vh; 
-            background: linear-gradient(180deg, #0d0d10 0%, #000 100%);
-            border: 2px solid #b8860b; 
-            border-radius: 6px; 
-            z-index: 2100; 
-            display: flex; flex-direction: column; 
-            box-shadow: 0 0 25px rgba(0,0,0,0.9);
-        }
+        .combat-tracker-panel { position: absolute; width: 300px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; z-index: 2100; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
         .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
         .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
         .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
@@ -1384,8 +1316,6 @@ export default function JogadorVttPage() {
         .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
         .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
-        
-        /* FEEDBACK VISUAL SE O PRÓPRIO JOGADOR ESTIVER EM FURTIVIDADE */
         .tracker-item.tracker-stealth-self { border-color: #a855f7; border-style: dashed; opacity: 0.8; box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.3); }
 
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
@@ -1500,457 +1430,90 @@ export default function JogadorVttPage() {
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
-        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 15px; background: transparent; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
-        .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
-
+        
         .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        
-        .fft-dialog-box {
-          position: relative;
-          width: 800px;
-          max-width: 95vw;
-          height: 450px;
-          background: linear-gradient(180deg, #001a4d 0%, #000022 100%);
-          border: 4px solid #b8860b;
-          border-radius: 8px;
-          box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5);
-          display: flex;
-          align-items: flex-start;
-          padding: 30px;
-          gap: 20px;
-          color: #fff;
-          font-family: 'Cinzel', serif;
-        }
+        .fft-dialog-box { position: relative; width: 800px; max-width: 95vw; height: 450px; background: linear-gradient(180deg, #001a4d 0%, #000022 100%); border: 4px solid #b8860b; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5); display: flex; align-items: flex-start; padding: 30px; gap: 20px; color: #fff; font-family: 'Cinzel', serif; }
+        .fft-portrait-section { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 150px; flex-shrink: 0; }
+        .fft-portrait-frame { width: 140px; height: 180px; border: 3px solid #b8860b; background: #000; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .fft-portrait-frame img { width: 100%; height: 100%; object-fit: cover; }
+        .fft-name-plate { width: 100%; background: linear-gradient(90deg, #b8860b, #8a6e14); color: #000; text-align: center; font-weight: bold; padding: 5px 0; font-size: 0.9rem; border: 1px solid #ffd700; box-shadow: 0 2px 5px rgba(0,0,0,0.5); letter-spacing: 1px; }
+        .fft-content-section { flex: 1; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+        .fft-title { margin: 0 0 15px 0; font-size: 1.8rem; color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); border-bottom: 1px solid #b8860b; padding-bottom: 10px; letter-spacing: 1px; }
+        .fft-scroll-text { flex: 1; overflow-y: auto; font-family: 'Lato', sans-serif; font-size: 1.1rem; line-height: 1.6; color: #e0e0e0; padding-right: 10px; scrollbar-width: none; -ms-overflow-style: none; }
+        .fft-scroll-text::-webkit-scrollbar { display: none; }
+        .fft-close-btn { position: absolute; top: -15px; right: -15px; width: 40px; height: 40px; background: #b8860b; color: #000; font-weight: bold; border: 2px solid #fff; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: sans-serif; box-shadow: 0 0 10px #000; transition: 0.2s; }
+        .fft-close-btn:hover { background: #ffd700; transform: scale(1.1); }
 
-        .fft-portrait-section {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 10px;
-          width: 150px;
-          flex-shrink: 0;
-        }
-
-        .fft-portrait-frame {
-          width: 140px;
-          height: 180px;
-          border: 3px solid #b8860b;
-          background: #000;
-          overflow: hidden;
-          box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        }
-        .fft-portrait-frame img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .fft-name-plate {
-          width: 100%;
-          background: linear-gradient(90deg, #b8860b, #8a6e14);
-          color: #000;
-          text-align: center;
-          font-weight: bold;
-          padding: 5px 0;
-          font-size: 0.9rem;
-          border: 1px solid #ffd700;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-          letter-spacing: 1px;
-        }
-
-        .fft-content-section {
-          flex: 1;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .fft-title {
-          margin: 0 0 15px 0;
-          font-size: 1.8rem;
-          color: #00f2ff;
-          text-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
-          border-bottom: 1px solid #b8860b;
-          padding-bottom: 10px;
-          letter-spacing: 1px;
-        }
-
-        .fft-scroll-text {
-          flex: 1;
-          overflow-y: auto;
-          font-family: 'Lato', sans-serif;
-          font-size: 1.1rem;
-          line-height: 1.6;
-          color: #e0e0e0;
-          padding-right: 10px;
-          scrollbar-width: none; 
-          -ms-overflow-style: none; 
-        }
-        .fft-scroll-text::-webkit-scrollbar { 
-          display: none; 
-        }
-
-        .fft-close-btn {
-          position: absolute;
-          top: -15px;
-          right: -15px;
-          width: 40px;
-          height: 40px;
-          background: #b8860b;
-          color: #000;
-          font-weight: bold;
-          border: 2px solid #fff;
-          border-radius: 50%;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: sans-serif;
-          box-shadow: 0 0 10px #000;
-          transition: 0.2s;
-        }
-        .fft-close-btn:hover {
-          background: #ffd700;
-          transform: scale(1.1);
-        }
-
-        .levelup-global-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.8);
-            z-index: 200000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(5px);
-        }
-
-        .levelup-content {
-            text-align: center;
-            animation: zoomIn 0.5s ease-out;
-        }
-
-        .levelup-title {
-            font-family: 'Cinzel', serif;
-            font-size: 80px;
-            font-weight: bold;
-            color: #ffcc00;
-            text-transform: uppercase;
-            letter-spacing: 10px;
-            margin: 0 0 30px 0;
-            text-shadow: 
-                3px 3px 0 #000,
-                -1px -1px 0 #000,  
-                1px -1px 0 #000,
-                -1px 1px 0 #000,
-                1px 1px 0 #000,
-                0 0 20px #ffcc00,
-                0 0 40px #ffcc00;
-            animation: pulseText 1.5s infinite alternate;
-        }
-
-        .levelup-confirm-btn {
-            background: linear-gradient(to bottom, #b8860b, #8a6e14);
-            border: 2px solid #fff;
-            color: #000;
-            font-family: 'Cinzel', serif;
-            font-size: 18px;
-            font-weight: bold;
-            padding: 10px 40px;
-            cursor: pointer;
-            box-shadow: 0 0 15px #ffcc00;
-            transition: 0.2s;
-            border-radius: 50px;
-        }
-        
-        .levelup-confirm-btn:hover {
-            transform: scale(1.1);
-            background: #ffd700;
-            color: #000;
-            box-shadow: 0 0 30px #ffd700;
-        }
-
+        .levelup-global-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 200000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .levelup-content { text-align: center; animation: zoomIn 0.5s ease-out; }
+        .levelup-title { font-family: 'Cinzel', serif; font-size: 80px; font-weight: bold; color: #ffcc00; text-transform: uppercase; letter-spacing: 10px; margin: 0 0 30px 0; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 20px #ffcc00, 0 0 40px #ffcc00; animation: pulseText 1.5s infinite alternate; }
+        .levelup-confirm-btn { background: linear-gradient(to bottom, #b8860b, #8a6e14); border: 2px solid #fff; color: #000; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; padding: 10px 40px; cursor: pointer; box-shadow: 0 0 15px #ffcc00; transition: 0.2s; border-radius: 50px; }
+        .levelup-confirm-btn:hover { transform: scale(1.1); background: #ffd700; color: #000; box-shadow: 0 0 30px #ffd700; }
         @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes pulseText { from { text-shadow: 0 0 20px #ffcc00; } to { text-shadow: 0 0 40px #ffcc00, 0 0 10px #fff; } }
-        
-        .guild-btn-float {
-            top: auto !important;
-            left: auto !important;
-            transform: none !important;
-            bottom: 30px !important;
-            right: 110px !important; 
-            z-index: 2000 !important;
-        }
 
-        /* --- RESPONSIVIDADE ADICIONADA --- */
-        @media (max-width: 850px) {
-            /* Ajustes do Dashboard Principal */
-            .player-dashboard-grid { grid-template-columns: 1fr; }
-            .top-bar-flex { flex-direction: column; gap: 15px; text-align: center; }
-            .char-identity-box { width: 100%; justify-content: center; }
-            
-            /* Ajustes Modais de Missão (Compacto e Detalhes) */
-            .ff-modal-compact { width: 95vw; max-height: 90vh; padding: 15px; }
-            .missions-grid-compact { grid-template-columns: 1fr; }
-            .mc-right { flex-direction: column; gap: 5px; align-items: stretch; }
-            
-            .ff-modal-details-wide { width: 95vw; height: auto; max-height: 90vh; }
-            .detail-wide-header { flex-direction: column; height: auto; padding: 15px; text-align: center; gap: 10px; }
-            .dw-vagas-box { align-items: center; width: 100%; }
-            .detail-wide-body { flex-direction: column; overflow-y: auto; }
-            .dw-col-left { width: 100%; border-right: none; border-bottom: 1px solid #333; overflow-y: visible; }
-            .dw-col-right { width: 100%; padding: 15px; overflow-y: visible; }
-            
-            /* Ajuste Modal Arena */
-            .detail-wide-body > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
-            
-            /* Ajustes Modal Sanches (FFT) */
-            .fft-dialog-box { flex-direction: column; height: auto; max-height: 90vh; align-items: center; padding: 20px; }
-            .fft-portrait-section { width: 100px; }
-            .fft-portrait-frame { width: 100px; height: 130px; }
-            .fft-title { font-size: 1.4rem; text-align: center; }
-        }
+        .team-chat-panel { position: absolute; width: 320px; height: 420px; background: rgba(10, 10, 12, 0.95); border: 2px solid var(--team-color, #a855f7); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); overflow: hidden; }
+        .chat-header { background: rgba(20, 20, 25, 0.9); border-bottom: 2px solid var(--team-color, #a855f7); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .chat-header h3 { margin: 0; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1px; color: var(--team-color, #fff); text-shadow: 0 0 8px var(--team-color-alpha, rgba(168, 85, 247, 0.4)); }
+        .chat-header-actions button { background: none; border: none; color: #fff; cursor: pointer; font-size: 14px; opacity: 0.7; transition: 0.2s; margin-left: 10px; }
+        .chat-header-actions button:hover { opacity: 1; }
+        .chat-messages-container { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        .chat-message-bubble { display: flex; gap: 8px; max-width: 85%; }
+        .chat-message-bubble.me { align-self: flex-end; flex-direction: row-reverse; }
+        .chat-message-bubble.other { align-self: flex-start; }
+        .chat-avatar-mini { width: 32px; height: 32px; border-radius: 50%; background-size: cover; background-position: center; border: 1px solid #555; box-shadow: 0 2px 4px rgba(0,0,0,0.5); flex-shrink: 0; }
+        .chat-avatar-mini-default { width: 32px; height: 32px; border-radius: 50%; background: #444; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 1px solid #555; flex-shrink: 0; }
+        .chat-bubble-content { background: rgba(30, 30, 35, 0.95); border: 1px solid #333; border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .chat-message-bubble.me .chat-bubble-content { background: var(--team-color-faded, rgba(168, 85, 247, 0.2)); border-color: var(--team-color, #a855f7); }
+        .chat-sender-name { font-size: 9px; font-weight: bold; color: #ffcc00; margin-bottom: 2px; }
+        .chat-message-text { font-size: 12px; color: #e2e8f0; line-height: 1.4; word-break: break-word; font-family: sans-serif; }
+        .chat-message-time { font-size: 8px; color: #888; align-self: flex-end; margin-top: 3px; }
+        .chat-input-area { padding: 10px; background: #0d0d10; border-top: 1px solid #222; display: flex; gap: 8px; }
+        .chat-input-field { flex: 1; background: #181820; border: 1px solid #444; border-radius: 20px; padding: 6px 14px; color: #fff; font-size: 12px; outline: none; font-family: sans-serif; transition: 0.2s; }
+        .chat-input-field:focus { border-color: var(--team-color, #a855f7); box-shadow: 0 0 5px var(--team-color-alpha, rgba(168, 85, 247, 0.3)); }
+        .chat-send-btn { background: var(--team-color, #a855f7); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .chat-send-btn:hover { transform: scale(1.1); box-shadow: 0 0 8px var(--team-color, #a855f7); }
 
-        /* --- TEAM CHAT STYLES --- */
-        .floating-team-chat-btn { 
-            position: fixed; 
-            bottom: 450px; 
-            left: 15px; 
-            width: 50px; 
-            height: 50px; 
-            border-radius: 50%; 
-            background: #000; 
-            color: #fff; 
-            font-size: 20px; 
-            cursor: pointer; 
-            z-index: 2000; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            transition: 0.3s; 
-        }
-        .floating-team-chat-btn:hover { 
-            transform: scale(1.1); 
-        }
+        /* MODAIS GERAIS (INCLUÍDO PARA CONSERTAR O DE TROCAS E DE BÊNÇÃO) */
+        .modal-overlay-custom { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-box-custom { background: #080808; border: 2px solid #ffcc00; padding: 25px; border-radius: 8px; width: 500px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 0 30px #000; }
+        .modal-box-custom.wide { width: 800px; }
+        .modal-header-c { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; align-items: center; }
+        .modal-header-c h3 { margin: 0; color: #ffcc00; }
+        .close-c { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+        .file-input-dark { background: #111; color: #fff; border: 1px solid #444; padding: 10px; width: 100%; border-radius: 4px; }
+        .btn-save-m { background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; border-radius: 4px; }
+        .btn-save-m:hover { background: #fff; box-shadow: 0 0 10px #ffcc00; }
 
-        .team-chat-panel {
-            position: absolute;
-            width: 320px;
-            height: 420px;
-            background: rgba(10, 10, 12, 0.95);
-            border: 2px solid var(--team-color, #a855f7);
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            overflow: hidden;
-        }
-
-        .chat-header {
-            background: rgba(20, 20, 25, 0.9);
-            border-bottom: 2px solid var(--team-color, #a855f7);
-            padding: 10px 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .chat-header h3 {
-            margin: 0;
-            font-family: 'Cinzel', serif;
-            font-size: 13px;
-            letter-spacing: 1px;
-            color: var(--team-color, #fff);
-            text-shadow: 0 0 8px var(--team-color-alpha, rgba(168, 85, 247, 0.4));
-        }
-
-        .chat-header-actions button {
-            background: none;
-            border: none;
-            color: #fff;
-            cursor: pointer;
-            font-size: 14px;
-            opacity: 0.7;
-            transition: 0.2s;
-            margin-left: 10px;
-        }
-
-        .chat-header-actions button:hover {
-            opacity: 1;
-        }
-
-        .chat-messages-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .chat-message-bubble {
-            display: flex;
-            gap: 8px;
-            max-width: 85%;
-        }
-
-        .chat-message-bubble.me {
-            align-self: flex-end;
-            flex-direction: row-reverse;
-        }
-
-        .chat-message-bubble.other {
-            align-self: flex-start;
-        }
-
-        .chat-avatar-mini {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background-size: cover;
-            background-position: center;
-            border: 1px solid #555;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            flex-shrink: 0;
-        }
-
-        .chat-avatar-mini-default {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: #444;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            border: 1px solid #555;
-            flex-shrink: 0;
-        }
-
-        .chat-bubble-content {
-            background: rgba(30, 30, 35, 0.95);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 6px 10px;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
-        .chat-message-bubble.me .chat-bubble-content {
-            background: var(--team-color-faded, rgba(168, 85, 247, 0.2));
-            border-color: var(--team-color, #a855f7);
-        }
-
-        .chat-sender-name {
-            font-size: 9px;
-            font-weight: bold;
-            color: #ffcc00;
-            margin-bottom: 2px;
-        }
-
-        .chat-message-text {
-            font-size: 12px;
-            color: #e2e8f0;
-            line-height: 1.4;
-            word-break: break-word;
-            font-family: sans-serif;
-        }
-
-        .chat-message-time {
-            font-size: 8px;
-            color: #888;
-            align-self: flex-end;
-            margin-top: 3px;
-        }
-
-        .chat-input-area {
-            padding: 10px;
-            background: #0d0d10;
-            border-top: 1px solid #222;
-            display: flex;
-            gap: 8px;
-        }
-
-        .chat-input-field {
-            flex: 1;
-            background: #181820;
-            border: 1px solid #444;
-            border-radius: 20px;
-            padding: 6px 14px;
-            color: #fff;
-            font-size: 12px;
-            outline: none;
-            font-family: sans-serif;
-            transition: 0.2s;
-        }
-
-        .chat-input-field:focus {
-            border-color: var(--team-color, #a855f7);
-            box-shadow: 0 0 5px var(--team-color-alpha, rgba(168, 85, 247, 0.3));
-        }
-
-        .chat-send-btn {
-            background: var(--team-color, #a855f7);
-            color: #fff;
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 14px;
-            transition: 0.2s;
-        }
-
-        .chat-send-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 8px var(--team-color, #a855f7);
-        }
-        
-        /* NOVAS REGRAS CSS - QUEUE 01 */
-        .floating-trocas-btn { position: fixed; bottom: 30px; left: 75px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-trocas-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-
-        .floating-bencao-btn { position: fixed; bottom: 90px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #ffcc00; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-bencao-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
-
-        .floating-tree-btn { position: fixed; bottom: 150px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; color: #00f2ff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .floating-tree-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; color: #fff; border-color: #fff; }
-
-        /* DESTAQUE BÊNÇÃO E OVERLAY */
-        .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
-        @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
         .bencao-victory-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 204, 0, 0.15); z-index: 10000; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flashScreen 0.5s ease-out; }
         .bencao-victory-box { background: rgba(0,0,0,0.9); border: 3px solid #ffcc00; box-shadow: 0 0 50px #ffcc00; padding: 40px; text-align: center; border-radius: 10px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; }
         .bencao-victory-box h2 { color: #ffcc00; font-size: 30px; margin: 0 0 10px 0; text-shadow: 0 0 10px #ffcc00; }
         .bencao-victory-box p { color: #fff; font-size: 18px; margin: 5px 0; }
         .bencao-victory-box .subtext { color: #0f0; font-weight: bold; margin-top: 15px; }
 
-        /* ESTILOS DE TROCAS / MERCADO */
         .itens-troca-lista { background: #000; border: 1px solid #444; padding: 10px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border-radius: 4px; }
         .item-checkbox-label { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #ccc; cursor: pointer; }
         .item-checkbox-label input { accent-color: #00f2ff; transform: scale(1.2); }
 
-        /* FLOWCHART CLASSES CSS */
-        .flowchart-css { display: flex; flex-direction: column; gap: 15px; align-items: flex-start; padding: 10px; background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid #333; }
-        .fc-row { display: flex; align-items: center; gap: 10px; width: 100%; }
-        .fc-col { display: flex; flex-direction: column; gap: 10px; }
-        .fc-node { padding: 10px 15px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; min-width: 120px; }
+        /* NOVA ÁRVORE DE CLASSES */
+        .tree-tabs-container { display: flex; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; overflow-x: auto; scrollbar-width: thin; }
+        .tree-tab-btn { background: transparent; border: none; color: #888; font-weight: bold; font-size: 12px; text-transform: uppercase; cursor: pointer; padding-bottom: 5px; border-bottom: 2px solid transparent; white-space: nowrap; transition: 0.2s; }
+        .tree-tab-btn:hover { color: #ccc; }
+        .tree-tab-btn.active { color: #00f2ff; border-bottom-color: #00f2ff; }
+        
+        .tree-container { display: flex; flex-direction: column; gap: 20px; max-height: 60vh; overflow-y: auto; padding-right: 10px; }
+        .tree-line { background: rgba(0,0,0,0.4); border: 1px solid #222; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .tree-paths { display: flex; gap: 30px; margin-top: 15px; width: 100%; justify-content: center; position: relative; }
+        .tree-path { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; }
+        
+        .fc-node { padding: 10px 15px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; min-width: 140px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .fc-node.base { background: #1f2937; border: 2px solid #3b82f6; color: #fff; }
         .fc-node.adv { background: #111827; border: 2px solid #fbbf24; color: #fbbf24; }
-        .fc-node.max { background: #000; border: 2px solid #f44; color: #f44; box-shadow: 0 0 10px rgba(244, 68, 68, 0.3); }
+        .fc-node.max { background: #000; border: 2px solid #f44; color: #f44; box-shadow: 0 0 15px rgba(244, 68, 68, 0.4); }
         .fc-node.special { background: #3b0764; border: 2px solid #a855f7; color: #e9d5ff; }
         .fc-node.legendary { background: #020617; border: 2px solid #00f2ff; color: #00f2ff; box-shadow: 0 0 15px #00f2ff; }
-        .fc-arrow { color: #555; font-size: 18px; font-weight: bold; }
-        .fc-div { width: 100%; border: none; border-top: 1px dashed #444; margin: 10px 0; }
+        .fc-arrow { color: #555; font-size: 16px; font-weight: bold; }
+        
+        .guild-btn-float { top: auto !important; left: auto !important; transform: none !important; bottom: 30px !important; right: 110px !important; z-index: 2000 !important; }
       `}</style>
 
       <WallpaperPicker

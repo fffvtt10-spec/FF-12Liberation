@@ -1,0 +1,56 @@
+{
+  "Bangaa": [
+    { "base": "Guerreiro", "paths": [ { "adv": "Gladiador", "max": "Viking" }, { "adv": "Lanceiro", "max": "Bangalor" } ] },
+    { "base": "Monge", "paths": [ { "adv": "Artista Marcial", "max": "Mestre das Artes Marciais" }, { "adv": "Lutador de Rua", "max": "Brutamontes" } ] },
+    { "base": "Cavaleiro Dragão", "special": true, "paths": [ { "adv": "Dragonslayer" } ] }
+  ],
+  "Elvaan": [
+    { "base": "Soldado", "paths": [ { "adv": "Paladino", "max": "Templário" }, { "adv": "Lâminas Mágicas", "max": "Saber" } ] },
+    { "base": "Espadachim", "paths": [ { "adv": "Duelista", "max": "Ronin" }, { "adv": "Lâminas Mágicas", "max": "Saber" } ] },
+    { "base": "Aprendiz de Cavaleiro", "paths": [ { "adv": "Cavaleiro Solaris" }, { "adv": "Cavaleiro Lunaris" } ] }
+  ],
+  "Grias": [
+    { "base": "Raptora", "paths": [ { "adv": "Cavaleira Alada", "max": "Devastadora" }, { "adv": "Terrana", "max": "Geomancer" } ] },
+    { "base": "Rastreadora", "paths": [ { "adv": "Caçadora Alada", "max": "Atiradora dos Céus" }, { "adv": "Terrana", "max": "Geomancer" } ] },
+    { "base": "Demon", "special": true, "paths": [ { "adv": "Lorde Demon" } ] }
+  ],
+  "Humes": [
+    { "base": "Soldado", "paths": [ { "adv": "Duelista", "max": "Samurai" }, { "adv": "Clérigo", "max": "Eremita" } ] },
+    { "base": "Mago Branco", "paths": [ { "adv": "Clérigo", "max": "Eremita" }, { "adv": "Mago Azul", "max": "Iluminista" }, { "adv": "Alquimista", "max": "Arquidênio" } ] },
+    { "base": "Químico", "paths": [ { "adv": "Alquimista", "max": "Arquidênio" }, { "adv": "Químico Avançado", "max": "Oppenheir" } ] },
+    { "base": "Cavaleiro Negro", "isolated": true }
+  ],
+  "Hypello": [
+    { "base": "Escudeiro", "paths": [ { "adv": "Protetor", "max": "Guardião do Pântano" }, { "adv": "Monge do Pântano", "max": "Sábio do Pântano" } ] },
+    { "base": "Curandeiro", "paths": [ { "adv": "Glutão", "max": "Burguês do Pântano" }, { "adv": "Xamã", "max": "Pai do Pântano" } ] },
+    { "base": "Cantor das Marés", "special": true, "paths": [ { "adv": "Astro do Pântano" } ] }
+  ],
+  "Mithra": [
+    { "base": "Ladra", "paths": [ { "adv": "Sutileira", "max": "Chefona" }, { "adv": "Kunoichi", "max": "Jounin" } ] },
+    { "base": "Espreitadora", "paths": [ { "adv": "Kunoichi", "max": "Jounin" }, { "adv": "Rastreadora", "max": "Assassina" } ] },
+    { "base": "Dançarina", "special": true, "paths": [ { "adv": "Odalisca de Batalha" } ] }
+  ],
+  "Moogles": [
+    { "base": "Engenheiro", "paths": [ { "adv": "Pistoleiro", "max": "Canhoneiro" }, { "adv": "Soldado Moogle", "max": "Cavaleiro Moogle" } ] },
+    { "base": "Animista", "paths": [ { "adv": "Mago Moogle", "max": "Mago do Tempo" }, { "adv": "Influencer", "max": "Malabarista" } ] },
+    { "base": "Chocobo Rider", "isolated": true }
+  ],
+  "No Muo": [
+    { "base": "Mago Negro", "paths": [ { "adv": "Mago Real", "max": "Mago Primordial" }, { "adv": "Professor", "max": "Sábio" } ] },
+    { "base": "Adestrador", "paths": [ { "adv": "Domador", "max": "Mestre das Bestas" } ] },
+    { "base": "Estudioso", "special": true, "paths": [ { "adv": "Magia Vender" } ] }
+  ],
+  "Umbros": [
+    { "base": "Mago Negro", "paths": [ { "adv": "Mago Elemental", "max": "Arquimago" } ] },
+    { "base": "Ocultista", "paths": [ { "adv": "Arcanista", "max": "Necromago" } ] },
+    { "base": "Malandro", "paths": [ { "adv": "Rei das Ruas" }, { "adv": "Apostador" } ] },
+    { "base": "Shadow Hunter", "special": true, "paths": [ { "adv": "Monarca das Sombras" } ] }
+  ],
+  "Viera": [
+    { "base": "Arqueira", "paths": [ { "adv": "Caçadora", "max": "Patrulheira da Floresta" } ] },
+    { "base": "Curandeiro", "paths": [ { "adv": "Espiritualista", "max": "Tecelã de Espíritos" }, { "adv": "Maga Vermelha", "max": "Spellblade" } ] },
+    { "base": "Esgrimista", "paths": [ { "adv": "Maga Vermelha", "max": "Spellblade" }, { "adv": "Floretista", "max": "Mosqueteira" } ] },
+    { "base": "Invocadora", "isolated": true },
+    { "base": "Exilado", "special": true, "paths": [ { "adv": "Mercenário", "max": "Mestre das Armas" } ] }
+  ]
+}
