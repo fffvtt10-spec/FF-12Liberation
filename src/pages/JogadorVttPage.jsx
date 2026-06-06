@@ -277,6 +277,21 @@ export default function JogadorVttPage() {
   const [isDraggingChat, setIsDraggingChat] = useState(false);
   const [dragOffsetChat, setDragOffsetChat] = useState({ x: 0, y: 0 });
 
+  // --- NOVOS ESTADOS - QUEUE 01 ---
+  const [showBencao, setShowBencao] = useState(false);
+  const [numeroDestino, setNumeroDestino] = useState("");
+  const [bencaoVencedorAtivo, setBencaoVencedorAtivo] = useState(false);
+
+  const [showTrocas, setShowTrocas] = useState(false);
+  const [minhasTrocas, setMinhasTrocas] = useState([]);
+  const [trocaForm, setTrocaForm] = useState({ destinatarioUid: '', itensSelecionados: [], gil: 0, mensagem: '' });
+
+  const [showClassTree, setShowClassTree] = useState(false);
+  const [treeTab, setTreeTab] = useState('Bangaa');
+  const [treePos, setTreePos] = useState({ x: 50, y: 50 });
+  const [isDraggingTree, setIsDraggingTree] = useState(false);
+  const [dragOffsetTree, setDragOffsetTree] = useState({ x: 0, y: 0 });
+
   const handleChatMouseDown = (e) => {
       setIsDraggingChat(true);
       setDragOffsetChat({ x: e.clientX - chatPos.x, y: e.clientY - chatPos.y });
@@ -395,6 +410,26 @@ export default function JogadorVttPage() {
       };
   }, [currentVttSession?.id]); 
 
+  // --- NOVO EFEITO: ESCUTAR MERCADO DE TROCAS ---
+  useEffect(() => {
+      if (!currentVttSession || !personagem) return;
+      const qMercado = query(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"));
+      const unsubMercado = onSnapshot(qMercado, mercSnap => {
+          const allTrocas = mercSnap.docs.map(d => ({id: d.id, ...d.data()}));
+          setMinhasTrocas(allTrocas.filter(t => t.remetenteUid === personagem.uid || t.destinatarioUid === personagem.uid));
+      });
+      return () => unsubMercado();
+  }, [currentVttSession?.id, personagem?.uid]);
+
+  // --- NOVO EFEITO: CHECK VITÓRIA BÊNÇÃO ---
+  useEffect(() => {
+      if(currentVttSession?.bencao_deuses?.active && currentVttSession.bencao_deuses.vencedores?.includes(personagem?.name)) {
+          setBencaoVencedorAtivo(true);
+          const t = setTimeout(() => setBencaoVencedorAtivo(false), 5000); 
+          return () => clearTimeout(t);
+      }
+  }, [currentVttSession?.bencao_deuses?.timestamp, personagem?.name, currentVttSession?.bencao_deuses?.active, currentVttSession?.bencao_deuses?.vencedores]);
+
   const handleConfirmLevelUp = () => { setShowLevelUpModal(false); audioRef.current.pause(); };
   
   const handleCandidatar = async (missao) => {
@@ -443,6 +478,82 @@ export default function JogadorVttPage() {
     window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
   };
 
+  // --- HANDLERS TROCAS (JOGADOR) ---
+  const toggleItemTroca = (slot) => {
+      setTrocaForm(prev => {
+          const isSelected = prev.itensSelecionados.find(i => i.slot_id === slot.slot_id);
+          if (isSelected) {
+              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.slot_id !== slot.slot_id) };
+          } else {
+              return { ...prev, itensSelecionados: [...prev.itensSelecionados, slot] };
+          }
+      });
+  };
+
+  const handleEnviarProposta = async (e) => {
+      e.preventDefault();
+      if(!currentVttSession || !personagem || !trocaForm.destinatarioUid) return alert("Selecione o destinatário da troca.");
+      
+      const target = allPersonagens.find(p => p.uid === trocaForm.destinatarioUid);
+      if (!target) return alert("Destinatário não encontrado.");
+      
+      const itensFormatados = trocaForm.itensSelecionados.map(i => ({ 
+          name: i.item_name, 
+          quantidade: 1, 
+          slot_id: i.slot_id,
+          effect: i.effect || ''
+      }));
+
+      try {
+          await addDoc(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"), {
+              remetenteUid: personagem.uid,
+              remetente: personagem.name,
+              destinatarioUid: target.uid,
+              destinatario: target.name,
+              itens: itensFormatados, 
+              gil: Number(trocaForm.gil) || 0,
+              mensagem: trocaForm.mensagem,
+              status: 'pendente_mestre',
+              createdAt: new Date().toISOString()
+          });
+          setTrocaForm({ destinatarioUid: '', itensSelecionados: [], gil: 0, mensagem: '' });
+          alert("Proposta enviada! O Narrador precisa autorizar para efetivar a movimentação na ficha.");
+      } catch(err) { alert("Erro ao enviar: " + err.message); }
+  };
+
+  // --- HANDLER BÊNÇÃO DOS DEUSES ---
+  const handleApostarNumero = async (e) => {
+      e.preventDefault();
+      if(!currentVttSession || !personagem || !numeroDestino) return;
+      try {
+          await updateDoc(doc(db, "sessoes", currentVttSession.id), {
+              [`bencao_deuses.numeros_escolhidos.${personagem.name}`]: Number(numeroDestino)
+          });
+          alert(`Número ${numeroDestino} cravado! Os deuses o observam.`);
+      } catch(err) { alert("Erro ao apostar: " + err.message); }
+  };
+
+  // --- HANDLERS ARRASTAR MOUSE/TOUCH (TREE, CHAT, TRACKER, DETAILS) ---
+  const startDragTree = (clientX, clientY) => {
+      setIsDraggingTree(true);
+      setDragOffsetTree({ x: clientX - treePos.x, y: clientY - treePos.y });
+  };
+  const onDragMoveTree = (clientX, clientY) => {
+      if (!isDraggingTree) return;
+      setTreePos({ x: clientX - dragOffsetTree.x, y: clientY - dragOffsetTree.y });
+  };
+  
+  const handleTreeMouseDown = (e) => startDragTree(e.clientX, e.clientY);
+  const handleTreeMouseMove = (e) => onDragMoveTree(e.clientX, e.clientY);
+  const handleTreeMouseUp = () => setIsDraggingTree(false);
+
+  const handleTreeTouchStart = (e) => startDragTree(e.touches[0].clientX, e.touches[0].clientY);
+  const handleTreeTouchMove = (e) => {
+      if(isDraggingTree) e.preventDefault(); 
+      onDragMoveTree(e.touches[0].clientX, e.touches[0].clientY);
+  };
+  const handleTreeTouchEnd = () => setIsDraggingTree(false);
+
   const handleTrackerMouseDown = (e) => {
       setIsDraggingTracker(true);
       setDragOffsetTracker({ x: e.clientX - trackerPos.x, y: e.clientY - trackerPos.y });
@@ -455,11 +566,13 @@ export default function JogadorVttPage() {
       if (isDraggingTracker) { setTrackerPos({ x: e.clientX - dragOffsetTracker.x, y: e.clientY - dragOffsetTracker.y }); }
       if (isDraggingDetails) { setDetailsPos({ x: e.clientX - dragOffsetDetails.x, y: e.clientY - dragOffsetDetails.y }); }
       if (isDraggingChat) { setChatPos({ x: e.clientX - dragOffsetChat.x, y: e.clientY - dragOffsetChat.y }); }
+      if (isDraggingTree) { setTreePos({ x: e.clientX - dragOffsetTree.x, y: e.clientY - dragOffsetTree.y }); } 
   };
   const handleWindowMouseUp = () => { 
       setIsDraggingTracker(false); 
       setIsDraggingDetails(false); 
       setIsDraggingChat(false);
+      setIsDraggingTree(false); 
   };
 
   // --- LOGICA E LISTENERS DO CHAT DE EQUIPE (PVP) ---
@@ -530,6 +643,44 @@ export default function JogadorVttPage() {
       return null;
   };
 
+  // --- RENDER ÁRVORE VISUAL ---
+  const renderClassTree = () => {
+      if (treeTab === 'Bangaa') {
+          return (
+              <div className="flowchart-css">
+                  <div className="fc-col"><div className="fc-node base">Guerreiro</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Gladiador</div><div className="fc-arrow">➔</div><div className="fc-node max">Viking</div></div><div className="fc-row"><div className="fc-node adv">Lanceiro</div><div className="fc-arrow">➔</div><div className="fc-node max">Bangalor</div></div></div></div>
+                  <hr className="fc-div"/>
+                  <div className="fc-col"><div className="fc-node base">Monge</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Artista Marcial</div><div className="fc-arrow">➔</div><div className="fc-node max">Mestre Artes</div></div><div className="fc-row"><div className="fc-node adv">Lutador Rua</div><div className="fc-arrow">➔</div><div className="fc-node max">Brutamontes</div></div></div></div>
+                  <hr className="fc-div"/>
+                  <div className="fc-row"><div className="fc-node special">Cavaleiro Dragão</div><div className="fc-arrow">➔</div><div className="fc-node legendary">Dragonslayer</div></div>
+              </div>
+          );
+      }
+      if (treeTab === 'Elvaan') {
+          return (
+              <div className="flowchart-css">
+                  <div className="fc-col"><div className="fc-node base">Soldado</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Paladino</div><div className="fc-arrow">➔</div><div className="fc-node max">Templário</div></div><div className="fc-row"><div className="fc-node adv">Lâminas Mágicas</div><div className="fc-arrow">➔</div><div className="fc-node max">Saber</div></div></div></div>
+                  <hr className="fc-div"/>
+                  <div className="fc-col"><div className="fc-node base">Espadachim</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Duelista</div><div className="fc-arrow">➔</div><div className="fc-node max">Ronin</div></div><div className="fc-row"><div className="fc-node adv" style={{opacity:0.5}}>Lâminas Mágicas</div><div className="fc-arrow" style={{opacity:0.5}}>➔</div><div className="fc-node max" style={{opacity:0.5}}>Saber</div></div></div></div>
+              </div>
+          );
+      }
+      if (treeTab === 'Viera') {
+          return (
+              <div className="flowchart-css">
+                  <div className="fc-row"><div className="fc-node base">Arqueira</div><div className="fc-arrow">➔</div><div className="fc-node adv">Caçadora</div><div className="fc-arrow">➔</div><div className="fc-node max">Patrulheira</div></div>
+                  <hr className="fc-div"/>
+                  <div className="fc-col"><div className="fc-node base">Curandeiro</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv">Espiritualista</div><div className="fc-arrow">➔</div><div className="fc-node max">Tecelã</div></div><div className="fc-row"><div className="fc-node adv">Maga Vermelha</div><div className="fc-arrow">➔</div><div className="fc-node max">Spellblade</div></div></div></div>
+                  <hr className="fc-div"/>
+                  <div className="fc-col"><div className="fc-node base">Esgrimista</div><div className="fc-arrow">➔</div><div className="fc-col"><div className="fc-row"><div className="fc-node adv" style={{opacity:0.5}}>Maga Vermelha</div><div className="fc-arrow" style={{opacity:0.5}}>➔</div><div className="fc-node max" style={{opacity:0.5}}>Spellblade</div></div><div className="fc-row"><div className="fc-node adv">Floretista</div><div className="fc-arrow">➔</div><div className="fc-node max">Mosqueteira</div></div></div></div>
+                  <hr className="fc-div"/>
+                  <div className="fc-row"><div className="fc-node special">Exilado</div><div className="fc-arrow">➔</div><div className="fc-node adv">Mercenário</div><div className="fc-arrow">➔</div><div className="fc-node legendary">Mestre Armas</div></div>
+              </div>
+          );
+      }
+      return null;
+  };
+
   if (loading || !minTimeElapsed) {
     return (
       <div style={{
@@ -556,12 +707,27 @@ export default function JogadorVttPage() {
 
   if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
+  const isBencaoWinner = currentVttSession?.bencao_deuses?.vencedores?.includes(personagem?.name);
+  const meuInventario = personagem?.character_sheet?.inventory?.slots?.filter(s => s && s.item_name && s.item_name.trim() !== '') || [];
+  const meuGil = personagem?.character_sheet?.inventory?.gil || 0;
+
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
+      
+      {bencaoVencedorAtivo && (
+          <div className="bencao-victory-overlay">
+              <div className="bencao-victory-box">
+                  <h2>OS DEUSES SORRIEM PARA VOCÊ!</h2>
+                  <p>O Narrador rolou o seu Número do Destino ({numeroDestino}).</p>
+                  <p className="subtext">Você recebeu a Bênção dos Deuses nesta sessão!</p>
+              </div>
+          </div>
+      )}
+
       <div className="content-layer">
 
-        <div className="char-hud clickable-hud" onClick={() => setShowFicha(true)} title="Abrir Ficha">
+        <div className={`char-hud clickable-hud ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowFicha(true)} title="Abrir Ficha">
           <div className="char-avatar"><div className="avatar-circle"><span className="hud-level">{personagem.character_sheet?.basic_info?.level || 1}</span></div></div>
           <div className="char-info"><h2 className="char-name">{personagem.name}</h2><span className="char-meta">{personagem.race} // {personagem.class}</span></div>
         </div>
@@ -757,6 +923,15 @@ export default function JogadorVttPage() {
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
 
         <button className="floating-mission-btn" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
+        
+        {/* NOVOS BOTÕES FLUTUANTES - QUEUE 01 */}
+        <button className="floating-trocas-btn" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
+            🏮
+            {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
+        </button>
+        <button className={`floating-bencao-btn ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
+        <button className="floating-tree-btn" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
+
         <button className="floating-calendar-btn" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
         
         {vttStatus === 'connected' && <button className="floating-combat-btn" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
@@ -998,13 +1173,158 @@ export default function JogadorVttPage() {
             </div>
         )}
 
+        {/* --- MODAIS QUEUE 01 --- */}
+
+        {/* MODAL: SISTEMA DE TROCAS */}
+        {showTrocas && (
+            <div className="modal-overlay-custom" onClick={() => setShowTrocas(false)}>
+                <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header-c"><h3>🏮 SISTEMA DE TROCAS</h3><button className="close-c" onClick={() => setShowTrocas(false)}>✕</button></div>
+                    <div style={{display:'flex', gap:'20px'}}>
+                        
+                        {/* Enviar Proposta */}
+                        <div style={{flex:1, background:'#111', padding:'15px', borderRadius:'4px', border:'1px solid #333'}}>
+                            <h4 style={{color:'#00f2ff', margin:'0 0 15px 0'}}>Oferecer Troca</h4>
+                            <form onSubmit={handleEnviarProposta}>
+                                <div style={{marginBottom:'10px'}}>
+                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>DESTINATÁRIO</label>
+                                    <select className="file-input-dark" value={trocaForm.destinatarioUid} onChange={e => setTrocaForm({...trocaForm, destinatarioUid: e.target.value})} required>
+                                        <option value="">-- Escolha um Aventureiro --</option>
+                                        {allPersonagens.filter(p => p.uid !== personagem?.uid && currentVttSession?.participantes?.includes(p.name)).map(p => (
+                                            <option key={p.uid} value={p.uid}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div style={{marginBottom:'10px'}}>
+                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>SEUS ITENS DISPONÍVEIS</label>
+                                    <div className="itens-troca-lista custom-scrollbar">
+                                        {meuInventario.length === 0 && <p style={{color:'#666', fontSize:'12px', fontStyle:'italic'}}>Seu inventário está vazio.</p>}
+                                        {meuInventario.map(slot => (
+                                            <label key={slot.slot_id} className="item-checkbox-label">
+                                                <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.slot_id === slot.slot_id)} onChange={() => toggleItemTroca(slot)} />
+                                                {slot.item_name}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div style={{marginBottom:'10px'}}>
+                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>GIL ENVIADO (Máx: {meuGil})</label>
+                                    <input type="number" min="0" max={meuGil} className="file-input-dark" value={trocaForm.gil} onChange={e => setTrocaForm({...trocaForm, gil: Number(e.target.value)})} />
+                                </div>
+
+                                <div style={{marginBottom:'15px'}}>
+                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>MENSAGEM (RP)</label>
+                                    <textarea className="file-input-dark" style={{resize:'none', height:'60px'}} placeholder="Descreva sua oferta (opcional)..." value={trocaForm.mensagem} onChange={e => setTrocaForm({...trocaForm, mensagem: e.target.value})} />
+                                </div>
+                                <button type="submit" className="btn-save-m" style={{width:'100%', padding:'15px'}}>ENVIAR PROPOSTA</button>
+                            </form>
+                        </div>
+
+                        {/* Histórico */}
+                        <div style={{flex:1, display:'flex', flexDirection:'column'}}>
+                            <h4 style={{color:'#ffcc00', margin:'0 0 15px 0'}}>Meus Registros Mercantis</h4>
+                            <div className="custom-scrollbar" style={{flex:1, background:'#0a0a0a', border:'1px solid #333', padding:'10px', overflowY:'auto', maxHeight:'400px'}}>
+                                {minhasTrocas.length === 0 && <p style={{color:'#666', fontSize:'12px', textAlign:'center'}}>Nenhum registro encontrado.</p>}
+                                {minhasTrocas.map(t => {
+                                    const isSent = t.remetenteUid === personagem?.uid;
+                                    const statusColor = t.status === 'aprovado' ? '#0f0' : t.status === 'recusado' ? '#f44' : '#ffcc00';
+                                    const statusText = t.status === 'aprovado' ? '✓ Aprovado' : t.status === 'recusado' ? '✕ Recusado' : '⏳ Pendente';
+                                    return (
+                                        <div key={t.id} style={{background:'#111', border:'1px solid #333', padding:'10px', marginBottom:'10px', borderRadius:'4px', borderLeft:`3px solid ${isSent ? '#00f2ff' : '#a855f7'}`}}>
+                                            <div style={{display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#888', marginBottom:'5px'}}>
+                                                <span>{isSent ? `ENVIADO PARA: ${t.destinatario}` : `RECEBIDO DE: ${t.remetente}`}</span>
+                                                <strong style={{color: statusColor}}>{statusText}</strong>
+                                            </div>
+                                            <p style={{margin:'5px 0', fontSize:'12px', color:'#ccc'}}>Itens: {t.itens?.map(i => i.name).join(', ') || 'Nenhum'}</p>
+                                            <p style={{margin:'5px 0', fontSize:'12px', color:'#fcd34d'}}>Gil: {t.gil}</p>
+                                            {t.mensagem && <p style={{margin:'5px 0', fontSize:'11px', color:'#aaa', fontStyle:'italic'}}>"{t.mensagem}"</p>}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL: BÊNÇÃO DOS DEUSES */}
+        {showBencao && (
+            <div className="modal-overlay-custom" onClick={() => setShowBencao(false)}>
+                <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header-c"><h3>✨ BÊNÇÃO DOS DEUSES</h3><button className="close-c" onClick={() => setShowBencao(false)}>✕</button></div>
+                    <div style={{textAlign:'center'}}>
+                        <p style={{color:'#ccc', fontSize:'14px', marginBottom:'20px'}}>
+                            Escolha um número entre 1 e 100. Se o Narrador rolar o **Dado dos Deuses** e cair no seu número, você receberá vantagens especiais nesta sessão.
+                        </p>
+                        <form onSubmit={handleApostarNumero}>
+                            <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'15px', marginBottom:'20px'}}>
+                                <input 
+                                    type="number" min="1" max="100" required
+                                    style={{background:'#000', color:'#ffcc00', border:'2px solid #ffcc00', padding:'15px', fontSize:'30px', width:'100px', textAlign:'center', borderRadius:'8px'}}
+                                    value={numeroDestino} onChange={e => setNumeroDestino(e.target.value)}
+                                />
+                            </div>
+                            <button type="submit" className="btn-save-m" style={{padding:'15px 30px', fontSize:'16px'}}>CRAVAR DESTINO</button>
+                        </form>
+                        
+                        <div style={{marginTop:'30px', background:'#111', padding:'15px', borderRadius:'4px', border:'1px solid #333'}}>
+                            <h4 style={{color:'#aaa', margin:'0 0 10px 0', fontSize:'12px'}}>Meu Número Atual:</h4>
+                            <span style={{fontSize:'24px', color:'#00f2ff', fontWeight:'bold'}}>
+                                {currentVttSession?.bencao_deuses?.numeros_escolhidos?.[personagem?.name] || "Nenhum escolhido"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL DRAGGABLE / TOUCH: ÁRVORE DE CLASSES */}
+        {showClassTree && (
+            <div 
+                className="draggable-card fade-in" 
+                style={{ position: 'absolute', top: treePos.y, left: treePos.x, zIndex: 3000, width: '600px', background: '#0d0d10', border: '2px solid #00f2ff', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.9)' }}
+                onClick={e => e.stopPropagation()}
+            >
+                <div 
+                    className="md-header" 
+                    onMouseDown={handleTreeMouseDown}
+                    onTouchStart={handleTreeTouchStart}
+                    onTouchMove={handleTreeTouchMove}
+                    onTouchEnd={handleTreeTouchEnd}
+                    style={{ background: 'linear-gradient(90deg, #001a33, #000)', padding: '15px', borderBottom: '1px solid #00f2ff', cursor: 'grab', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                    <h3 style={{ margin: 0, color: '#00f2ff', fontFamily: 'Cinzel, serif', letterSpacing: '2px' }}>🌳 ÁRVORE DE CLASSES</h3>
+                    <button onClick={() => setShowClassTree(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+                </div>
+                <div style={{ padding: '15px' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
+                        {['Bangaa', 'Elvaan', 'Viera'].map(r => (
+                            <button 
+                                key={r} 
+                                className={treeTab === r ? 'active' : ''} 
+                                onClick={() => setTreeTab(r)} 
+                                style={{ background: 'transparent', border: 'none', color: treeTab === r ? '#00f2ff' : '#aaa', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', paddingBottom: '5px', borderBottom: treeTab === r ? '2px solid #00f2ff' : 'none' }}
+                            >
+                                {r}
+                            </button>
+                        ))}
+                    </div>
+                    {renderClassTree()}
+                </div>
+            </div>
+        )}
+
       </div>
       <style>{`
         .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         
-        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; }
+        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; transition: 0.3s; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
         .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; }
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
@@ -1012,6 +1332,16 @@ export default function JogadorVttPage() {
         
         .floating-mission-btn { position: fixed; bottom: 30px; left: 15px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #fff; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-mission-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
+
+        /* NOVOS BOTÕES FLUTUANTES - QUEUE 01 */
+        .floating-trocas-btn { position: fixed; bottom: 30px; left: 75px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-trocas-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
+
+        .floating-bencao-btn { position: fixed; bottom: 90px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #ffcc00; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-bencao-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
+
+        .floating-tree-btn { position: fixed; bottom: 150px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; color: #00f2ff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-tree-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; color: #fff; border-color: #fff; }
 
         .floating-dice-btn { position: fixed; bottom: 90px; left: 18px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #fff; background: #111; color: #fff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .floating-dice-btn:hover { border-color: #ffcc00; transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
@@ -1055,7 +1385,7 @@ export default function JogadorVttPage() {
         .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
         
-        /* NOVO: FEEDBACK VISUAL SE O PRÓPRIO JOGADOR ESTIVER EM FURTIVIDADE */
+        /* FEEDBACK VISUAL SE O PRÓPRIO JOGADOR ESTIVER EM FURTIVIDADE */
         .tracker-item.tracker-stealth-self { border-color: #a855f7; border-style: dashed; opacity: 0.8; box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.3); }
 
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
@@ -1584,6 +1914,43 @@ export default function JogadorVttPage() {
             transform: scale(1.1);
             box-shadow: 0 0 8px var(--team-color, #a855f7);
         }
+        
+        /* NOVAS REGRAS CSS - QUEUE 01 */
+        .floating-trocas-btn { position: fixed; bottom: 30px; left: 75px; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #a855f7; background: #000; color: #a855f7; font-size: 24px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-trocas-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
+
+        .floating-bencao-btn { position: fixed; bottom: 90px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #ffcc00; background: #000; color: #ffcc00; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-bencao-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
+
+        .floating-tree-btn { position: fixed; bottom: 150px; left: 75px; width: 45px; height: 45px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; color: #00f2ff; font-size: 20px; cursor: pointer; z-index: 2000; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .floating-tree-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; color: #fff; border-color: #fff; }
+
+        /* DESTAQUE BÊNÇÃO E OVERLAY */
+        .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
+        @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
+        .bencao-victory-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 204, 0, 0.15); z-index: 10000; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flashScreen 0.5s ease-out; }
+        .bencao-victory-box { background: rgba(0,0,0,0.9); border: 3px solid #ffcc00; box-shadow: 0 0 50px #ffcc00; padding: 40px; text-align: center; border-radius: 10px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; }
+        .bencao-victory-box h2 { color: #ffcc00; font-size: 30px; margin: 0 0 10px 0; text-shadow: 0 0 10px #ffcc00; }
+        .bencao-victory-box p { color: #fff; font-size: 18px; margin: 5px 0; }
+        .bencao-victory-box .subtext { color: #0f0; font-weight: bold; margin-top: 15px; }
+
+        /* ESTILOS DE TROCAS / MERCADO */
+        .itens-troca-lista { background: #000; border: 1px solid #444; padding: 10px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border-radius: 4px; }
+        .item-checkbox-label { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #ccc; cursor: pointer; }
+        .item-checkbox-label input { accent-color: #00f2ff; transform: scale(1.2); }
+
+        /* FLOWCHART CLASSES CSS */
+        .flowchart-css { display: flex; flex-direction: column; gap: 15px; align-items: flex-start; padding: 10px; background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid #333; }
+        .fc-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+        .fc-col { display: flex; flex-direction: column; gap: 10px; }
+        .fc-node { padding: 10px 15px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; min-width: 120px; }
+        .fc-node.base { background: #1f2937; border: 2px solid #3b82f6; color: #fff; }
+        .fc-node.adv { background: #111827; border: 2px solid #fbbf24; color: #fbbf24; }
+        .fc-node.max { background: #000; border: 2px solid #f44; color: #f44; box-shadow: 0 0 10px rgba(244, 68, 68, 0.3); }
+        .fc-node.special { background: #3b0764; border: 2px solid #a855f7; color: #e9d5ff; }
+        .fc-node.legendary { background: #020617; border: 2px solid #00f2ff; color: #00f2ff; box-shadow: 0 0 15px #00f2ff; }
+        .fc-arrow { color: #555; font-size: 18px; font-weight: bold; }
+        .fc-div { width: 100%; border: none; border-top: 1px dashed #444; margin: 10px 0; }
       `}</style>
 
       <WallpaperPicker

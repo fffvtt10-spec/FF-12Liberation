@@ -5,8 +5,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom'; 
 import { backgroundMusic } from './LandingPage'; 
 import fundoMestre from '../assets/fundo-mestre.jpg'; 
-import sanchezImg from '../assets/sanchez.jpeg'; 
-import papiroImg from '../assets/papiro.png'; 
 import chocoboGif from '../assets/chocobo-loading.gif';
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
@@ -61,6 +59,7 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
                 className={`cal-event-pill ${ev.type} ${ev.isArena ? 'arena' : ''}`} 
                 onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
                 title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
+                style={ev.mestreCor ? { borderLeft: `4px solid ${ev.mestreCor}`, backgroundColor: ev.type === 'session' ? `${ev.mestreCor}30` : '' } : {}}
               >
                 {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? (ev.isArena ? '⚔️' : '🛡️') : '✅'}
               </div>
@@ -124,10 +123,10 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
                 <div className="mini-modal detail">
                     {viewEvent.type === 'session' ? (
                         <>
-                            <h4 style={{color: viewEvent.isArena ? '#a855f7' : '#f44'}}>{viewEvent.isArena ? '⚔️ ARENA PVP' : '🛡️ SESSÃO AGENDADA'}</h4>
+                            <h4 style={{color: viewEvent.isArena ? '#a855f7' : (viewEvent.mestreCor || '#f44')}}>{viewEvent.isArena ? '⚔️ ARENA PVP' : '🛡️ SESSÃO AGENDADA'}</h4>
                             <h3>{viewEvent.missaoNome}</h3>
                             <p><strong>Horário Atual:</strong> {new Date(viewEvent.dataInicio).toLocaleString()}</p>
-                            <p><strong>Mestre:</strong> {viewEvent.mestreNome || "Você"}</p>
+                            <p><strong>Narrador:</strong> <span style={{color: viewEvent.mestreCor || '#fff'}}>{viewEvent.mestreNome || "Desconhecido"}</span></p>
                             <div className="detail-players">
                                 <strong>Jogadores:</strong>
                                 {viewEvent.participantes?.join(', ') || "Nenhum"}
@@ -146,8 +145,9 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
                         </>
                     ) : (
                         <>
-                            <h4 style={{color: '#0f0'}}>✅ DISPONIBILIDADE</h4>
+                            <h4 style={{color: viewEvent.mestreCor || '#0f0'}}>✅ DISPONIBILIDADE</h4>
                             <p><strong>Data:</strong> {new Date(viewEvent.start).toLocaleString()}</p>
+                            <p><strong>Narrador:</strong> <span style={{color: viewEvent.mestreCor || '#fff'}}>{viewEvent.mestreNome || "Desconhecido"}</span></p>
                             <p>Horário reservado para futuras sessões.</p>
                             {isMaster && (
                                 <button className="btn-red" onClick={() => { onDeleteSlot(viewEvent.id); setViewEvent(null); }}>REMOVER DISPONIBILIDADE</button>
@@ -191,43 +191,11 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
   );
 };
 
-// O Timer mantido apenas para ser usado nas resenhas, se necessário.
-const Timer = ({ expiry }) => {
-  const [timeLeft, setTimeLeft] = useState("");
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = new Date(expiry).getTime() - now;
-      if (distance < 0) { 
-        setTimeLeft("EXPIRADA"); 
-        clearInterval(interval); 
-      } else {
-        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        setTimeLeft(`${days}d ${hours}h ${mins}m`);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [expiry]);
-  return <span className="mission-timer">⏳ {timeLeft}</span>;
-};
-
-const formatSanchezText = (text) => {
-  if (!text) return { __html: "" };
-  let formatted = text
-    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-    .replace(/_(.*?)_/g, '<em>$1</em>')           
-    .replace(/\n/g, '<br />');                    
-  return { __html: formatted };
-};
-
 export default function MestrePage() {
   const navigate = useNavigate();
   
   const [currentUser, setCurrentUser] = useState(null);
   const [missoes, setMissoes] = useState([]);
-  const [resenhas, setResenhas] = useState([]); 
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
   const [disponibilidades, setDisponibilidades] = useState([]); 
@@ -236,7 +204,6 @@ export default function MestrePage() {
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   const [showModal, setShowModal] = useState(false); 
-  const [showResenhaModal, setShowResenhaModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
   const [showCalendar, setShowCalendar] = useState(false); 
   const [showFichasList, setShowFichasList] = useState(false); 
@@ -249,9 +216,6 @@ export default function MestrePage() {
   const [arenaForm, setArenaForm] = useState({
       nomeEvento: '',
       selectedSlotId: '',
-      mapas: [],    // ADICIONADO PARA ARENA
-      cenarios: [], // ADICIONADO PARA ARENA
-      npcs: [],     // ADICIONADO PARA ARENA
       equipes: [
           { id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] },
           { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }
@@ -259,14 +223,9 @@ export default function MestrePage() {
   });
   
   const [showDetails, setShowDetails] = useState(null); 
-  const [viewResenha, setViewResenha] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
   const [viewMembers, setViewMembers] = useState(null); 
 
-  const [resenha, setResenha] = useState("");
-  const [tituloResenha, setTituloResenha] = useState("");
-  const [destinatarios, setDestinatarios] = useState([]);
-  const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
   const [form, setForm] = useState({
     nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
   });
@@ -274,23 +233,23 @@ export default function MestrePage() {
   const [sessionForm, setSessionForm] = useState({
     missaoId: '', 
     selectedSlotId: '', 
-    mapas: [],      
-    cenarios: [],   
-    monstros: [],   
-    npcs: [],       
     jogadores: []   
   });
   
-  const [tempLink, setTempLink] = useState("");
-  const [tempType, setTempType] = useState("mapas"); 
+  const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
 
   const [mestreIdentidade, setMestreIdentidade] = useState(() => {
     return localStorage.getItem('mestreAssinatura') || "Narrador";
   });
 
+  const [mestreCor, setMestreCor] = useState(() => {
+    return localStorage.getItem('mestreCor') || "#fbbf24";
+  });
+
   useEffect(() => {
     localStorage.setItem('mestreAssinatura', mestreIdentidade);
-  }, [mestreIdentidade]);
+    localStorage.setItem('mestreCor', mestreCor);
+  }, [mestreIdentidade, mestreCor]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -305,14 +264,12 @@ export default function MestrePage() {
     const unsub = onAuthStateChanged(auth, (user) => {
         if (user) {
             setCurrentUser(user);
-            const qM = query(collection(db, "missoes"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
-            const qR = query(collection(db, "resenhas"), where("mestreId", "==", user.uid), orderBy("createdAt", "desc"));
-            const qS = query(collection(db, "sessoes"), where("mestreId", "==", user.uid), orderBy("dataInicio", "asc"));
-            const qD = query(collection(db, "disponibilidades"), where("mestreId", "==", user.uid));
+            const qM = query(collection(db, "missoes"), orderBy("createdAt", "desc"));
+            const qS = query(collection(db, "sessoes"), orderBy("dataInicio", "asc"));
+            const qD = query(collection(db, "disponibilidades"));
             const qC = query(collection(db, "characters"));
 
             const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            const unsubR = onSnapshot(qR, (snap) => setResenhas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubS = onSnapshot(qS, (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubD = onSnapshot(qD, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubC = onSnapshot(qC, (snap) => {
@@ -320,7 +277,7 @@ export default function MestrePage() {
                 setLoading(false); 
             });
 
-            return () => { unsubM(); unsubR(); unsubS(); unsubC(); unsubD(); };
+            return () => { unsubM(); unsubS(); unsubC(); unsubD(); };
         } else {
             setLoading(false);
             navigate('/login'); 
@@ -337,28 +294,16 @@ export default function MestrePage() {
       }
   }, [personagensDb]);
 
-  // --- ALTERAÇÃO AQUI: Removemos o timer de expiração (expiraEm) das missões ---
   const handleCreateMission = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
     try {
       await addDoc(collection(db, "missoes"), {
-        ...form, mestreNome: mestreIdentidade, mestreId: currentUser.uid, createdAt: serverTimestamp()
+        ...form, mestreNome: mestreIdentidade, mestreCor: mestreCor, mestreId: currentUser.uid, createdAt: serverTimestamp()
       });
       setShowModal(false);
       setForm({ nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: '' });
     } catch (err) { alert("Erro ao forjar cartaz: " + err.message); }
-  };
-
-  const publicarResenha = async () => {
-    if (!tituloResenha || !resenha || !currentUser) return alert("Preencha título e conteúdo!");
-    try {
-      const expiraEm = new Date(); expiraEm.setDate(expiraEm.getDate() + 7); 
-      await addDoc(collection(db, "resenhas"), {
-        titulo: tituloResenha, conteudo: resenha, mestre: mestreIdentidade, mestreId: currentUser.uid, destinatarios, createdAt: serverTimestamp(), expiraEm: expiraEm.toISOString()
-      });
-      setShowResenhaModal(false); setResenha(""); setTituloResenha(""); setDestinatarios([]);
-    } catch (e) { alert("Erro ao publicar."); }
   };
 
   const handleRemoveCandidate = async (missaoId, candidate) => {
@@ -370,44 +315,13 @@ export default function MestrePage() {
       }
   };
 
-  const handleAddAsset = () => {
-      if (!tempLink) return;
-      setSessionForm(prev => ({
-          ...prev,
-          [tempType]: [...prev[tempType], tempLink]
-      }));
-      setTempLink(""); 
-  };
-
-  const handleRemoveAsset = (type, index) => {
-      setSessionForm(prev => ({
-          ...prev,
-          [type]: prev[type].filter((_, i) => i !== index)
-      }));
-  };
-
-  // --- HANDLERS UPLOAD ARENA ---
-  const handleAddArenaAsset = () => {
-      if (!tempLink) return;
-      setArenaForm(prev => ({
-          ...prev,
-          [tempType]: [...prev[tempType], tempLink]
-      }));
-      setTempLink(""); 
-  };
-
-  const handleRemoveArenaAsset = (type, index) => {
-      setArenaForm(prev => ({
-          ...prev,
-          [type]: prev[type].filter((_, i) => i !== index)
-      }));
-  };
-
   const addAvailabilitySlot = async (isoDateString) => {
       if (!currentUser) return;
       try {
           await addDoc(collection(db, "disponibilidades"), {
               mestreId: currentUser.uid,
+              mestreNome: mestreIdentidade,
+              mestreCor: mestreCor,
               start: isoDateString,
               status: 'free'
           });
@@ -457,13 +371,15 @@ export default function MestrePage() {
             missaoId: sessionForm.missaoId,
             missaoNome: missaoObj ? missaoObj.nome : "Missão Desconhecida",
             mestreId: currentUser.uid,
+            mestreNome: mestreIdentidade,
+            mestreCor: mestreCor,
             dataInicio: slot.start, 
             expiraEm: fim.toISOString(),
             participantes: sessaoDestinatarios, 
-            mapas: sessionForm.mapas,
-            cenarios: sessionForm.cenarios,
-            monstros: sessionForm.monstros,
-            npcs: sessionForm.npcs,
+            mapas: [],
+            cenarios: [],
+            monstros: [],
+            npcs: [],
             jogadores: sessionForm.jogadores,
             connected_players: [],
             dm_online: false,
@@ -473,7 +389,7 @@ export default function MestrePage() {
         await deleteDoc(doc(db, "disponibilidades", sessionForm.selectedSlotId));
 
         setShowSessionModal(false);
-        setSessionForm({ missaoId: '', selectedSlotId: '', mapas: [], cenarios: [], monstros: [], npcs: [], jogadores: [] });
+        setSessionForm({ missaoId: '', selectedSlotId: '', jogadores: [] });
         setSessaoDestinatarios([]);
         alert("Sessão agendada com sucesso!");
       } catch (err) {
@@ -532,15 +448,17 @@ export default function MestrePage() {
           await addDoc(collection(db, "sessoes"), {
               missaoNome: `⚔️ ARENA: ${arenaForm.nomeEvento}`,
               mestreId: currentUser.uid,
+              mestreNome: mestreIdentidade,
+              mestreCor: mestreCor,
               dataInicio: slot.start,
               expiraEm: fim.toISOString(),
               participantes: todosParticipantes,
               equipes: equipesParaSalvar,
               isArena: true,
               pvp_mode: true,
-              mapas: arenaForm.mapas,        // SALVANDO MAPAS DA ARENA
-              cenarios: arenaForm.cenarios,  // SALVANDO CENÁRIOS DA ARENA
-              npcs: arenaForm.npcs,          // SALVANDO NPCS DA ARENA
+              mapas: [],       
+              cenarios: [],  
+              npcs: [],         
               monstros: [], jogadores: [],
               connected_players: [], dm_online: false,
               createdAt: serverTimestamp()
@@ -550,7 +468,7 @@ export default function MestrePage() {
 
           setShowArenaModal(false);
           setArenaForm({ 
-              nomeEvento: '', selectedSlotId: '', mapas: [], cenarios: [], npcs: [], 
+              nomeEvento: '', selectedSlotId: '',
               equipes: [{ id: 1, nome: 'Time Alpha', lider: '', max: 10, cor: '#ef4444', membros: [] }, { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }] 
           });
           alert("Arena agendada com sucesso!");
@@ -589,7 +507,6 @@ export default function MestrePage() {
       if (!window.confirm(`Tem certeza que deseja cancelar a sessão "${sessao.missaoNome}"?`)) return;
       
       try {
-          // Se for uma arena PvP com equipes, tenta limpar a subcoleção de chats de cada equipe no Firestore
           if (sessao.equipes) {
               for (let eq of sessao.equipes) {
                   const msgsRef = collection(db, "sessoes", sessao.id, "team_chats", eq.id.toString(), "messages");
@@ -598,7 +515,6 @@ export default function MestrePage() {
                   await Promise.all(deletePromises);
               }
           }
-          // Exclui o documento principal da sessão
           await deleteDoc(doc(db, "sessoes", sessao.id));
       } catch (err) {
           console.error("Erro ao deletar sessão e chats:", err);
@@ -640,6 +556,8 @@ export default function MestrePage() {
             <div className="mestre-identity-box ff-card fade-in">
                 <label>ASSINATURA DO MESTRE:</label>
                 <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
+                <label style={{marginLeft: '15px'}}>COR DO NARRADOR:</label>
+                <input type="color" value={mestreCor} onChange={(e) => setMestreCor(e.target.value)} style={{width: '30px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer'}} />
             </div>
         </div>
         
@@ -658,9 +576,9 @@ export default function MestrePage() {
                 const isFull = currentGroup >= maxGroup && maxGroup > 0;
 
                 return (
-                    <div key={m.id} className={`mission-poster rank-${m.rank}`}>
+                    <div key={m.id} className={`mission-poster rank-${m.rank}`} style={{borderColor: m.mestreCor || '#334155'}}>
                     <div className="poster-rank-label-fixed">{m.rank}</div>
-                    <span className="mestre-tag">Narrador: {m.mestreNome}</span>
+                    <span className="mestre-tag" style={{color: m.mestreCor || '#94a3b8'}}>Narrador: {m.mestreNome}</span>
                     <h4>{m.nome}</h4>
                     <p className="gil-recompensa">💰 Recompensa: {m.gilRecompensa} Gil</p>
                     
@@ -687,8 +605,6 @@ export default function MestrePage() {
                         ))}
                         </div>
                     )}
-
-                    {/* --- TIMER REMOVIDO DAQUI CONFORME SOLICITADO --- */}
                     
                     <div className="poster-actions" style={{marginTop: '10px'}}>
                         <button className="btn-cyan" onClick={() => setViewImage(m.imagem)}>CARTAZ</button>
@@ -701,23 +617,29 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: RESENHAS */}
-          <div className="ff-card sanchez-card board-column">
-            <div className="sanchez-header-top no-border">
-              <h3>RESENHA DO SANCHES</h3>
-              <button className="ff-add-btn-gold-small" onClick={() => setShowResenhaModal(true)}>+ CRIAR NOVA RESENHA</button>
+          {/* COLUNA 2: RANK DA TEMPORADA */}
+          <div className="ff-card rank-card board-column">
+            <div className="card-header no-border">
+              <h3>RANK DA TEMPORADA</h3>
             </div>
             <div className="mission-scroll">
-              {resenhas.map(r => (
-                <div key={r.id} className="resenha-item-card">
-                  <h4>{r.titulo}</h4>
-                  {/* --- O TIMER FOI MANTIDO AQUI PARA AS RESENHAS --- */}
-                  <Timer expiry={r.expiraEm} />
-                  <div className="poster-actions">
-                    <button className="btn-cyan" onClick={() => setViewResenha(r)}>VISUALIZAR</button>
-                    <button className="btn-red" onClick={() => deleteDoc(doc(db, "resenhas", r.id))}>EXCLUIR</button>
+              {personagensDb
+                .slice()
+                .sort((a, b) => (b.character_sheet?.basic_info?.level || 1) - (a.character_sheet?.basic_info?.level || 1))
+                .map((p, idx) => (
+                  <div key={p.id} className="rank-item-card" style={{ display: 'flex', alignItems: 'center', gap: '15px', background: '#0f172a', border: '1px solid #334155', padding: '15px', borderRadius: '4px', borderLeft: idx === 0 ? '4px solid #fbbf24' : idx === 1 ? '4px solid #94a3b8' : idx === 2 ? '4px solid #b45309' : '4px solid #334155' }}>
+                    <div className="rank-pos" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: idx === 0 ? '#fbbf24' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#475569' }}>
+                      #{idx + 1}
+                    </div>
+                    <div className="rank-avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundImage: `url(${p.character_sheet?.imgUrl || ''})`, backgroundSize: 'cover', backgroundColor: '#1e293b', border: '1px solid #444' }}></div>
+                    <div className="rank-info" style={{ flex: 1 }}>
+                      <h4 style={{ margin: '0 0 5px 0', color: '#e2e8f0', fontSize: '1rem', textTransform: 'uppercase' }}>{p.name}</h4>
+                      <div style={{ display: 'flex', gap: '10px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                        <span>Nível {p.character_sheet?.basic_info?.level || 1}</span>
+                        <span>{p.class}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
               ))}
             </div>
           </div>
@@ -737,15 +659,13 @@ export default function MestrePage() {
                    <div className="empty-instancia">NENHUMA INSTÂNCIA ATIVA</div>
                ) : (
                    sessoes.map(s => (
-                       <div key={s.id} className={`sessao-card ${s.isArena ? 'arena-mode' : ''}`}>
+                       <div key={s.id} className={`sessao-card ${s.isArena ? 'arena-mode' : ''}`} style={s.mestreCor ? {borderLeft: `4px solid ${s.mestreCor}`} : {}}>
                            <div className={`sessao-status ${s.isArena ? 'arena' : ''}`}>{s.isArena ? '⚔️ ARENA PVP' : '🔴 AO VIVO / AGENDADA'}</div>
                            <h4 className="sessao-title" style={{color: s.isArena ? '#c4b5fd' : '#fff'}}>{s.missaoNome}</h4>
                            <div className="sessao-info">
                                <span>📅 {new Date(s.dataInicio).toLocaleString()}</span>
+                               <span style={{color: s.mestreCor || '#94a3b8', fontWeight: 'bold'}}>Narrador: {s.mestreNome || 'Desconhecido'}</span>
                                <span className="sessao-players">👥 {s.participantes?.length || 0} Jogadores</span>
-                           </div>
-                           <div className="sessao-assets-count">
-                               🖼️ {(s.mapas?.length || 0) + (s.cenarios?.length || 0)} Imagens
                            </div>
                            <div className="poster-actions" style={{marginTop: '15px'}}>
                                {s.isArena ? (
@@ -871,34 +791,6 @@ export default function MestrePage() {
                           ))}
                       </div>
 
-                      {/* --- NOVO: SEÇÃO DE IMPORTAR IMAGENS PARA ARENA --- */}
-                      <div className="upload-section-box" style={{borderColor: '#8b5cf6'}}>
-                          <h4 className="upload-section-title" style={{color: '#c4b5fd', borderBottomColor: '#8b5cf6'}}>IMPORTAR IMAGENS DA ARENA</h4>
-                          <div className="link-import-row">
-                              <input 
-                                className="ff-input-dark" 
-                                placeholder="Link da imagem..."
-                                value={tempLink} 
-                                onChange={e => setTempLink(e.target.value)} 
-                              />
-                              <select 
-                                className="ff-select-dark small-select" 
-                                value={tempType} 
-                                onChange={e => setTempType(e.target.value)}
-                              >
-                                <option value="mapas">Tabletop</option>
-                                <option value="cenarios">Cenário</option>
-                                <option value="npcs">NPCs</option>
-                              </select>
-                              <button type="button" className="btn-cyan" style={{borderColor: '#a855f7', color: '#a855f7'}} onClick={handleAddArenaAsset}>+</button>
-                          </div>
-                          <div className="assets-lists">
-                              {arenaForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveArenaAsset('mapas', i)}>×</button></div>))}
-                              {arenaForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveArenaAsset('cenarios', i)}>×</button></div>))}
-                              {arenaForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveArenaAsset('npcs', i)}>×</button></div>))}
-                          </div>
-                      </div>
-
                       <div className="btn-group-ff">
                           <button type="submit" className="btn-forjar-main" style={{background: '#a855f7'}}>CRIAR ARENA</button>
                           <button type="button" className="btn-cancelar-main" onClick={() => setShowArenaModal(false)}>CANCELAR</button>
@@ -967,18 +859,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {showResenhaModal && (
-        <div className="ff-modal-overlay-fixed">
-          <div className="ff-modal-scrollable ff-card">
-            <h3 className="modal-title-ff">ESCREVER CRÔNICA</h3>
-            <div className="modal-input-group"><label>TÍTULO</label><input className="ff-modal-input-dark" value={tituloResenha} onChange={(e)=>setTituloResenha(e.target.value)} /></div>
-            <div className="modal-input-group"><label>CORPO</label><textarea className="tall-area-ff-dark" value={resenha} onChange={(e) => setResenha(e.target.value)} /></div>
-            <div className="player-selector-box-fixed"><label>DESTINATÁRIOS:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={destinatarios.includes(p.name)} onChange={() => destinatarios.includes(p.name) ? setDestinatarios(destinatarios.filter(x=>x!==p.name)) : setDestinatarios([...destinatarios, p.name])} /> {p.name}</label>))}</div></div>
-            <div className="btn-group-ff"><button className="btn-forjar-main" onClick={publicarResenha}>PUBLICAR</button><button className="btn-cancelar-main" onClick={() => setShowResenhaModal(false)}>FECHAR</button></div>
-          </div>
-        </div>
-      )}
-
       {showSessionModal && (
           <div className="ff-modal-overlay-fixed">
               <div className="ff-modal-scrollable ff-card">
@@ -1004,32 +884,6 @@ export default function MestrePage() {
 
                       <div className="player-selector-box-fixed"><label>JOGADORES:</label><div className="destinatarios-grid-fixed">{personagensDb.map(p => (<label key={p.id} className="chip-label-ff"><input type="checkbox" checked={sessaoDestinatarios.includes(p.name)} onChange={() => sessaoDestinatarios.includes(p.name) ? setSessaoDestinatarios(sessaoDestinatarios.filter(x=>x!==p.name)) : setSessaoDestinatarios([...sessaoDestinatarios, p.name])} /> {p.name} ({p.class})</label>))}</div></div>
                       
-                      <div className="upload-section-box">
-                          <h4 className="upload-section-title">IMPORTAR IMAGENS</h4>
-                          <div className="link-import-row">
-                              <input 
-                                className="ff-input-dark" 
-                                placeholder="Link da imagem..."
-                                value={tempLink} 
-                                onChange={e => setTempLink(e.target.value)} 
-                              />
-                              <select 
-                                className="ff-select-dark small-select" 
-                                value={tempType} 
-                                onChange={e => setTempType(e.target.value)}
-                              >
-                                <option value="mapas">Tabletop</option>
-                                <option value="cenarios">Cenário</option>
-                                <option value="npcs">NPCs</option>
-                              </select>
-                              <button type="button" className="btn-cyan" onClick={handleAddAsset}>+</button>
-                          </div>
-                          <div className="assets-lists">
-                              {sessionForm.mapas.map((link, i) => (<div key={`map-${i}`} className="asset-item"><span className="truncate-link">[TABLETOP] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('mapas', i)}>×</button></div>))}
-                              {sessionForm.cenarios.map((link, i) => (<div key={`cen-${i}`} className="asset-item"><span className="truncate-link">[CENÁRIO] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('cenarios', i)}>×</button></div>))}
-                              {sessionForm.npcs.map((link, i) => (<div key={`npc-${i}`} className="asset-item"><span className="truncate-link">[NPC] {link}</span><button type="button" className="btn-remove-x" onClick={() => handleRemoveAsset('npcs', i)}>×</button></div>))}
-                          </div>
-                      </div>
                       <div className="btn-group-ff"><button type="submit" className="btn-forjar-main">AGENDAR</button><button type="button" className="btn-cancelar-main" onClick={() => setShowSessionModal(false)}>CANCELAR</button></div>
                   </form>
               </div>
@@ -1080,28 +934,6 @@ export default function MestrePage() {
         </div>
       )}
 
-      {viewResenha && (
-        <div className="fft-modal-overlay" onClick={() => setViewResenha(null)}>
-          <div className="fft-dialog-box" onClick={e => e.stopPropagation()}>
-             <div className="fft-portrait-section">
-                <div className="fft-portrait-frame">
-                   <img src={sanchezImg} alt="Sanchez" />
-                </div>
-                <div className="fft-name-plate">
-                   SANCHEZ
-                </div>
-             </div>
-
-             <div className="fft-content-section">
-                <h2 className="fft-title">{viewResenha.titulo}</h2>
-                <div className="fft-scroll-text" dangerouslySetInnerHTML={formatSanchezText(viewResenha.conteudo)}></div>
-             </div>
-
-             <button className="fft-close-btn" onClick={() => setViewResenha(null)}>X</button>
-          </div>
-        </div>
-      )}
-
       <style>{`
         /* --- ESTILOS PRINCIPAIS MESTRE --- */
         .mestre-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #020617; font-family: 'Cinzel', serif; color: #e2e8f0; }
@@ -1113,7 +945,7 @@ export default function MestrePage() {
         .ff-title { font-size: 2rem; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); letter-spacing: 4px; margin: 0; }
         .mestre-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); border: 1px solid #fbbf24; border-radius: 4px; }
         .mestre-identity-box label { font-size: 0.8rem; color: #fbbf24; font-weight: bold; }
-        .mestre-identity-box input { background: transparent; border: none; border-bottom: 1px solid #555; color: #fff; font-family: 'Cinzel', serif; text-align: center; width: 150px; }
+        .mestre-identity-box input[type="text"] { background: transparent; border: none; border-bottom: 1px solid #555; color: #fff; font-family: 'Cinzel', serif; text-align: center; width: 150px; }
         
         .mestre-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
         .board-column { display: flex; flex-direction: column; height: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; overflow: hidden; backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
@@ -1143,20 +975,14 @@ export default function MestrePage() {
         .btn-kick-x { background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 14px; }
         .btn-kick-x:hover { color: #f87171; }
         
-        .mission-timer { display: block; text-align: center; font-size: 0.8rem; color: #94a3b8; margin: 10px 0; font-weight: bold; }
-        
         .poster-actions { display: flex; gap: 5px; justify-content: space-between; }
         .btn-cyan { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #00f2ff; color: #00f2ff; cursor: pointer; transition: 0.2s; font-weight: bold; text-transform: uppercase; }
         .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); }
         .btn-red { flex: 1; padding: 6px; font-size: 0.7rem; background: transparent; border: 1px solid #ef4444; color: #ef4444; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .btn-red:hover { background: rgba(239, 68, 68, 0.1); }
         
-        /* SANCHES */
-        .sanchez-card { border-color: #00f2ff; }
-        .sanchez-header-top { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00f2ff; background: rgba(0, 242, 255, 0.05); }
-        .sanchez-header-top h3 { color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); }
-        .resenha-item-card { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 4px; border-left: 3px solid #00f2ff; }
-        .resenha-item-card h4 { margin: 0 0 10px 0; color: #e2e8f0; font-size: 1rem; }
+        /* RANK DA TEMPORADA */
+        .rank-card { border-color: #fbbf24; }
         
         /* SESSÕES E ARENA */
         .sessao-card { background: #1e293b; border: 1px solid #fbbf24; padding: 15px; border-radius: 4px; position: relative; margin-bottom: 15px; }
@@ -1165,7 +991,6 @@ export default function MestrePage() {
         .sessao-status.arena { background: #a855f7; color: #fff; }
         .sessao-title { margin: 10px 0 5px 0; color: #fff; font-size: 1.1rem; }
         .sessao-info { font-size: 0.8rem; color: #94a3b8; display: flex; flex-direction: column; gap: 2px; }
-        .sessao-assets-count { font-size: 0.75rem; color: #cbd5e1; margin-top: 5px; font-style: italic; }
         .btn-play-vtt { background: #fbbf24; color: #000; border: none; padding: 8px; font-weight: bold; cursor: pointer; flex: 2; transition: 0.2s; }
         .btn-play-vtt:hover { background: #f59e0b; box-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
         .btn-cyan.arena-btn { border-color: #a855f7; color: #a855f7; flex: 2; }
@@ -1220,17 +1045,8 @@ export default function MestrePage() {
         .ff-add-btn-gold-small { background: transparent; border: 1px dashed #00f2ff; color: #00f2ff; padding: 5px 10px; cursor: pointer; font-size: 0.7rem; font-weight: bold; }
         .ff-add-btn-gold-small:hover { background: rgba(0, 242, 255, 0.1); }
 
-        /* UPLOAD SECTION (SESSÃO) */
-        .upload-section-box { border: 1px solid #334155; padding: 15px; border-radius: 4px; margin-top: 20px; background: rgba(0,0,0,0.2); }
-        .upload-section-title { font-size: 0.9rem; color: #fbbf24; margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 5px; }
-        .link-import-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .ff-input-dark { flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
         .ff-select-dark { background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
-        .small-select { width: 120px; }
-        .assets-lists { display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; }
-        .asset-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; }
-        .truncate-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
-        .btn-remove-x { background: transparent; border: none; color: #f44; cursor: pointer; font-weight: bold; }
 
         /* SELEÇÃO DE JOGADORES */
         .player-selector-box-fixed { margin: 15px 0; }
@@ -1238,119 +1054,6 @@ export default function MestrePage() {
         .chip-label-ff { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #94a3b8; cursor: pointer; padding: 5px; border: 1px solid transparent; border-radius: 4px; transition: 0.2s; }
         .chip-label-ff:hover { background: rgba(255,255,255,0.05); }
         .chip-label-ff input { width: auto; margin: 0; }
-
-        /* --- FINAL FANTASY TACTICS MODAL STYLE --- */
-        .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        
-        .fft-dialog-box {
-          position: relative;
-          width: 800px;
-          max-width: 95vw;
-          height: 450px;
-          background: linear-gradient(180deg, #001a4d 0%, #000022 100%);
-          border: 4px solid #b8860b;
-          border-radius: 8px;
-          box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5);
-          display: flex;
-          align-items: flex-start;
-          padding: 30px;
-          gap: 20px;
-          color: #fff;
-          font-family: 'Cinzel', serif;
-        }
-
-        .fft-portrait-section {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 10px;
-          width: 150px;
-          flex-shrink: 0;
-        }
-
-        .fft-portrait-frame {
-          width: 140px;
-          height: 180px;
-          border: 3px solid #b8860b;
-          background: #000;
-          overflow: hidden;
-          box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        }
-        .fft-portrait-frame img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .fft-name-plate {
-          width: 100%;
-          background: linear-gradient(90deg, #b8860b, #8a6e14);
-          color: #000;
-          text-align: center;
-          font-weight: bold;
-          padding: 5px 0;
-          font-size: 0.9rem;
-          border: 1px solid #ffd700;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-          letter-spacing: 1px;
-        }
-
-        .fft-content-section {
-          flex: 1;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .fft-title {
-          margin: 0 0 15px 0;
-          font-size: 1.8rem;
-          color: #00f2ff;
-          text-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
-          border-bottom: 1px solid #b8860b;
-          padding-bottom: 10px;
-          letter-spacing: 1px;
-        }
-
-        .fft-scroll-text {
-          flex: 1;
-          overflow-y: auto;
-          font-family: 'Lato', sans-serif;
-          font-size: 1.1rem;
-          line-height: 1.6;
-          color: #e0e0e0;
-          padding-right: 10px;
-          scrollbar-width: none; 
-          -ms-overflow-style: none; 
-        }
-        .fft-scroll-text::-webkit-scrollbar { 
-          display: none; 
-        }
-
-        .fft-close-btn {
-          position: absolute;
-          top: -15px;
-          right: -15px;
-          width: 40px;
-          height: 40px;
-          background: #b8860b;
-          color: #000;
-          font-weight: bold;
-          border: 2px solid #fff;
-          border-radius: 50%;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: sans-serif;
-          box-shadow: 0 0 10px #000;
-          transition: 0.2s;
-        }
-        .fft-close-btn:hover {
-          background: #ffd700;
-          transform: scale(1.1);
-        }
 
         /* DETALHES MISSÃO */
         .detail-view-main { width: 800px; height: 600px; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
-import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom';
 import fundoMestre from '../assets/fundo-mestre.jpg';
@@ -125,6 +126,20 @@ export default function MestreVTTPage() {
   const [showPlayerManager, setShowPlayerManager] = useState(false);   
   const [showCombatTracker, setShowCombatTracker] = useState(false);
   
+  // --- NOVOS MODAIS E ESTADOS (ATT V2.2) ---
+  const [showMercadoManager, setShowMercadoManager] = useState(false);
+  const [trocasPendentes, setTrocasPendentes] = useState([]);
+
+  const [showBencaoManager, setShowBencaoManager] = useState(false);
+
+  const [showUploadManager, setShowUploadManager] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadingGeral, setUploadingGeral] = useState(false);
+  const [uploadedUrl, setUploadedUrl] = useState("");
+  const [uploadMapName, setUploadMapName] = useState("");
+  
+  const [uploadingImg, setUploadingImg] = useState(false); // Para modal de Bestiário
+
   const [viewMonsterDetails, setViewMonsterDetails] = useState(null);
   const [activeStatusMenu, setActiveStatusMenu] = useState(null); // ID do token com o menu de status aberto
 
@@ -171,15 +186,19 @@ export default function MestreVTTPage() {
   // Auth & Data Sync
   useEffect(() => {
     let unsubSession = () => {};
+    let unsubTrocas = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
-            const q = query(collection(db, "sessoes"), where("mestreId", "==", user.uid));
+            // Aceitando permissões multi-mestre (sem where restrito a apenas "user.uid" como criador, 
+            // basta ser uma sessão ativa). Como MestreVTTPage é acessada pós-login, pegaremos a mais recente 
+            // ou a marcada como ativa baseada no Firestore. (Ajuste multi-mestre)
+            const q = query(collection(db, "sessoes"));
             unsubSession = onSnapshot(q, (snap) => {
               const sessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
               const ativa = sessoes.find(s => {
                   const agora = new Date();
                   const fim = new Date(s.expiraEm);
-                  return agora <= fim; 
+                  return agora <= fim && (s.mestreId === user.uid || s.dm_online || s.participantes); // Ajustado para ser flexível
               });
               if (ativa) {
                 setSessaoAtiva(ativa);
@@ -191,6 +210,12 @@ export default function MestreVTTPage() {
                         setRollResult(prev => { if (!prev || (prev.id || prev.timestamp) !== rollId) return roll; return prev; });
                      }
                 }
+
+                // Listener do Mercado dos Lanternas (Aprovações do Mestre)
+                const qTrocas = query(collection(db, "sessoes", ativa.id, "mercado_lanternas"), where("status", "==", "pendente_mestre"));
+                unsubTrocas = onSnapshot(qTrocas, (trocasSnap) => {
+                    setTrocasPendentes(trocasSnap.docs.map(tDoc => ({id: tDoc.id, ...tDoc.data()})));
+                });
               }
               setLoading(false); 
             });
@@ -198,7 +223,7 @@ export default function MestreVTTPage() {
             onSnapshot(qBestiary, (snap) => setBestiary(snap.docs.map(d => ({id: d.id, ...d.data()}))));
         } else { setLoading(false); navigate('/login'); }
     });
-    return () => { unsubscribeAuth(); unsubSession(); };
+    return () => { unsubscribeAuth(); unsubSession(); unsubTrocas(); };
   }, [navigate]); 
 
   // Online Check
@@ -222,6 +247,101 @@ export default function MestreVTTPage() {
     });
     return () => unsubAll();
   }, [sessaoAtiva?.participantes]); 
+
+  // --- HANDLER DE UPLOADS E MAPAS ---
+  const handleUploadAction = async () => {
+    if (!uploadFile) return;
+    setUploadingGeral(true);
+    try {
+        const storage = getStorage();
+        const storageRef = ref(storage, `uploads/vtt_${Date.now()}_${uploadFile.name}`);
+        await uploadBytes(storageRef, uploadFile);
+        const url = await getDownloadURL(storageRef);
+        setUploadedUrl(url);
+    } catch (e) {
+        alert("Erro no upload: " + e.message);
+    }
+    setUploadingGeral(false);
+  };
+
+  const handleAddMapToSession = async (url, name) => {
+    if (!sessaoAtiva) return;
+    const novoMapa = { id: Date.now().toString(), name: name || "Novo Mapa VTT", url: url };
+    try {
+        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
+            mapas: arrayUnion(url),
+            saved_maps: arrayUnion(novoMapa)
+        });
+        alert("Mapa adicionado à sessão! Acesse pelo Tabletop.");
+        setUploadFile(null); setUploadedUrl(""); setUploadMapName(""); setShowUploadManager(false);
+    } catch(e) { alert("Erro ao vincular mapa: " + e.message); }
+  };
+
+  const handleImageUploadBestiary = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingImg(true);
+    try {
+        const storage = getStorage();
+        const storageRef = ref(storage, `uploads/bestiary_${Date.now()}_${file.name}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        setMonsterForm({ ...monsterForm, img: url });
+    } catch (error) {
+        console.error("Erro no upload", error);
+        alert("Erro ao fazer upload da imagem para o Storage.");
+    }
+    setUploadingImg(false);
+  };
+
+  // --- HANDLERS DO MERCADO DOS LANTERNAS ---
+  const handleAprovarTroca = async (troca) => {
+    try {
+        await updateDoc(doc(db, "sessoes", sessaoAtiva.id, "mercado_lanternas", troca.id), {
+            status: 'aprovado',
+            dataAprovacao: new Date().toISOString()
+        });
+        alert("Troca autorizada! Os itens e recursos foram movimentados.");
+    } catch(e) {
+        alert("Erro ao aprovar troca: " + e.message);
+    }
+  };
+  
+  const handleRecusarTroca = async (troca) => {
+    try {
+        await updateDoc(doc(db, "sessoes", sessaoAtiva.id, "mercado_lanternas", troca.id), {
+            status: 'recusado',
+            dataRecusa: new Date().toISOString()
+        });
+        alert("Troca recusada!");
+    } catch(e) {
+        alert("Erro ao recusar troca: " + e.message);
+    }
+  };
+
+  // --- HANDLER DO DdD (BÊNÇÃO DOS DEUSES) ---
+  const handleRolarDdD = async () => {
+    if (!sessaoAtiva) return;
+    const resultado = Math.floor(Math.random() * 100) + 1;
+    const numeros = sessaoAtiva.bencao_deuses?.numeros_escolhidos || {};
+    const vencedores = [];
+    
+    Object.entries(numeros).forEach(([nome, num]) => {
+        if (Number(num) === resultado) vencedores.push(nome);
+    });
+
+    try {
+        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
+            bencao_deuses: {
+                active: true,
+                numeros_escolhidos: numeros,
+                resultado_d100: resultado,
+                vencedores: vencedores,
+                timestamp: Date.now()
+            }
+        });
+    } catch(e) { console.error("Erro ao rolar DdD", e); }
+  };
 
   // Handler Piscar Token no VTT
   const blinkToken = (id) => {
@@ -386,6 +506,8 @@ export default function MestreVTTPage() {
 
   const filteredBestiary = bestiary.filter(b => bestiaryTab === 'monsters' ? (b.category !== 'object') : (b.category === 'object'));
 
+  const vencedoresBencao = sessaoAtiva?.bencao_deuses?.vencedores || [];
+
   // --- LOADING SCREEN ---
   if (loading || !minTimeElapsed) {
     return (
@@ -409,15 +531,16 @@ export default function MestreVTTPage() {
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
       
-      {/* SIDEBAR */}
+      {/* SIDEBAR AVENTUREIROS (Com Destaque para Bênção dos Deuses) */}
       <div className="dm-players-sidebar">
           <h3 className="sidebar-title">AVENTUREIROS</h3>
           <div className="players-list-scroll">
               {personagensData.map(char => {
                   const isOnline = connectedPlayers.includes(char.uid); 
+                  const isBencaoWinner = vencedoresBencao.includes(char.name);
                   const bgImage = char.character_sheet?.imgUrl; 
                   return (
-                      <div key={char.id} className={`mini-player-card ${isOnline ? 'online' : 'offline'}`} onClick={() => setSelectedFicha(char)} title="Ficha">
+                      <div key={char.id} className={`mini-player-card ${isOnline ? 'online' : 'offline'} ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setSelectedFicha(char)} title="Ficha">
                           <div className="mini-avatar">
                               {bgImage ? <div className="avatar-img" style={{backgroundImage: `url(${bgImage})`}}></div> : <div className="avatar-placeholder">{char.name.charAt(0)}</div>}
                               <div className={`status-dot ${isOnline ? 'green' : 'gray'}`}></div>
@@ -510,7 +633,6 @@ export default function MestreVTTPage() {
                                   <div className="t-col-info">
                                       <div className="t-name" style={teamColor ? {color: teamColor} : {}}>
                                           {token.name}
-                                          {/* Exibição dos ícones ativos no painel */}
                                           <span className="t-active-statuses">
                                               {token.statuses?.map(s => {
                                                   const effect = STATUS_EFFECTS.find(e => e.id === s);
@@ -546,7 +668,6 @@ export default function MestreVTTPage() {
                                           <button onClick={() => handleUpdateTokenInTracker(token, { imgY: (token.imgY||50)+10 })}>▼</button>
                                       </div>
                                       <div className="act-btns">
-                                          {/* --- NOVO BOTÃO DE STATUS --- */}
                                           <button 
                                               className="btn-icon-sm" 
                                               title="Status Negativos" 
@@ -706,6 +827,26 @@ export default function MestreVTTPage() {
       <div className="dm-tools-dock">
           <div className="tool-group"><Bazar isMestre={true} vttDock={true} /><div className="tool-label">BAZAR</div></div>
           <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA</div></div>
+          
+          {/* NOVAS FERRAMENTAS DO VTT (QUEUE 01) */}
+          <div className="tool-group">
+              <button className="tool-btn-placeholder" onClick={() => setShowMercadoManager(true)} style={{ position: 'relative' }}>
+                  🏮
+                  {trocasPendentes.length > 0 && <span className="notification-badge">{trocasPendentes.length}</span>}
+              </button>
+              <div className="tool-label">MERCADO DOS LANTERNAS (TROCAS)</div>
+          </div>
+          
+          <div className="tool-group">
+              <button className="tool-btn-placeholder" onClick={() => setShowBencaoManager(true)}>✨</button>
+              <div className="tool-label">BÊNÇÃO DOS DEUSES (D100)</div>
+          </div>
+
+          <div className="tool-group">
+              <button className="tool-btn-placeholder" onClick={() => setShowUploadManager(true)}>📤</button>
+              <div className="tool-label">CENTRAL DE UPLOADS (STORAGE)</div>
+          </div>
+
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Rastreador de Combate"><IconCombat /></button><div className="tool-label">COMBATE</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowDiceSelector(true)}><IconDice /></button><div className="tool-label">DADOS</div></div>
@@ -718,6 +859,111 @@ export default function MestreVTTPage() {
       </div>
 
       {selectedFicha && <Ficha characterData={selectedFicha} isMaster={true} onClose={() => setSelectedFicha(null)} />}
+
+      {/* --- MODAIS DE ATUALIZAÇÃO (QUEUE 01) --- */}
+      
+      {/* 1. MERCADO DOS LANTERNAS (APROVAÇÕES) */}
+      {showMercadoManager && (
+          <div className="modal-overlay-custom" onClick={() => setShowMercadoManager(false)}>
+              <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+                  <div className="modal-header-c">
+                      <h3>MERCADO DOS LANTERNAS</h3>
+                      <button className="close-c" onClick={() => setShowMercadoManager(false)}>✕</button>
+                  </div>
+                  <div className="mercado-list">
+                      {trocasPendentes.length === 0 ? <p style={{color: '#666', textAlign: 'center', margin: '20px 0'}}>Nenhuma troca ou envio pendente de autorização.</p> : null}
+                      {trocasPendentes.map(troca => (
+                          <div key={troca.id} className="troca-card-dm">
+                              <p><strong>De:</strong> {troca.remetente}</p>
+                              <p><strong>Para:</strong> {troca.destinatario}</p>
+                              <p><strong>Itens:</strong> {troca.itens?.map(i => `${i.quantidade}x ${i.name}`).join(', ') || 'Nenhum'}</p>
+                              <p><strong>Gil:</strong> {troca.gil || 0}</p>
+                              {troca.mensagem && <p style={{color: '#00f2ff', fontStyle: 'italic'}}><strong>Msg:</strong> "{troca.mensagem}"</p>}
+                              <div className="troca-actions">
+                                  <button className="btn-approve" onClick={() => handleAprovarTroca(troca)}>AUTORIZAR</button>
+                                  <button className="btn-deny" onClick={() => handleRecusarTroca(troca)}>BARRAR</button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* 2. BÊNÇÃO DOS DEUSES (D100) */}
+      {showBencaoManager && (
+         <div className="modal-overlay-custom" onClick={() => setShowBencaoManager(false)}>
+            <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+                <div className="modal-header-c">
+                    <h3>✨ BÊNÇÃO DOS DEUSES (D100)</h3>
+                    <button className="close-c" onClick={() => setShowBencaoManager(false)}>✕</button>
+                </div>
+                <div className="bencao-body">
+                    <div className="numeros-jogadores">
+                        <h4 style={{color: '#aaa', marginBottom: '10px', borderBottom: '1px solid #333', paddingBottom: '5px'}}>NÚMEROS APOSTADOS (Atuais):</h4>
+                        <ul style={{listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+                        {Object.entries(sessaoAtiva?.bencao_deuses?.numeros_escolhidos || {}).map(([nome, num]) => (
+                            <li key={nome} style={{background: '#111', padding: '10px', borderRadius: '4px', border: '1px solid #333'}}>
+                                <strong style={{color: '#00f2ff'}}>{nome}:</strong> <span style={{fontSize: '18px', color: '#ffcc00', float: 'right', fontWeight: 'bold'}}>{num}</span>
+                            </li>
+                        ))}
+                        {Object.keys(sessaoAtiva?.bencao_deuses?.numeros_escolhidos || {}).length === 0 && <p style={{color: '#666', gridColumn: '1 / -1'}}>Nenhum jogador apostou ainda.</p>}
+                        </ul>
+                    </div>
+                    
+                    <div className="bencao-actions" style={{textAlign:'center', marginTop:'30px'}}>
+                        <button className="btn-save-m" style={{fontSize:'20px', padding:'15px 30px', width: '100%'}} onClick={handleRolarDdD}>ROLAR DdD (1-100)</button>
+                    </div>
+
+                    {sessaoAtiva?.bencao_deuses?.resultado_d100 > 0 && (
+                        <div className="bencao-resultado" style={{textAlign:'center', marginTop:'30px', background: 'rgba(255,204,0,0.1)', padding: '20px', borderRadius: '8px', border: '1px solid #ffcc00'}}>
+                            <h4 style={{margin: 0, color: '#aaa'}}>O DADO DOS DEUSES CRAVOU:</h4>
+                            <h1 style={{fontSize:'60px', color:'#ffcc00', margin:'10px 0', textShadow: '0 0 20px #ffcc00'}}>{sessaoAtiva.bencao_deuses.resultado_d100}</h1>
+                            {sessaoAtiva.bencao_deuses.vencedores?.length > 0 ? (
+                                <h3 style={{color:'#0f0', margin: 0, animation: 'pulse 1.5s infinite'}}>Bênção ativada para: {sessaoAtiva.bencao_deuses.vencedores.join(', ')}!</h3>
+                            ) : (
+                                <p style={{color:'#aaa', fontStyle: 'italic', margin: 0}}>Os deuses permanecem em silêncio...</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* 3. CENTRAL DE UPLOADS (STORAGE) */}
+      {showUploadManager && (
+         <div className="modal-overlay-custom" onClick={() => setShowUploadManager(false)}>
+            <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+                <div className="modal-header-c">
+                    <h3>CENTRAL DE UPLOADS</h3>
+                    <button className="close-c" onClick={() => setShowUploadManager(false)}>✕</button>
+                </div>
+                <div className="upload-manager-body">
+                    <input type="file" className="file-input-dark" onChange={e => setUploadFile(e.target.files[0])} />
+                    <button className="btn-save-m" style={{width: '100%', padding: '15px'}} onClick={handleUploadAction} disabled={uploadingGeral}>
+                        {uploadingGeral ? "ENVIANDO PARA O ÉTER (STORAGE)..." : "ENVIAR ARQUIVO"}
+                    </button>
+                    
+                    {uploadedUrl && (
+                        <div className="uploaded-result-box" style={{marginTop: '20px', background: '#111', padding: '15px', border: '1px solid #333', borderRadius: '4px'}}>
+                            <p style={{color: '#0f0', margin: '0 0 10px 0', fontWeight: 'bold'}}>✓ Upload Concluído!</p>
+                            <label style={{fontSize: '10px', color: '#888'}}>LINK GERADO (BASE DO STORAGE):</label>
+                            <input type="text" readOnly value={uploadedUrl} className="input-title" style={{fontSize:'11px', marginTop: '5px', cursor: 'copy'}} onClick={e => { e.target.select(); document.execCommand('copy'); alert('Link copiado!'); }} />
+                            
+                            <hr style={{borderColor:'#222', margin:'15px 0'}}/>
+                            <p style={{margin: '0 0 10px 0', color: '#ffcc00', fontSize: '14px'}}><strong>Deseja adicionar diretamente como Mapa nesta Sessão?</strong></p>
+                            <div style={{display:'flex', gap:'10px'}}>
+                                <input placeholder="Nome do Novo Mapa" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} className="input-title" />
+                                <button className="btn-approve" onClick={() => handleAddMapToSession(uploadedUrl, uploadMapName)}>VINCULAR</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
 
       {/* --- MODAL DE BESTIÁRIO/OBJETOS --- */}
       {showMonsterManager && (
@@ -754,7 +1000,14 @@ export default function MestreVTTPage() {
                   ) : (
                       <div className="monster-create-view">
                           <div className="create-row">
-                              <div className="img-upload-box"><div className="preview-img" style={{backgroundImage: `url(${monsterForm.img})`}}></div><input placeholder="Link Imagem..." value={monsterForm.img} onChange={e => setMonsterForm({...monsterForm, img: e.target.value})} /></div>
+                              <div className="img-upload-box">
+                                  <div className="preview-img" style={{backgroundImage: `url(${monsterForm.img})`}}></div>
+                                  <input placeholder="Link Imagem (URL)..." value={monsterForm.img} onChange={e => setMonsterForm({...monsterForm, img: e.target.value})} />
+                                  <label className="btn-upload-file" style={{background:'#222', border: '1px solid #555', color:'#fff', padding:'8px', textAlign:'center', cursor:'pointer', fontSize:'10px', marginTop:'5px', fontWeight: 'bold'}}>
+                                      {uploadingImg ? "ENVIANDO..." : "📤 UPLOAD ARQUIVO (STORAGE)"}
+                                      <input type="file" style={{display:'none'}} accept="image/*" onChange={handleImageUploadBestiary} />
+                                  </label>
+                              </div>
                               <div className="details-inputs">
                                   <input className="input-title" placeholder="Nome" value={monsterForm.name} onChange={e => setMonsterForm({...monsterForm, name: e.target.value})} />
                                   
@@ -778,7 +1031,7 @@ export default function MestreVTTPage() {
                                   </>
                               )}
                           </div>
-                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
+                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR NO BESTIÁRIO</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
                       </div>
                   )}
               </div>
@@ -843,7 +1096,7 @@ export default function MestreVTTPage() {
         .dm-players-sidebar { position: absolute; top: 20px; left: 20px; width: 200px; background: rgba(0, 10, 20, 0.95); border: 2px solid #ffcc00; border-radius: 8px; padding: 10px; z-index: 50; max-height: 80vh; display: flex; flex-direction: column; }
         .sidebar-title { color: #ffcc00; font-size: 12px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; text-align: center; }
         .players-list-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .mini-player-card { display: flex; align-items: center; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 4px; cursor: pointer; }
+        .mini-player-card { display: flex; align-items: center; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 4px; cursor: pointer; transition: 0.2s; }
         .mini-player-card.online { border-left: 3px solid #00f2ff; }
         .mini-avatar { position: relative; margin-right: 8px; }
         .avatar-img, .avatar-placeholder { width: 30px; height: 30px; border-radius: 50%; background-size: cover; border: 1px solid #fff; }
@@ -852,6 +1105,10 @@ export default function MestreVTTPage() {
         .status-dot.green { background: #00f2ff; } .status-dot.gray { background: #666; }
         .p-name { font-size: 11px; font-weight: bold; display: block; }
         .p-lvl { font-size: 9px; color: #ffcc00; }
+
+        /* DESTAQUE BÊNÇÃO DOS DEUSES */
+        .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
+        @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
 
         .session-status-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; padding: 5px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 40; }
         .status-indicator { width: 10px; height: 10px; background: #00f2ff; border-radius: 50%; box-shadow: 0 0 10px #00f2ff; animation: pulse 2s infinite; }
@@ -934,8 +1191,9 @@ export default function MestreVTTPage() {
         .tool-group:hover .tool-label { opacity: 1; transform: translateX(0); }
         .tool-btn-placeholder { width: 50px; height: 50px; border-radius: 50%; background: #111; border: 2px solid #555; color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; box-shadow: 0 0 10px #000; pointer-events: auto; }
         .tool-btn-placeholder:hover { border-color: #ffcc00; color: #ffcc00; transform: scale(1.1); }
+        .notification-badge { position: absolute; top: -5px; right: -5px; background: #f44; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border: 1px solid #fff; z-index: 10; }
 
-        /* MODAIS GERAIS */
+        /* MODAIS GERAIS E QUEUE 01 */
         .modal-overlay-custom { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
         .modal-box-custom { background: #080808; border: 2px solid #ffcc00; padding: 20px; border-radius: 8px; width: 500px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
         .modal-box-custom.wide { width: 800px; }
@@ -943,6 +1201,15 @@ export default function MestreVTTPage() {
         .modal-header-c h3 { margin: 0; color: #ffcc00; }
         .close-c { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
         
+        .file-input-dark { background: #111; color: #fff; border: 1px solid #444; padding: 10px; width: 100%; margin-bottom: 15px; border-radius: 4px; }
+        .btn-approve { background: #00f2ff; color: #000; font-weight: bold; padding: 8px 15px; border: none; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .btn-approve:hover { background: #fff; box-shadow: 0 0 10px #00f2ff; }
+        .btn-deny { background: #f44; color: #fff; font-weight: bold; padding: 8px 15px; border: none; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .btn-deny:hover { background: #f00; box-shadow: 0 0 10px #f44; }
+        .troca-card-dm { background: #111; border: 1px solid #333; padding: 15px; border-radius: 4px; margin-bottom: 10px; }
+        .troca-card-dm p { margin: 5px 0; font-size: 13px; color: #ccc; }
+        .troca-actions { display: flex; gap: 10px; margin-top: 15px; }
+
         /* TABS DO BESTIÁRIO E OBJETOS */
         .bestiary-tabs { display: flex; gap: 15px; margin: 0 20px; }
         .bestiary-tabs button { background: transparent; border: none; color: #aaa; font-family: 'Cinzel', serif; font-size: 12px; cursor: pointer; padding-bottom: 5px; font-weight: bold; }
@@ -993,7 +1260,8 @@ export default function MestreVTTPage() {
         .stats-row-c div { flex: 1; }
         .stats-row-c input { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 5px; text-align: center; }
         .actions-row-bottom { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-save-m { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+        .btn-save-m { flex: 1; background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-save-m:hover { background: #fff; box-shadow: 0 0 10px #ffcc00; }
         .btn-cancel-m { background: #333; color: #fff; border: none; padding: 10px; cursor: pointer; }
         
         .toggle-row { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 12px; margin-top: 5px; }

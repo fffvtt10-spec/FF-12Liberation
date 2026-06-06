@@ -97,24 +97,21 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
 
     if (token.stealth) {
         if (isPvPMode) {
-            // PvP ativo: visibilidade apenas para mestre, dono e mesmo time
             const clientChar = personagensData?.find(p => p.uid === currentUserUid);
             const clientCharName = clientChar ? clientChar.name : '';
             const clientTeam = equipes?.find(eq => eq.membros.includes(clientCharName));
             const isTeammate = clientTeam && clientTeam.membros.includes(token.name);
 
             if (isMaster || isOwner || isTeammate) {
-                isMyStealth = true; // Mestre, dono ou aliado veem translúcido
+                isMyStealth = true; 
             } else {
-                isStealthHidden = true; // Inimigos não veem nada
+                isStealthHidden = true; 
             }
         } else {
-            // PvP inativo: todos veem translúcido
             isMyStealth = true;
         }
     }
 
-    // Oculta o token se não for mestre e estiver invisível OU em furtividade PVP
     if (!isMaster && (!isBaseVisible || isStealthHidden)) return null;
 
     let tokenClasses = `vtt-token ${token.type} ${flash}`;
@@ -131,10 +128,9 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
         zIndex: isMaster ? 100 : 50 
     };
 
-    // Aplica a cor do time se houver e não estiver sobreposto por furtividade/highlight
     if (isPvPMode && teamColor && !isMyStealth && !isHighlighted && token.type === 'player') {
         customStyle.borderColor = teamColor;
-        customStyle.boxShadow = `0 0 15px ${teamColor}80`; // 80 é hex para 50% opacidade
+        customStyle.boxShadow = `0 0 15px ${teamColor}80`; 
     }
 
     return (
@@ -199,7 +195,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const [currentPaintGroupId, setCurrentPaintGroupId] = useState(null);
   const [tempPaintCells, setTempPaintCells] = useState([]);
   
-  // --- NOVOS ESTADOS PARA A BORRACHA ---
   const [isErasing, setIsErasing] = useState(false);
   const [tempEraseCells, setTempEraseCells] = useState([]);
 
@@ -207,7 +202,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   const imgRef = useRef(null);
   const lastPingTime = useRef(0);
 
-  // --- EFEITOS E SINCRONIZAÇÃO ---
   useEffect(() => {
     if (sessaoData) {
       setActiveMap(sessaoData.active_map || null);
@@ -315,7 +309,10 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       const isMine = token.type === 'player' && token.uid === currentUserUid;
       if (!isMaster && !isMine) return;
 
+      // Impede o scroll nativo durante o toque/drag
+      if (e.cancelable) e.preventDefault(); 
       e.stopPropagation();
+
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
@@ -344,7 +341,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
           });
       }
 
-      // --- LOGICA DA BORRACHA (MOVE) ---
       if (isErasing && activeTool === 'eraser') {
           const coords = getLocalCoords(e);
           const gX = Math.floor(coords.x / gridSizePx);
@@ -390,15 +386,12 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
           }
       }
 
-      // --- LOGICA DA BORRACHA (UP - SALVAR NO FIREBASE) ---
       if (isErasing && activeTool === 'eraser') {
           setIsErasing(false);
           if (tempEraseCells.length > 0 && sessaoData.painted_groups) {
-              // Clonamos os grupos atuais para manipular
               let updatedGroups = JSON.parse(JSON.stringify(sessaoData.painted_groups));
               let groupsChanged = false;
 
-              // Filtra as células apagadas
               updatedGroups = updatedGroups.map(group => {
                   const originalLength = group.cells.length;
                   group.cells = group.cells.filter(cell => 
@@ -406,7 +399,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                   );
                   if (group.cells.length !== originalLength) groupsChanged = true;
                   return group;
-              }).filter(group => group.cells.length > 0); // Remove grupos que ficaram vazios
+              }).filter(group => group.cells.length > 0);
 
               if (groupsChanged) {
                   try {
@@ -452,13 +445,13 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
 
   const handleMapStart = (e) => {
       if (activeTool === 'ping') {
-          if (e.cancelable) e.preventDefault();
+          if (e.cancelable && e.type.includes('touch')) e.preventDefault();
           handleCreatePing(e);
           return;
       }
 
       if (activeTool === 'paint') {
-          if (e.cancelable) e.preventDefault();
+          if (e.cancelable && e.type.includes('touch')) e.preventDefault();
           setIsPainting(true);
           const groupId = Date.now().toString();
           setCurrentPaintGroupId(groupId);
@@ -469,9 +462,8 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
           return;
       }
 
-      // --- LOGICA DA BORRACHA (START) ---
       if (activeTool === 'eraser') {
-          if (e.cancelable) e.preventDefault();
+          if (e.cancelable && e.type.includes('touch')) e.preventDefault();
           setIsErasing(true);
           const coords = getLocalCoords(e);
           const gX = Math.floor(coords.x / gridSizePx);
@@ -481,7 +473,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       }
 
       if (activeTool === 'ruler' || e.button === 2) {
-          if (e.cancelable) e.preventDefault(); 
+          if (e.cancelable && e.type.includes('touch')) e.preventDefault(); 
           setIsMeasuring(true);
           const coords = getLocalCoords(e);
           const gX = Math.floor(coords.x / gridSizePx);
@@ -534,7 +526,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
     await updateDoc(doc(db, "sessoes", sessaoData.id), { active_map: null });
   };
 
-  // Função auxiliar para buscar a cor do time (Caso esteja em modo PVP)
   const getTeamColor = (tokenName) => {
       if (!sessaoData.equipes) return null;
       for (let eq of sessaoData.equipes) {
@@ -545,35 +536,25 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
 
   const isPvP = sessaoData?.pvp_mode && sessaoData?.equipes && sessaoData?.equipes.length > 0;
   
-  // Acha o nome do personagem do jogador atual (cliente)
   let currentPlayerCharName = "";
   if (!isMaster) {
       const char = personagensData?.find(p => p.uid === currentUserUid);
       if (char) currentPlayerCharName = char.name;
   }
 
-  // Acha a equipe do jogador atual
   const currentPlayerTeam = isPvP && !isMaster 
       ? sessaoData.equipes?.find(eq => eq.membros.includes(currentPlayerCharName))
       : null;
 
   const visiblePings = pings.filter(ping => {
-      // Mestre vê tudo
       if (isMaster) return true;
-      // Se o PvP estiver desligado ou não houver equipes, todos veem todos os pings
       if (!isPvP) return true;
-      // Se for ping do Mestre, todos veem
       if (ping.isMaster) return true;
       
-      // Acha a equipe do dono do ping
       const pingSenderTeam = sessaoData.equipes?.find(eq => eq.membros.includes(ping.userName));
-      
-      // Se o dono estiver em uma equipe, só exibe para o jogador atual se ele for do mesmo time
       if (pingSenderTeam) {
           return currentPlayerTeam && currentPlayerTeam.id === pingSenderTeam.id;
       }
-      
-      // Pings de usuários sem equipe (se existirem) são visíveis
       return true;
   });
 
@@ -664,7 +645,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                 {gridSizePx > 0 && (
                                     <>
                                         <div className="paint-layer">
-                                            {/* Renderização das pinturas reais */}
                                             {sessaoData.painted_groups?.map(group => (
                                                 group.cells.map((cell, idx) => (
                                                     <div key={`${group.groupId}-${idx}`} className="painted-grid-cell" style={{
@@ -673,14 +653,12 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                                                     }} />
                                                 ))
                                             ))}
-                                            {/* Renderização do traço sendo pintado agora */}
                                             {tempPaintCells.map((cell, idx) => (
                                                 <div key={`temp-paint-${idx}`} className="painted-grid-cell" style={{
                                                     left: cell.gX * gridSizePx, top: cell.gY * gridSizePx, width: gridSizePx, height: gridSizePx,
                                                     backgroundColor: cell.color
                                                 }} />
                                             ))}
-                                            {/* Renderização do rastro visual da borracha */}
                                             {tempEraseCells.map((cell, idx) => (
                                                 <div key={`temp-erase-${idx}`} className="erased-grid-cell" style={{
                                                     left: cell.gX * gridSizePx, top: cell.gY * gridSizePx, width: gridSizePx, height: gridSizePx
@@ -789,6 +767,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .grid-btn-mini { background: #333; color: #fff; border: none; width: 20px; cursor: pointer; }
             .grid-number-display { width: 30px; background: #222; border: none; color: #ffcc00; text-align: center; font-size: 12px; outline: none; }
             
+            /* --- MELHORIA DE TOUCH --- touch-action: none trava o scroll da tela e viabiliza arrastar o token no mobile */
             .map-layer-container { position: relative; box-shadow: 0 0 30px #000; user-select: none; touch-action: none; }
             .map-img-element { display: block; max-width: 100%; max-height: 80vh; object-fit: contain; pointer-events: none; }
             
@@ -886,7 +865,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                 border-radius: 2px;
             }
 
-            /* --- ESTILO PARA A BORRACHA --- */
             .erased-grid-cell {
                 position: absolute;
                 background-color: rgba(255, 0, 0, 0.4);
@@ -901,7 +879,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             }
 
             /* --- TOKENS E FURTIVIDADE --- */
-            .vtt-token { position: absolute; border-radius: 50%; box-shadow: 0 0 10px #000; z-index: 10; overflow: visible; transition: border-color 0.3s; }
+            .vtt-token { position: absolute; border-radius: 50%; box-shadow: 0 0 10px #000; z-index: 10; overflow: visible; transition: border-color 0.3s; touch-action: none; }
             .vtt-token.dragging { z-index: 100; transition: none; box-shadow: 0 10px 20px rgba(0,0,0,0.8); transform: scale(1.05); }
             .vtt-token.enemy { border: 2px solid #f44; }
             .vtt-token.player { border: 2px solid #00f2ff; }
@@ -909,7 +887,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             
             .vtt-token.ghost-token { opacity: 0.5; filter: grayscale(100%); border-style: dashed; }
             
-            /* CSS NOVO: FURTIVIDADE */
             .vtt-token.stealth-token { opacity: 0.6; border: 2px dotted #8a2be2 !important; box-shadow: 0 0 15px rgba(138, 43, 226, 0.6) !important; }
             .vtt-token.stealth-token .token-inner { filter: grayscale(50%) hue-rotate(250deg); }
 
@@ -928,7 +905,6 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             .token-name { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; font-size: 10px; padding: 2px 5px; border-radius: 4px; white-space: nowrap; pointer-events: none; opacity: 0; transition: 0.2s; z-index: 15; text-shadow: 0 0 3px #000; }
             .vtt-token:hover .token-name { opacity: 1; }
             
-            /* CSS NOVO: OVERLAY DE STATUS NO MAPA */
             .token-status-overlay { position: absolute; top: -10px; right: -10px; display: flex; flex-wrap: wrap; gap: 2px; width: calc(100% + 20px); justify-content: center; pointer-events: none; z-index: 20; }
             .status-icon-badge { background: rgba(0,0,0,0.8); border-radius: 50%; padding: 2px; display: flex; align-items: center; justify-content: center; font-size: 12px; box-shadow: 0 0 5px #000; border: 1px solid #444; }
 
