@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove, updateDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, serverTimestamp, arrayRemove, updateDoc, getDocs, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom'; 
 import { backgroundMusic } from './LandingPage'; 
@@ -225,7 +225,7 @@ export default function MestrePage() {
   
   // --- MERCADO DOS LANTERNAS (TROCAS GLOBAIS) ---
   const [showMercadoModal, setShowMercadoModal] = useState(false);
-  const [mercadoTab, setMercadoTab] = useState('pendentes'); // pendentes | historico
+  const [mercadoTab, setMercadoTab] = useState('pendentes'); 
   
   const [showDetails, setShowDetails] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
@@ -243,18 +243,9 @@ export default function MestrePage() {
   
   const [sessaoDestinatarios, setSessaoDestinatarios] = useState([]); 
 
-  const [mestreIdentidade, setMestreIdentidade] = useState(() => {
-    return localStorage.getItem('mestreAssinatura') || "Narrador";
-  });
-
-  const [mestreCor, setMestreCor] = useState(() => {
-    return localStorage.getItem('mestreCor') || "#fbbf24";
-  });
-
-  useEffect(() => {
-    localStorage.setItem('mestreAssinatura', mestreIdentidade);
-    localStorage.setItem('mestreCor', mestreCor);
-  }, [mestreIdentidade, mestreCor]);
+  // Assinatura vinculada agora ao banco de dados por conta
+  const [mestreIdentidade, setMestreIdentidade] = useState("Narrador");
+  const [mestreCor, setMestreCor] = useState("#fbbf24");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -266,9 +257,18 @@ export default function MestrePage() {
   useEffect(() => {
     if (backgroundMusic) backgroundMusic.pause();
 
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
         if (user) {
             setCurrentUser(user);
+            
+            // Busca os dados do Narrador específicos dessa conta no Firestore
+            const profileRef = doc(db, "mestres_profiles", user.uid);
+            const profileSnap = await getDoc(profileRef);
+            if (profileSnap.exists()) {
+                setMestreIdentidade(profileSnap.data().nome || "Narrador");
+                setMestreCor(profileSnap.data().cor || "#fbbf24");
+            }
+
             const qM = query(collection(db, "missoes"), orderBy("createdAt", "desc"));
             const qS = query(collection(db, "sessoes"), orderBy("dataInicio", "asc"));
             const qD = query(collection(db, "disponibilidades"));
@@ -293,6 +293,16 @@ export default function MestrePage() {
 
     return () => unsub();
   }, [navigate]);
+
+  // Salva no Firestore sempre que o Narrador mudar o nome ou a cor
+  useEffect(() => {
+      if (currentUser) {
+          setDoc(doc(db, "mestres_profiles", currentUser.uid), {
+              nome: mestreIdentidade,
+              cor: mestreCor
+          }, { merge: true }).catch(console.error);
+      }
+  }, [mestreIdentidade, mestreCor, currentUser]);
 
   useEffect(() => {
       if (selectedFicha) {
@@ -380,7 +390,6 @@ export default function MestrePage() {
           alert("Erro: " + e.message);
       }
   };
-
 
   const handleCreateMission = async (e) => {
     e.preventDefault();
@@ -772,15 +781,15 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- BOTÕES FLUTUANTES ALINHADOS --- */}
+      {/* --- BOTÕES FLUTUANTES ALINHADOS VERTICALMENTE --- */}
       <div className="dm-floating-container">
+          <button className="dm-float-btn btn-fichas-dm" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
+              <img src={fichaIcon} alt="Fichas" style={{ width: '60%', height: '60%', objectFit: 'contain' }} />
+          </button>
+
           <button className="dm-float-btn btn-trocas-dm" onClick={() => setShowMercadoModal(true)} title="Mercado dos Lanternas">
               🏮
               {trocasPendentes.length > 0 && <span className="notification-badge-dm">{trocasPendentes.length}</span>}
-          </button>
-          
-          <button className="dm-float-btn btn-fichas-dm" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
-              <img src={fichaIcon} alt="Fichas" style={{ width: '60%', height: '60%', objectFit: 'contain' }} />
           </button>
       </div>
 
@@ -1250,8 +1259,8 @@ export default function MestrePage() {
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
         
-        /* BOTÕES FLUTUANTES (NOVO CONTAINER FLEX ALINHADO) */
-        .dm-floating-container { position: fixed; right: 30px; bottom: 30px; display: flex; gap: 20px; z-index: 9999; }
+        /* BOTÕES FLUTUANTES NO MESTREPAGE (EM COLUNA E MAIS ACIMA) */
+        .dm-floating-container { position: fixed; right: 30px; bottom: 110px; display: flex; flex-direction: column; gap: 20px; z-index: 9999; }
         .dm-float-btn { width: 70px; height: 70px; border-radius: 50%; border: 2px solid; background: #000; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; position: relative; }
         .dm-float-btn:hover { transform: scale(1.1); }
         
