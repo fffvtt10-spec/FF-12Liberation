@@ -368,7 +368,7 @@ export default function JogadorVttPage() {
         if (validas.length > lastSeen) setUnreadResenhas(validas.length - lastSeen); else setUnreadResenhas(0);
       });
       return () => { unsubSessoes(); unsubResenhas(); };
-  }, [personagem, currentVttSession?.id]); 
+  }, [personagem?.name, currentVttSession?.id]); 
 
   useEffect(() => {
       if (!currentVttSession || !auth.currentUser) return;
