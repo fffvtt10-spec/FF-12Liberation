@@ -199,6 +199,7 @@ export default function MestrePage() {
   const [sessoes, setSessoes] = useState([]); 
   const [personagensDb, setPersonagensDb] = useState([]);
   const [disponibilidades, setDisponibilidades] = useState([]); 
+  const [allTrocas, setAllTrocas] = useState([]); 
   
   const [loading, setLoading] = useState(true);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
@@ -221,6 +222,10 @@ export default function MestrePage() {
           { id: 2, nome: 'Time Ômega', lider: '', max: 10, cor: '#3b82f6', membros: [] }
       ]
   });
+  
+  // --- MERCADO DOS LANTERNAS (TROCAS GLOBAIS) ---
+  const [showMercadoModal, setShowMercadoModal] = useState(false);
+  const [mercadoTab, setMercadoTab] = useState('pendentes'); // pendentes | historico
   
   const [showDetails, setShowDetails] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
@@ -268,16 +273,18 @@ export default function MestrePage() {
             const qS = query(collection(db, "sessoes"), orderBy("dataInicio", "asc"));
             const qD = query(collection(db, "disponibilidades"));
             const qC = query(collection(db, "characters"));
+            const qT = query(collection(db, "mercado_lanternas"), orderBy("createdAt", "desc"));
 
             const unsubM = onSnapshot(qM, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubS = onSnapshot(qS, (snap) => setSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubD = onSnapshot(qD, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            const unsubT = onSnapshot(qT, (snap) => setAllTrocas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubC = onSnapshot(qC, (snap) => {
                 setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 setLoading(false); 
             });
 
-            return () => { unsubM(); unsubS(); unsubC(); unsubD(); };
+            return () => { unsubM(); unsubS(); unsubC(); unsubD(); unsubT(); };
         } else {
             setLoading(false);
             navigate('/login'); 
@@ -293,6 +300,87 @@ export default function MestrePage() {
           if (updated) setSelectedFicha(updated);
       }
   }, [personagensDb]);
+
+  // --- LÓGICA DE APROVAÇÃO/RECUSA DO MERCADO DOS LANTERNAS ---
+  const trocasPendentes = allTrocas.filter(t => t.status === 'pendente_mestre');
+  const trocasHistorico = allTrocas.filter(t => t.status !== 'pendente_mestre');
+
+  const handleAprovarTroca = async (troca) => {
+      if(!window.confirm("Autorizar transferência de recursos entre as fichas?")) return;
+      
+      const remetente = personagensDb.find(p => p.uid === troca.remetenteUid);
+      const destinatario = personagensDb.find(p => p.uid === troca.destinatarioUid);
+      
+      if(!remetente || !destinatario) return alert("Erro: Um dos personagens não foi encontrado na base de dados.");
+
+      // Clonar para manipulação segura
+      let remetenteInv = JSON.parse(JSON.stringify(remetente.character_sheet.inventory));
+      let destInv = JSON.parse(JSON.stringify(destinatario.character_sheet.inventory));
+      
+      // Transferência de GIL
+      if(troca.gil > 0) {
+          if((remetenteInv.gil || 0) < troca.gil) return alert(`Erro: O remetente ${remetente.name} não possui Gil suficiente na ficha.`);
+          remetenteInv.gil -= troca.gil;
+          destInv.gil = (destInv.gil || 0) + troca.gil;
+      }
+
+      // Transferência de ITENS
+      if(troca.itens && troca.itens.length > 0) {
+          for (let itemTroca of troca.itens) {
+              // Checa e remove do remetente
+              let itemIndexRem = remetenteInv.items.findIndex(i => i.name === itemTroca.name);
+              if(itemIndexRem === -1 || remetenteInv.items[itemIndexRem].quantity < itemTroca.quantidade) {
+                  return alert(`Erro: O remetente ${remetente.name} não possui a quantidade exata do item "${itemTroca.name}" na ficha.`);
+              }
+              
+              remetenteInv.items[itemIndexRem].quantity -= itemTroca.quantidade;
+              if(remetenteInv.items[itemIndexRem].quantity <= 0) {
+                  // Limpa o slot caso a quantidade zere
+                  remetenteInv.items[itemIndexRem] = { name: "", quantity: 0, description: "" };
+              }
+
+              // Adiciona ao destinatário
+              let itemIndexDest = destInv.items.findIndex(i => i.name === itemTroca.name);
+              if(itemIndexDest !== -1) {
+                  destInv.items[itemIndexDest].quantity += itemTroca.quantidade;
+              } else {
+                  // Procura slot vazio para alocar o item novo
+                  let emptySlot = destInv.items.findIndex(i => !i.name || i.name.trim() === '');
+                  if(emptySlot !== -1) {
+                      destInv.items[emptySlot] = { name: itemTroca.name, quantity: itemTroca.quantidade, description: "Recebido via Mercado" };
+                  } else {
+                      // Cria novo slot dinâmico no final
+                      destInv.items.push({ name: itemTroca.name, quantity: itemTroca.quantidade, description: "Recebido via Mercado" });
+                  }
+              }
+          }
+      }
+
+      try {
+          // Commit das alterações
+          await updateDoc(doc(db, "characters", remetente.uid), { "character_sheet.inventory": remetenteInv });
+          await updateDoc(doc(db, "characters", destinatario.uid), { "character_sheet.inventory": destInv });
+          await updateDoc(doc(db, "mercado_lanternas", troca.id), { status: 'aprovado', resolvedAt: new Date().toISOString(), resolvedBy: mestreIdentidade });
+          
+          alert("Troca APROVADA! Recursos movidos automaticamente entre as fichas.");
+      } catch(e) {
+          alert("Falha de rede ao processar aprovação: " + e.message);
+      }
+  };
+
+  const handleRecusarTroca = async (troca) => {
+      if(!window.confirm(`Negar o pedido de troca de ${troca.remetente}?`)) return;
+      try {
+          await updateDoc(doc(db, "mercado_lanternas", troca.id), { 
+              status: 'recusado', 
+              resolvedAt: new Date().toISOString(), 
+              resolvedBy: mestreIdentidade 
+          });
+      } catch(e) {
+          alert("Erro: " + e.message);
+      }
+  };
+
 
   const handleCreateMission = async (e) => {
     e.preventDefault();
@@ -684,9 +772,17 @@ export default function MestrePage() {
         </div>
       </div>
 
-      <button className="fichas-trigger-btn" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
-          <img src={fichaIcon} alt="Fichas" />
-      </button>
+      {/* --- BOTÕES FLUTUANTES ALINHADOS --- */}
+      <div className="dm-floating-container">
+          <button className="dm-float-btn btn-trocas-dm" onClick={() => setShowMercadoModal(true)} title="Mercado dos Lanternas">
+              🏮
+              {trocasPendentes.length > 0 && <span className="notification-badge-dm">{trocasPendentes.length}</span>}
+          </button>
+          
+          <button className="dm-float-btn btn-fichas-dm" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
+              <img src={fichaIcon} alt="Fichas" style={{ width: '60%', height: '60%', objectFit: 'contain' }} />
+          </button>
+      </div>
 
       <GuildBoard isMaster={true} />
       <Bazar isMestre={true} />
@@ -722,6 +818,78 @@ export default function MestrePage() {
                       ))}
                   </div>
                   <button className="btn-cancelar-main" style={{marginTop:'20px'}} onClick={() => setShowFichasList(false)}>FECHAR</button>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL GESTÃO MERCADO DOS LANTERNAS (TROCAS) */}
+      {showMercadoModal && (
+          <div className="ff-modal-overlay-fixed" onClick={() => setShowMercadoModal(false)}>
+              <div className="ff-modal-scrollable ff-card" onClick={e => e.stopPropagation()} style={{width: '900px', height: '80vh', display: 'flex', flexDirection: 'column'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid #334155', paddingBottom:'15px', marginBottom:'20px'}}>
+                      <h3 style={{margin:0, color:'#fbbf24', fontSize:'1.5rem', letterSpacing:'2px'}}>🏮 MERCADO DOS LANTERNAS</h3>
+                      <button className="btn-close-cal" onClick={() => setShowMercadoModal(false)}>✕</button>
+                  </div>
+
+                  <div className="mercado-tabs">
+                      <button className={mercadoTab === 'pendentes' ? 'active' : ''} onClick={() => setMercadoTab('pendentes')}>
+                          APROVAÇÕES PENDENTES ({trocasPendentes.length})
+                      </button>
+                      <button className={mercadoTab === 'historico' ? 'active' : ''} onClick={() => setMercadoTab('historico')}>
+                          HISTÓRICO GERAL
+                      </button>
+                  </div>
+
+                  <div className="mercado-content custom-scrollbar" style={{flex:1, overflowY:'auto', paddingRight:'10px'}}>
+                      {mercadoTab === 'pendentes' && (
+                          <div className="mercado-grid">
+                              {trocasPendentes.length === 0 && <p style={{color:'#64748b', textAlign:'center', gridColumn:'1/-1', fontStyle:'italic', marginTop:'20px'}}>Nenhuma transação aguardando análise.</p>}
+                              {trocasPendentes.map(t => (
+                                  <div key={t.id} className="troca-card-dm" style={{borderColor: '#00f2ff'}}>
+                                      <div className="tc-header" style={{background: 'rgba(0, 242, 255, 0.1)'}}>
+                                          <span>De: <strong>{t.remetente}</strong></span>
+                                          <span>Para: <strong>{t.destinatario}</strong></span>
+                                      </div>
+                                      <div className="tc-body">
+                                          <p><strong>Itens:</strong> {t.itens?.map(i => `${i.quantidade}x ${i.name}`).join(', ') || 'Nenhum'}</p>
+                                          <p><strong>Gil:</strong> <span style={{color:'#fbbf24'}}>{t.gil}</span></p>
+                                          {t.mensagem && <p className="tc-msg">"{t.mensagem}"</p>}
+                                      </div>
+                                      <div className="tc-footer">
+                                          <button className="btn-approve-dm" onClick={() => handleAprovarTroca(t)}>✓ APROVAR</button>
+                                          <button className="btn-reject-dm" onClick={() => handleRecusarTroca(t)}>✕ BARRAR</button>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+
+                      {mercadoTab === 'historico' && (
+                          <div className="mercado-list">
+                              {trocasHistorico.length === 0 && <p style={{color:'#64748b', textAlign:'center', fontStyle:'italic', marginTop:'20px'}}>Nenhum registro encontrado.</p>}
+                              {trocasHistorico.map(t => {
+                                  const dateStr = new Date(t.createdAt).toLocaleString('pt-BR');
+                                  const resDateStr = t.resolvedAt ? new Date(t.resolvedAt).toLocaleString('pt-BR') : '';
+                                  const isAprovado = t.status === 'aprovado';
+                                  return (
+                                      <div key={t.id} className="historico-row-dm" style={{borderLeftColor: isAprovado ? '#22c55e' : '#ef4444'}}>
+                                          <div className="hist-main-info">
+                                              <span className="hist-date">{dateStr}</span>
+                                              <strong>{t.remetente} ➔ {t.destinatario}</strong>
+                                              <span className="hist-items">{t.itens?.map(i => `${i.quantidade}x ${i.name}`).join(', ') || 'Nenhum'} | {t.gil} Gil</span>
+                                          </div>
+                                          <div className="hist-status-col">
+                                              <span style={{color: isAprovado ? '#22c55e' : '#ef4444', fontWeight:'bold', fontSize:'14px'}}>
+                                                  {isAprovado ? 'APROVADO' : 'RECUSADO'}
+                                              </span>
+                                              <span className="hist-gm">por {t.resolvedBy || 'Sistema'} em {resDateStr}</span>
+                                          </div>
+                                      </div>
+                                  )
+                              })}
+                          </div>
+                      )}
+                  </div>
               </div>
           </div>
       )}
@@ -1082,21 +1250,56 @@ export default function MestrePage() {
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
         
-        /* BOTÃO FLUTUANTE DE FICHAS */
-        .fichas-trigger-btn { position: fixed; bottom: 30px; right: 190px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f2ff; background: #000; cursor: pointer; z-index: 9999; transition: transform 0.2s, box-shadow 0.2s; padding: 0; display: flex; align-items: center; justify-content: center; }
-        .fichas-trigger-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px #00f2ff; }
-        .fichas-trigger-btn img { width: 70%; height: 70%; object-fit: contain; }
+        /* BOTÕES FLUTUANTES (NOVO CONTAINER FLEX ALINHADO) */
+        .dm-floating-container { position: fixed; right: 30px; bottom: 30px; display: flex; gap: 20px; z-index: 9999; }
+        .dm-float-btn { width: 70px; height: 70px; border-radius: 50%; border: 2px solid; background: #000; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; position: relative; }
+        .dm-float-btn:hover { transform: scale(1.1); }
+        
+        .btn-fichas-dm { border-color: #00f2ff; }
+        .btn-fichas-dm:hover { box-shadow: 0 0 25px #00f2ff; }
+        .btn-trocas-dm { border-color: #f43f5e; color: #f43f5e; font-size: 30px; }
+        .btn-trocas-dm:hover { box-shadow: 0 0 25px #f43f5e; }
+        .notification-badge-dm { position: absolute; top: 0; right: 0; background: #f00; color: #fff; font-size: 12px; font-weight: bold; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+
+        /* MERCADO DOS LANTERNAS MESTRE */
+        .mercado-tabs { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #334155; }
+        .mercado-tabs button { background: transparent; border: none; color: #94a3b8; padding-bottom: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; border-bottom: 2px solid transparent; font-family: 'Cinzel', serif; letter-spacing: 1px; }
+        .mercado-tabs button.active { color: #fbbf24; border-bottom-color: #fbbf24; }
+        
+        .mercado-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .troca-card-dm { background: #0f172a; border: 1px solid #334155; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+        .tc-header { padding: 10px 15px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; font-size: 12px; color: #fff; }
+        .tc-body { padding: 15px; flex: 1; font-size: 14px; color: #cbd5e1; }
+        .tc-body p { margin: 5px 0; }
+        .tc-msg { font-style: italic; color: #94a3b8; border-left: 2px solid #475569; padding-left: 10px; margin-top: 10px !important; }
+        .tc-footer { display: flex; border-top: 1px solid #334155; }
+        .btn-approve-dm { flex: 1; background: rgba(34, 197, 94, 0.1); border: none; color: #22c55e; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; border-right: 1px solid #334155; }
+        .btn-approve-dm:hover { background: #22c55e; color: #000; }
+        .btn-reject-dm { flex: 1; background: rgba(239, 68, 68, 0.1); border: none; color: #ef4444; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-reject-dm:hover { background: #ef4444; color: #000; }
+
+        .historico-row-dm { background: #0f172a; border: 1px solid #334155; border-left: 4px solid; padding: 15px; margin-bottom: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .hist-main-info { display: flex; flex-direction: column; gap: 5px; }
+        .hist-date { font-size: 10px; color: #94a3b8; }
+        .hist-main-info strong { color: #fff; font-size: 14px; }
+        .hist-items { color: #fbbf24; font-size: 12px; }
+        .hist-status-col { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .hist-gm { font-size: 10px; color: #64748b; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
 
         /* LISTA DE FICHAS */
         .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
         .ficha-row-name strong { display: block; color: #fff; font-size: 1.1rem; }
         .ficha-row-name small { color: #94a3b8; }
+        
         .guild-btn-float {
             top: auto !important;
             left: auto !important;
             transform: none !important;
             bottom: 30px !important;
-            right: 270px !important;
+            right: 190px !important;
         }
       `}</style>
     </div>

@@ -20,7 +20,7 @@ import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
-import treeData from '../data/tree.json'; // IMPORTANDO O JSON CRIADO
+import treeData from '../data/tree.json'; 
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -215,6 +215,7 @@ export default function JogadorVttPage() {
   const [showArenaDetails, setShowArenaDetails] = useState(null);
 
   const [allSessoes, setAllSessoes] = useState([]); 
+  const [allGlobalSessoes, setAllGlobalSessoes] = useState([]); // Todas as sessões do servidor (para checar status de todos)
   const [sessoesAtivas, setSessoesAtivas] = useState([]); 
   const [sessoesFuturas, setSessoesFuturas] = useState([]); 
   const [hasJoinedSession, setHasJoinedSession] = useState(false);
@@ -311,7 +312,7 @@ export default function JogadorVttPage() {
   }, []);
 
   useEffect(() => {
-    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {}; let unsubAllChars = () => {};
+    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {}; let unsubAllChars = () => {}; let unsubGlobalSessoes = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
             const docRef = doc(db, "characters", user.uid);
@@ -331,15 +332,17 @@ export default function JogadorVttPage() {
             const qDisp = query(collection(db, "disponibilidades")); 
             const qArenas = query(collection(db, "sessoes"), where("isArena", "==", true));
             const qAllChars = query(collection(db, "characters"));
+            const qGlobalSessoes = query(collection(db, "sessoes"));
 
             unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubArenas = onSnapshot(qArenas, (snap) => setArenasDisponiveis(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubAllChars = onSnapshot(qAllChars, (snap) => setAllPersonagens(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            unsubGlobalSessoes = onSnapshot(qGlobalSessoes, (snap) => setAllGlobalSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
         } else { setLoading(false); navigate('/login'); }
     });
-    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); unsubAllChars(); };
+    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); unsubAllChars(); unsubGlobalSessoes(); };
   }, [navigate]);
 
   useEffect(() => {
@@ -395,15 +398,18 @@ export default function JogadorVttPage() {
       };
   }, [currentVttSession?.id]); 
 
+  // --- LISTENER GLOBAL DE TROCAS ---
   useEffect(() => {
-      if (!currentVttSession || !personagem) return;
-      const qMercado = query(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"));
+      if (!personagem) return;
+      const qMercado = query(collection(db, "mercado_lanternas"));
       const unsubMercado = onSnapshot(qMercado, mercSnap => {
           const allTrocas = mercSnap.docs.map(d => ({id: d.id, ...d.data()}));
-          setMinhasTrocas(allTrocas.filter(t => t.remetenteUid === personagem.uid || t.destinatarioUid === personagem.uid));
+          const myTrocas = allTrocas.filter(t => t.remetenteUid === personagem.uid || t.destinatarioUid === personagem.uid);
+          myTrocas.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setMinhasTrocas(myTrocas);
       });
       return () => unsubMercado();
-  }, [currentVttSession?.id, personagem?.uid]);
+  }, [personagem?.uid]);
 
   useEffect(() => {
       if(currentVttSession?.bencao_deuses?.active && currentVttSession.bencao_deuses.vencedores?.includes(personagem?.name)) {
@@ -412,6 +418,18 @@ export default function JogadorVttPage() {
           return () => clearTimeout(t);
       }
   }, [currentVttSession?.bencao_deuses?.timestamp, personagem?.name, currentVttSession?.bencao_deuses?.active, currentVttSession?.bencao_deuses?.vencedores]);
+
+  // Função helper para verificar se um jogador X está com sessão ativa rolando
+  const isPlayerActive = (playerName) => {
+      const now = new Date();
+      return allGlobalSessoes.some(s => {
+          const inicio = new Date(s.dataInicio);
+          const fim = new Date(s.expiraEm);
+          return now >= inicio && now <= fim && s.participantes?.includes(playerName);
+      });
+  };
+
+  const iAmActive = personagem ? isPlayerActive(personagem.name) : false;
 
   const handleConfirmLevelUp = () => { setShowLevelUpModal(false); audioRef.current.pause(); };
   
@@ -461,7 +479,7 @@ export default function JogadorVttPage() {
     window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
   };
 
-  // --- HANDLERS TROCAS (JOGADOR) ---
+  // --- HANDLERS TROCAS GLOBAIS (JOGADOR) ---
   const toggleItemTroca = (itemIndex, itemName) => {
       setTrocaForm(prev => {
           const isSelected = prev.itensSelecionados.find(i => i.index === itemIndex);
@@ -475,10 +493,12 @@ export default function JogadorVttPage() {
 
   const handleEnviarProposta = async (e) => {
       e.preventDefault();
-      if(!currentVttSession || !personagem || !trocaForm.destinatarioUid) return alert("Selecione o destinatário da troca.");
+      if(iAmActive) return alert("Você está em uma sessão ativa. Trocas não permitidas.");
+      if(!personagem || !trocaForm.destinatarioUid) return alert("Selecione o destinatário da troca.");
       
       const target = allPersonagens.find(p => p.uid === trocaForm.destinatarioUid);
       if (!target) return alert("Destinatário não encontrado.");
+      if (isPlayerActive(target.name)) return alert("O destinatário está em uma sessão ativa agora.");
       
       const itensFormatados = trocaForm.itensSelecionados.map(i => ({ 
           name: i.name, 
@@ -487,7 +507,7 @@ export default function JogadorVttPage() {
       }));
 
       try {
-          await addDoc(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"), {
+          await addDoc(collection(db, "mercado_lanternas"), {
               remetenteUid: personagem.uid,
               remetente: personagem.name,
               destinatarioUid: target.uid,
@@ -880,46 +900,43 @@ export default function JogadorVttPage() {
         {sessoesAtivas.length > 0 && !hasJoinedSession && <div className="active-sessions-banner fade-in"><h3>SESSÃO EM ANDAMENTO!</h3>{sessoesAtivas.map(s => <div key={s.id} className="session-entry-row"><span className="sessao-nome-active">{s.missaoNome}</span><button className="btn-enter-session" onClick={() => enterVTT(s)}>ENTRAR AGORA</button></div>)}</div>}
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
 
-        {/* --- BOTÕES FLUTUANTES (ALINHADOS EM DUAS COLUNAS NO CSS) --- */}
-        <button className="floating-mission-btn hud-col-1 pos-1" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
-        {vttStatus === 'connected' && <button className="floating-dice-btn hud-col-1 pos-2" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>}
-        {vttStatus === 'connected' && <button className="floating-combat-btn hud-col-1 pos-3" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>}
-        {resenhas.length > 0 && <button className="floating-sanches-btn hud-col-1 pos-4" onClick={handleOpenSanches} title="Resenhas"><div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>{unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}</button>}
-        <button className="floating-book-btn hud-col-1 pos-5" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
-        <button className="floating-calendar-btn hud-col-1 pos-6" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
-        <button className="floating-arena-btn hud-col-1 pos-7" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
+        {/* --- BOTÕES FLUTUANTES ENVOLTOS EM UM FLEX CONTAINER --- */}
+        <div className="hud-columns-container">
+            {/* Coluna 1: Principal (Sempre visível ou global) */}
+            <div className="hud-col">
+                <button className="hud-btn btn-tree" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
+                <button className="hud-btn btn-trocas" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
+                    🏮
+                    {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
+                </button>
+                <button className="hud-btn btn-arena" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
+                <button className="hud-btn btn-calendar" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
+                <button className="hud-btn btn-book" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
+                {resenhas.length > 0 && <button className="hud-btn btn-sanches" onClick={handleOpenSanches} title="Resenhas">
+                    <div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>
+                    {unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}
+                </button>}
+                <button className="hud-btn btn-mission" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
+            </div>
 
-        {currentVttSession && (
-            <button className="floating-trocas-btn hud-col-2 pos-1" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
-                🏮
-                {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
-            </button>
-        )}
-        {currentVttSession && (
-            <button className={`floating-bencao-btn hud-col-2 pos-2 ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
-        )}
-        <button className="floating-tree-btn hud-col-2 pos-3" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
-
-        {showTeamChat && (
-            <button 
-                className="floating-team-chat-btn hud-col-2 pos-4" 
-                onClick={() => {
-                    setChatOpen(!chatOpen);
-                    if (!chatOpen) {
-                        setLastOpenedChat(Date.now());
-                        setUnreadChatMessages(0);
-                    }
-                }} 
-                title="Chat de Equipe"
-                style={{
-                    border: `2px solid ${myTeam.cor || '#22c55e'}`,
-                    boxShadow: chatOpen ? `0 0 15px ${myTeam.cor || '#22c55e'}` : 'none'
-                }}
-            >
-                💬
-                {unreadChatMessages > 0 && <span className="notification-badge">{unreadChatMessages}</span>}
-            </button>
-        )}
+            {/* Coluna 2: Apenas durante VTT Ativo */}
+            {currentVttSession && (
+                <div className="hud-col">
+                    {showTeamChat && (
+                        <button className="hud-btn" style={{borderColor: myTeam.cor, color: '#fff'}} onClick={() => {
+                            setChatOpen(!chatOpen);
+                            if (!chatOpen) { setLastOpenedChat(Date.now()); setUnreadChatMessages(0); }
+                        }} title="Chat de Equipe">
+                            💬
+                            {unreadChatMessages > 0 && <span className="notification-badge">{unreadChatMessages}</span>}
+                        </button>
+                    )}
+                    <button className={`hud-btn btn-bencao ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
+                    <button className="hud-btn btn-combat" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>
+                    <button className="hud-btn btn-dice" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>
+                </div>
+            )}
+        </div>
 
         <Bazar isMestre={false} playerData={personagem} />
         <GuildBoard isMaster={false} />
@@ -1043,146 +1060,79 @@ export default function JogadorVttPage() {
         
         {showFicha && personagem && <Ficha characterData={personagem} isMaster={false} onClose={() => setShowFicha(false)} />}
 
-        {showTeamChat && chatOpen && (
-            <div 
-                className="team-chat-panel fade-in"
-                style={{ 
-                    top: chatPos.y, 
-                    left: chatPos.x, 
-                    zIndex: 2100,
-                    '--team-color': myTeam.cor || '#a855f7',
-                    '--team-color-alpha': `${myTeam.cor || '#a855f7'}66`,
-                    '--team-color-faded': `${myTeam.cor || '#a855f7'}22`
-                }}
-            >
-                <div 
-                    className="chat-header"
-                    onMouseDown={handleChatMouseDown}
-                    style={{ cursor: 'grab' }}
-                >
-                    <h3>💬 CHAT: {myTeam.nome}</h3>
-                    <div className="chat-header-actions">
-                        <button 
-                            type="button" 
-                            onClick={() => {
-                                setChatOpen(false);
-                                setLastOpenedChat(Date.now());
-                                setUnreadChatMessages(0);
-                            }}
-                            title="Minimizar"
-                        >
-                            ➖
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="chat-messages-container custom-scrollbar">
-                    {chatMessages.map((msg) => {
-                        const isMe = msg.senderUid === auth.currentUser?.uid;
-                        const senderChar = allPersonagens.find(p => p.name === msg.senderName);
-                        const avatarUrl = senderChar?.character_sheet?.imgUrl || '';
-
-                        let timeStr = "";
-                        if (msg.createdAt) {
-                            const date = msg.createdAt.toDate();
-                            timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        } else {
-                            timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        }
-
-                        return (
-                            <div key={msg.id} className={`chat-message-bubble ${isMe ? 'me' : 'other'}`}>
-                                {avatarUrl ? (
-                                    <div className="chat-avatar-mini" style={{ backgroundImage: `url(${avatarUrl})` }} title={msg.senderName} />
-                                ) : (
-                                    <div className="chat-avatar-mini-default" title={msg.senderName}>{msg.senderName ? msg.senderName.substring(0, 2).toUpperCase() : '?'}</div>
-                                )}
-                                <div className="chat-bubble-content">
-                                    {!isMe && <span className="chat-sender-name">{msg.senderName}</span>}
-                                    <span className="chat-message-text">{msg.content}</span>
-                                    <span className="chat-message-time">{timeStr}</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                    <div ref={chatEndRef} />
-                </div>
-                
-                <form className="chat-input-area" onSubmit={handleSendChatMessage}>
-                    <input 
-                        type="text" 
-                        className="chat-input-field" 
-                        placeholder="Mensagem para equipe..." 
-                        value={chatInputText}
-                        onChange={(e) => setChatInputText(e.target.value)}
-                    />
-                    <button type="submit" className="chat-send-btn">➤</button>
-                </form>
-            </div>
-        )}
-
-        {/* MODAL: SISTEMA DE TROCAS */}
+        {/* MODAL: SISTEMA DE TROCAS GLOBAIS */}
         {showTrocas && (
             <div className="modal-overlay-custom" onClick={() => setShowTrocas(false)}>
                 <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header-c"><h3>🏮 SISTEMA DE TROCAS</h3><button className="close-c" onClick={() => setShowTrocas(false)}>✕</button></div>
+                    <div className="modal-header-c"><h3>🏮 MERCADO DOS LANTERNAS</h3><button className="close-c" onClick={() => setShowTrocas(false)}>✕</button></div>
                     <div style={{display:'flex', gap:'20px'}}>
                         
                         {/* Enviar Proposta */}
                         <div style={{flex:1, background:'#111', padding:'15px', borderRadius:'4px', border:'1px solid #333'}}>
                             <h4 style={{color:'#00f2ff', margin:'0 0 15px 0'}}>Oferecer Troca</h4>
-                            <form onSubmit={handleEnviarProposta}>
-                                <div style={{marginBottom:'10px'}}>
-                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>DESTINATÁRIO</label>
-                                    <select className="file-input-dark" value={trocaForm.destinatarioUid} onChange={e => setTrocaForm({...trocaForm, destinatarioUid: e.target.value})} required>
-                                        <option value="">-- Escolha um Aventureiro --</option>
-                                        {allPersonagens.filter(p => p.uid !== personagem?.uid && currentVttSession?.participantes?.includes(p.name)).map(p => (
-                                            <option key={p.uid} value={p.uid}>{p.name}</option>
-                                        ))}
-                                    </select>
+                            {iAmActive ? (
+                                <div style={{background: 'rgba(244, 68, 68, 0.1)', border: '1px solid #f44', padding: '15px', borderRadius: '4px', textAlign: 'center'}}>
+                                    <span style={{fontSize: '24px'}}>⚔️</span>
+                                    <p style={{color: '#f44', fontSize: '13px', fontWeight: 'bold', margin: '10px 0'}}>Acesso Negado</p>
+                                    <p style={{color: '#ccc', fontSize: '11px', margin: 0}}>Você está atualmente em uma sessão ativa (combate/rp). As leis do mercado não permitem negociações nestas condições.</p>
                                 </div>
-
-                                <div style={{marginBottom:'10px'}}>
-                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>SEUS ITENS DISPONÍVEIS</label>
-                                    <div className="itens-troca-lista custom-scrollbar">
-                                        {meuInventario.length === 0 && <p style={{color:'#666', fontSize:'12px', fontStyle:'italic'}}>Seu inventário está vazio.</p>}
-                                        {meuInventario.map((item, idx) => (
-                                            <label key={idx} className="item-checkbox-label">
-                                                <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.index === idx)} onChange={() => toggleItemTroca(idx, item.name)} />
-                                                {item.name} (Qtd: {item.quantity})
-                                            </label>
-                                        ))}
+                            ) : (
+                                <form onSubmit={handleEnviarProposta}>
+                                    <div style={{marginBottom:'10px'}}>
+                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>DESTINATÁRIO</label>
+                                        <select className="file-input-dark" value={trocaForm.destinatarioUid} onChange={e => setTrocaForm({...trocaForm, destinatarioUid: e.target.value})} required>
+                                            <option value="">-- Escolha um Aventureiro Livre --</option>
+                                            {allPersonagens.filter(p => p.uid !== personagem?.uid && !isPlayerActive(p.name)).map(p => (
+                                                <option key={p.uid} value={p.uid}>{p.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                </div>
 
-                                <div style={{marginBottom:'10px'}}>
-                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>GIL ENVIADO (Máx: {meuGil})</label>
-                                    <input type="number" min="0" max={meuGil} className="file-input-dark" value={trocaForm.gil} onChange={e => setTrocaForm({...trocaForm, gil: Number(e.target.value)})} />
-                                </div>
+                                    <div style={{marginBottom:'10px'}}>
+                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>SEUS ITENS DISPONÍVEIS</label>
+                                        <div className="itens-troca-lista custom-scrollbar">
+                                            {meuInventario.length === 0 && <p style={{color:'#666', fontSize:'12px', fontStyle:'italic'}}>Seu inventário está vazio.</p>}
+                                            {meuInventario.map((item, idx) => (
+                                                <label key={idx} className="item-checkbox-label">
+                                                    <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.index === idx)} onChange={() => toggleItemTroca(idx, item.name)} />
+                                                    {item.name} (Qtd: {item.quantity})
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                                <div style={{marginBottom:'15px'}}>
-                                    <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>MENSAGEM (RP)</label>
-                                    <textarea className="file-input-dark" style={{resize:'none', height:'60px'}} placeholder="Descreva sua oferta (opcional)..." value={trocaForm.mensagem} onChange={e => setTrocaForm({...trocaForm, mensagem: e.target.value})} />
-                                </div>
-                                <button type="submit" className="btn-save-m" style={{width:'100%', padding:'15px'}}>ENVIAR PROPOSTA</button>
-                            </form>
+                                    <div style={{marginBottom:'10px'}}>
+                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>GIL ENVIADO (Máx: {meuGil})</label>
+                                        <input type="number" min="0" max={meuGil} className="file-input-dark" value={trocaForm.gil} onChange={e => setTrocaForm({...trocaForm, gil: Number(e.target.value)})} />
+                                    </div>
+
+                                    <div style={{marginBottom:'15px'}}>
+                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>MENSAGEM (RP)</label>
+                                        <textarea className="file-input-dark" style={{resize:'none', height:'60px'}} placeholder="Descreva sua oferta (opcional)..." value={trocaForm.mensagem} onChange={e => setTrocaForm({...trocaForm, mensagem: e.target.value})} />
+                                    </div>
+                                    <button type="submit" className="btn-save-m" style={{width:'100%', padding:'15px'}}>ENVIAR PROPOSTA</button>
+                                </form>
+                            )}
                         </div>
 
                         {/* Histórico */}
                         <div style={{flex:1, display:'flex', flexDirection:'column'}}>
                             <h4 style={{color:'#ffcc00', margin:'0 0 15px 0'}}>Meus Registros Mercantis</h4>
-                            <div className="custom-scrollbar" style={{flex:1, background:'#0a0a0a', border:'1px solid #333', padding:'10px', overflowY:'auto', maxHeight:'400px'}}>
+                            <div className="custom-scrollbar" style={{flex:1, background:'#0a0a0a', border:'1px solid #333', padding:'10px', overflowY:'auto', maxHeight:'450px'}}>
                                 {minhasTrocas.length === 0 && <p style={{color:'#666', fontSize:'12px', textAlign:'center'}}>Nenhum registro encontrado.</p>}
                                 {minhasTrocas.map(t => {
                                     const isSent = t.remetenteUid === personagem?.uid;
                                     const statusColor = t.status === 'aprovado' ? '#0f0' : t.status === 'recusado' ? '#f44' : '#ffcc00';
                                     const statusText = t.status === 'aprovado' ? '✓ Aprovado' : t.status === 'recusado' ? '✕ Recusado' : '⏳ Pendente';
+                                    const dataHora = new Date(t.createdAt).toLocaleString('pt-BR');
+
                                     return (
                                         <div key={t.id} style={{background:'#111', border:'1px solid #333', padding:'10px', marginBottom:'10px', borderRadius:'4px', borderLeft:`3px solid ${isSent ? '#00f2ff' : '#a855f7'}`}}>
                                             <div style={{display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#888', marginBottom:'5px'}}>
                                                 <span>{isSent ? `ENVIADO PARA: ${t.destinatario}` : `RECEBIDO DE: ${t.remetente}`}</span>
                                                 <strong style={{color: statusColor}}>{statusText}</strong>
                                             </div>
+                                            <p style={{margin:'2px 0', fontSize:'10px', color:'#555'}}>{dataHora}</p>
                                             <p style={{margin:'5px 0', fontSize:'12px', color:'#ccc'}}>Itens: {t.itens?.map(i => i.name).join(', ') || 'Nenhum'}</p>
                                             <p style={{margin:'5px 0', fontSize:'12px', color:'#fcd34d'}}>Gil: {t.gil}</p>
                                             {t.mensagem && <p style={{margin:'5px 0', fontSize:'11px', color:'#aaa', fontStyle:'italic'}}>"{t.mensagem}"</p>}
@@ -1192,37 +1142,6 @@ export default function JogadorVttPage() {
                             </div>
                         </div>
 
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* MODAL: BÊNÇÃO DOS DEUSES */}
-        {showBencao && (
-            <div className="modal-overlay-custom" onClick={() => setShowBencao(false)}>
-                <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header-c"><h3>✨ BÊNÇÃO DOS DEUSES</h3><button className="close-c" onClick={() => setShowBencao(false)}>✕</button></div>
-                    <div style={{textAlign:'center'}}>
-                        <p style={{color:'#ccc', fontSize:'14px', marginBottom:'20px'}}>
-                            Escolha um número entre 1 e 100. Se o Narrador rolar o **Dado dos Deuses** e cair no seu número, você receberá vantagens especiais nesta sessão.
-                        </p>
-                        <form onSubmit={handleApostarNumero}>
-                            <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'15px', marginBottom:'20px'}}>
-                                <input 
-                                    type="number" min="1" max="100" required
-                                    style={{background:'#000', color:'#ffcc00', border:'2px solid #ffcc00', padding:'15px', fontSize:'30px', width:'100px', textAlign:'center', borderRadius:'8px'}}
-                                    value={numeroDestino} onChange={e => setNumeroDestino(e.target.value)}
-                                />
-                            </div>
-                            <button type="submit" className="btn-save-m" style={{padding:'15px 30px', fontSize:'16px'}}>CRAVAR DESTINO</button>
-                        </form>
-                        
-                        <div style={{marginTop:'30px', background:'#111', padding:'15px', borderRadius:'4px', border:'1px solid #333'}}>
-                            <h4 style={{color:'#aaa', margin:'0 0 10px 0', fontSize:'12px'}}>Meu Número Atual:</h4>
-                            <span style={{fontSize:'24px', color:'#00f2ff', fontWeight:'bold'}}>
-                                {currentVttSession?.bencao_deuses?.numeros_escolhidos?.[personagem?.name] || "Nenhum escolhido"}
-                            </span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1275,36 +1194,36 @@ export default function JogadorVttPage() {
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
         .char-meta { font-size: 12px; color: #00f2ff; }
         
-        /* BOTÕES FLUTUANTES - COLUNA 1 */
-        .hud-col-1 { position: fixed; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 2000; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; }
-        .hud-col-1.pos-1 { bottom: 30px; border: 2px solid #ffcc00; color: #fff; }
-        .hud-col-1.pos-1:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
-        .hud-col-1.pos-2 { bottom: 90px; border: 2px solid #fff; color: #fff; background: #111; }
-        .hud-col-1.pos-2:hover { border-color: #ffcc00; transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; }
-        .hud-col-1.pos-3 { bottom: 150px; border: 2px solid #f44; color: #f44; background: #111; }
-        .hud-col-1.pos-3:hover { border-color: #fff; color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #f44; }
-        .hud-col-1.pos-4 { bottom: 210px; border: 2px solid #00f2ff; }
-        .hud-col-1.pos-4:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; }
-        .hud-col-1.pos-5 { bottom: 270px; border: 2px solid #fff; color: #fff; }
-        .hud-col-1.pos-5:hover { transform: scale(1.1); box-shadow: 0 0 15px #fff; border-color: #ffcc00; color: #ffcc00; }
-        .hud-col-1.pos-6 { bottom: 330px; border: 2px solid #22c55e; color: #22c55e; font-size: 24px; }
-        .hud-col-1.pos-6:hover { transform: scale(1.1); box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
-        .hud-col-1.pos-7 { bottom: 390px; border: 2px solid #a855f7; color: #a855f7; }
-        .hud-col-1.pos-7:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-
-        /* BOTÕES FLUTUANTES - COLUNA 2 */
-        .hud-col-2 { position: fixed; left: 85px; width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 2000; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; }
-        .hud-col-2.pos-1 { bottom: 30px; border: 2px solid #a855f7; color: #a855f7; font-size: 24px; }
-        .hud-col-2.pos-1:hover { transform: scale(1.1); box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-        .hud-col-2.pos-2 { bottom: 90px; border: 2px solid #ffcc00; color: #ffcc00; }
-        .hud-col-2.pos-2:hover { transform: scale(1.1); box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
-        .hud-col-2.pos-3 { bottom: 150px; border: 2px solid #00f2ff; color: #00f2ff; }
-        .hud-col-2.pos-3:hover { transform: scale(1.1); box-shadow: 0 0 15px #00f2ff; color: #fff; border-color: #fff; }
-        .hud-col-2.pos-4 { bottom: 210px; color: #fff; }
-        .hud-col-2.pos-4:hover { transform: scale(1.1); }
+        /* CONTAINER DOS BOTÕES FLUTUANTES (SOLUÇÃO DE ALINHAMENTO) */
+        .hud-columns-container { position: fixed; left: 20px; bottom: 30px; display: flex; gap: 15px; align-items: flex-end; z-index: 2000; }
+        .hud-col { display: flex; flex-direction: column; gap: 15px; }
+        .hud-btn { width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; position: relative; }
+        .hud-btn:hover { transform: scale(1.1); }
+        
+        .btn-mission { border: 2px solid #ffcc00; color: #fff; }
+        .btn-mission:hover { box-shadow: 0 0 15px #ffcc00; }
+        .btn-sanches { border: 2px solid #00f2ff; }
+        .btn-sanches:hover { box-shadow: 0 0 15px #00f2ff; }
+        .btn-book { border: 2px solid #fff; color: #fff; }
+        .btn-book:hover { border-color: #ffcc00; color: #ffcc00; box-shadow: 0 0 15px #fff; }
+        .btn-calendar { border: 2px solid #22c55e; color: #22c55e; }
+        .btn-calendar:hover { box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
+        .btn-arena { border: 2px solid #a855f7; color: #a855f7; }
+        .btn-arena:hover { box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
+        .btn-trocas { border: 2px solid #f43f5e; color: #f43f5e; }
+        .btn-trocas:hover { box-shadow: 0 0 15px #f43f5e; color: #fff; border-color: #fff; }
+        .btn-tree { border: 2px solid #3b82f6; color: #3b82f6; }
+        .btn-tree:hover { box-shadow: 0 0 15px #3b82f6; color: #fff; border-color: #fff; }
+        
+        .btn-dice { border: 2px solid #fff; background: #111; color: #fff; }
+        .btn-dice:hover { border-color: #ffcc00; box-shadow: 0 0 15px #ffcc00; }
+        .btn-combat { border: 2px solid #f44; background: #111; color: #f44; }
+        .btn-combat:hover { border-color: #fff; color: #fff; box-shadow: 0 0 15px #f44; }
+        .btn-bencao { border: 2px solid #ffcc00; color: #ffcc00; }
+        .btn-bencao:hover { box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
 
         .sanches-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
-        .floating-sanches-btn:hover .sanches-icon-face { opacity: 1; }
+        .btn-sanches:hover .sanches-icon-face { opacity: 1; }
         .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
         
         .combat-tracker-panel { position: absolute; width: 300px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; z-index: 2100; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
