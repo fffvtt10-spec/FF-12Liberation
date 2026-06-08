@@ -12,6 +12,7 @@ import WallpaperPicker from '../components/WallpaperPicker';
 import sanchezImg from '../assets/sanchez.jpeg'; 
 import levelUpMusic from '../assets/level-up.mp3'; 
 import Bazar from '../components/Bazar';
+import Forja from '../components/Forja';
 import Ficha from '../components/Ficha';
 import Tabletop from '../components/Tabletop'; 
 import SceneryViewer from '../components/SceneryViewer'; 
@@ -20,7 +21,6 @@ import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
-import treeData from '../data/tree.json'; 
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -119,26 +119,6 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
             </div>
         )}
       </div>
-      <style>{`
-        .ff-modal-calendar { width: 90vw; height: 90vh; background: #0f172a; border: 2px solid #fbbf24; display: flex; flex-direction: column; padding: 20px; box-shadow: 0 0 50px #000; }
-        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 1.5rem; color: #fbbf24; }
-        .cal-header button { background: transparent; border: 1px solid #fbbf24; color: #fbbf24; cursor: pointer; padding: 5px 15px; font-weight: bold; }
-        .btn-close-cal { background: #f44 !important; border-color: #f44 !important; color: #fff !important; }
-        .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; color: #94a3b8; font-weight: bold; margin-bottom: 10px; }
-        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 5px; flex: 1; overflow-y: auto; }
-        .cal-day { background: #1e293b; border: 1px solid #334155; padding: 5px; min-height: 100px; position: relative; display: flex; flex-direction: column; }
-        .cal-day.empty { background: transparent; border: none; }
-        .cal-day-number { font-weight: bold; color: #64748b; font-size: 0.9rem; align-self: flex-end; }
-        .cal-events-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
-        .cal-event-pill { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .cal-event-pill.session { background: #7f1d1d; color: #fca5a5; border: 1px solid #f87171; }
-        .cal-event-pill.slot { background: #064e3b; color: #6ee7b7; border: 1px solid #34d399; }
-        .mini-modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; }
-        .mini-modal { background: #020617; border: 1px solid #fbbf24; padding: 20px; width: 300px; border-radius: 8px; box-shadow: 0 0 20px #000; }
-        .mini-modal.detail { width: 400px; }
-        .mini-modal h4 { color: #fbbf24; margin: 0 0 10px 0; }
-        .ff-modal-overlay-calendar { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-      `}</style>
     </div>
   );
 };
@@ -181,6 +161,11 @@ const BookIcon = () => (
   </svg>
 );
 
+const IconTabletop = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>);
+const IconDice = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" /><path d="M12 22V12" /></svg>);
+const IconScenery = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>);
+const IconNPC = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>);
+
 const formatSanchesText = (text) => {
     if (!text) return { __html: "" };
     let formatted = text
@@ -188,7 +173,7 @@ const formatSanchesText = (text) => {
       .replace(/_(.*?)_/g, '<em>$1</em>')           
       .replace(/\n/g, '<br />');                    
     return { __html: formatted };
-  };
+};
 
 const JOGADOR_WALLPAPERS = [
   { label: 'Padrão',      src: fundoJogador  },
@@ -205,17 +190,18 @@ export default function JogadorVttPage() {
   const [loading, setLoading] = useState(true);
   const [missoes, setMissoes] = useState([]);
 
+  // Wallpaper state
   const [wallpaper, setWallpaper] = useState(() => {
     const saved = localStorage.getItem('jogador_wallpaper');
     return saved || fundoJogador;
   });
   
+  // Arenas Disponíveis para Inscrição
   const [arenasDisponiveis, setArenasDisponiveis] = useState([]);
   const [showArenaModal, setShowArenaModal] = useState(false);
   const [showArenaDetails, setShowArenaDetails] = useState(null);
 
   const [allSessoes, setAllSessoes] = useState([]); 
-  const [allGlobalSessoes, setAllGlobalSessoes] = useState([]); // Todas as sessões do servidor (para checar status de todos)
   const [sessoesAtivas, setSessoesAtivas] = useState([]); 
   const [sessoesFuturas, setSessoesFuturas] = useState([]); 
   const [hasJoinedSession, setHasJoinedSession] = useState(false);
@@ -266,7 +252,10 @@ export default function JogadorVttPage() {
   // --- NOVOS ESTADOS - QUEUE 01 ---
   const [showBencao, setShowBencao] = useState(false);
   const [numeroDestino, setNumeroDestino] = useState("");
-  const [bencaoVencedorAtivo, setBencaoVencedorAtivo] = useState(false);
+  
+  // ESTADO GLOBAL DO ALERTA DA BÊNÇÃO
+  const [bencaoAlert, setBencaoAlert] = useState(null);
+  const lastBencaoTimestamp = useRef(0);
 
   const [showTrocas, setShowTrocas] = useState(false);
   const [minhasTrocas, setMinhasTrocas] = useState([]);
@@ -312,7 +301,7 @@ export default function JogadorVttPage() {
   }, []);
 
   useEffect(() => {
-    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {}; let unsubAllChars = () => {}; let unsubGlobalSessoes = () => {};
+    let unsubChar = () => {}; let unsubMissoes = () => {}; let unsubDisp = () => {}; let unsubArenas = () => {}; let unsubAllChars = () => {};
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user) {
             const docRef = doc(db, "characters", user.uid);
@@ -332,17 +321,15 @@ export default function JogadorVttPage() {
             const qDisp = query(collection(db, "disponibilidades")); 
             const qArenas = query(collection(db, "sessoes"), where("isArena", "==", true));
             const qAllChars = query(collection(db, "characters"));
-            const qGlobalSessoes = query(collection(db, "sessoes"));
 
             unsubMissoes = onSnapshot(qMissoes, (snap) => setMissoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubDisp = onSnapshot(qDisp, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubArenas = onSnapshot(qArenas, (snap) => setArenasDisponiveis(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             unsubAllChars = onSnapshot(qAllChars, (snap) => setAllPersonagens(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-            unsubGlobalSessoes = onSnapshot(qGlobalSessoes, (snap) => setAllGlobalSessoes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
         } else { setLoading(false); navigate('/login'); }
     });
-    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); unsubAllChars(); unsubGlobalSessoes(); };
+    return () => { unsubscribeAuth(); unsubChar(); unsubMissoes(); unsubDisp(); unsubArenas(); unsubAllChars(); };
   }, [navigate]);
 
   useEffect(() => {
@@ -398,38 +385,35 @@ export default function JogadorVttPage() {
       };
   }, [currentVttSession?.id]); 
 
-  // --- LISTENER GLOBAL DE TROCAS ---
+  // --- ESCUTAR MERCADO DE TROCAS ---
   useEffect(() => {
-      if (!personagem) return;
-      const qMercado = query(collection(db, "mercado_lanternas"));
+      if (!currentVttSession || !personagem) return;
+      const qMercado = query(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"));
       const unsubMercado = onSnapshot(qMercado, mercSnap => {
           const allTrocas = mercSnap.docs.map(d => ({id: d.id, ...d.data()}));
-          const myTrocas = allTrocas.filter(t => t.remetenteUid === personagem.uid || t.destinatarioUid === personagem.uid);
-          myTrocas.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-          setMinhasTrocas(myTrocas);
+          setMinhasTrocas(allTrocas.filter(t => t.remetenteUid === personagem.uid || t.destinatarioUid === personagem.uid));
       });
       return () => unsubMercado();
-  }, [personagem?.uid]);
+  }, [currentVttSession?.id, personagem?.uid]);
 
+  // --- NOVO: ALERTA GLOBAL DO DADO DOS DEUSES ---
   useEffect(() => {
-      if(currentVttSession?.bencao_deuses?.active && currentVttSession.bencao_deuses.vencedores?.includes(personagem?.name)) {
-          setBencaoVencedorAtivo(true);
-          const t = setTimeout(() => setBencaoVencedorAtivo(false), 5000); 
-          return () => clearTimeout(t);
-      }
-  }, [currentVttSession?.bencao_deuses?.timestamp, personagem?.name, currentVttSession?.bencao_deuses?.active, currentVttSession?.bencao_deuses?.vencedores]);
-
-  // Função helper para verificar se um jogador X está com sessão ativa rolando
-  const isPlayerActive = (playerName) => {
-      const now = new Date();
-      return allGlobalSessoes.some(s => {
-          const inicio = new Date(s.dataInicio);
-          const fim = new Date(s.expiraEm);
-          return now >= inicio && now <= fim && s.participantes?.includes(playerName);
-      });
-  };
-
-  const iAmActive = personagem ? isPlayerActive(personagem.name) : false;
+    const bencao = currentVttSession?.bencao_deuses;
+    if (bencao && bencao.timestamp) {
+        if (lastBencaoTimestamp.current === 0) {
+            lastBencaoTimestamp.current = bencao.timestamp;
+        } else if (bencao.timestamp !== lastBencaoTimestamp.current) {
+            lastBencaoTimestamp.current = bencao.timestamp;
+            setBencaoAlert({
+                resultado: bencao.resultado_d100,
+                vencedores: bencao.vencedores || []
+            });
+            // O alerta dura 7 segundos na tela
+            const t = setTimeout(() => setBencaoAlert(null), 7000);
+            return () => clearTimeout(t);
+        }
+    }
+  }, [currentVttSession?.bencao_deuses?.timestamp]);
 
   const handleConfirmLevelUp = () => { setShowLevelUpModal(false); audioRef.current.pause(); };
   
@@ -479,35 +463,34 @@ export default function JogadorVttPage() {
     window.open("https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton", "_blank");
   };
 
-  // --- HANDLERS TROCAS GLOBAIS (JOGADOR) ---
-  const toggleItemTroca = (itemIndex, itemName) => {
+  // --- HANDLERS TROCAS (JOGADOR) ---
+  const toggleItemTroca = (slot) => {
       setTrocaForm(prev => {
-          const isSelected = prev.itensSelecionados.find(i => i.index === itemIndex);
+          const isSelected = prev.itensSelecionados.find(i => i.slot_id === slot.slot_id);
           if (isSelected) {
-              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.index !== itemIndex) };
+              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.slot_id !== slot.slot_id) };
           } else {
-              return { ...prev, itensSelecionados: [...prev.itensSelecionados, { index: itemIndex, name: itemName }] };
+              return { ...prev, itensSelecionados: [...prev.itensSelecionados, slot] };
           }
       });
   };
 
   const handleEnviarProposta = async (e) => {
       e.preventDefault();
-      if(iAmActive) return alert("Você está em uma sessão ativa. Trocas não permitidas.");
-      if(!personagem || !trocaForm.destinatarioUid) return alert("Selecione o destinatário da troca.");
+      if(!currentVttSession || !personagem || !trocaForm.destinatarioUid) return alert("Selecione o destinatário da troca.");
       
       const target = allPersonagens.find(p => p.uid === trocaForm.destinatarioUid);
       if (!target) return alert("Destinatário não encontrado.");
-      if (isPlayerActive(target.name)) return alert("O destinatário está em uma sessão ativa agora.");
       
       const itensFormatados = trocaForm.itensSelecionados.map(i => ({ 
-          name: i.name, 
+          name: i.item_name, 
           quantidade: 1, 
-          index: i.index
+          slot_id: i.slot_id,
+          effect: i.effect || ''
       }));
 
       try {
-          await addDoc(collection(db, "mercado_lanternas"), {
+          await addDoc(collection(db, "sessoes", currentVttSession.id, "mercado_lanternas"), {
               remetenteUid: personagem.uid,
               remetente: personagem.name,
               destinatarioUid: target.uid,
@@ -535,7 +518,7 @@ export default function JogadorVttPage() {
       } catch(err) { alert("Erro ao apostar: " + err.message); }
   };
 
-  // --- HANDLERS ARRASTAR ---
+  // --- HANDLERS ARRASTAR MOUSE/TOUCH (TREE, CHAT, TRACKER, DETAILS) ---
   const startDragTree = (clientX, clientY) => {
       setIsDraggingTree(true);
       setDragOffsetTree({ x: clientX - treePos.x, y: clientY - treePos.y });
@@ -546,6 +529,9 @@ export default function JogadorVttPage() {
   };
   
   const handleTreeMouseDown = (e) => startDragTree(e.clientX, e.clientY);
+  const handleTreeMouseMove = (e) => onDragMoveTree(e.clientX, e.clientY);
+  const handleTreeMouseUp = () => setIsDraggingTree(false);
+
   const handleTreeTouchStart = (e) => startDragTree(e.touches[0].clientX, e.touches[0].clientY);
   const handleTreeTouchMove = (e) => {
       if(isDraggingTree) e.preventDefault(); 
@@ -574,6 +560,7 @@ export default function JogadorVttPage() {
       setIsDraggingTree(false); 
   };
 
+  // --- LOGICA E LISTENERS DO CHAT DE EQUIPE (PVP) ---
   const myTeam = currentVttSession?.pvp_mode && currentVttSession?.equipes?.find(eq => eq.membros.includes(personagem?.name));
   const showTeamChat = vttStatus === 'connected' && currentVttSession?.pvp_mode && myTeam;
 
@@ -583,10 +570,16 @@ export default function JogadorVttPage() {
       setUnreadChatMessages(0);
       return;
     }
-    const messagesQuery = query(collection(db, "sessoes", currentVttSession.id, "team_chats", myTeam.id.toString(), "messages"), orderBy("createdAt", "asc"));
+
+    const messagesQuery = query(
+      collection(db, "sessoes", currentVttSession.id, "team_chats", myTeam.id.toString(), "messages"),
+      orderBy("createdAt", "asc")
+    );
+
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setChatMessages(msgs);
+
       if (!chatOpen) {
         const newMsgs = msgs.filter(m => {
           const mTime = m.createdAt ? m.createdAt.toDate().getTime() : Date.now();
@@ -597,6 +590,7 @@ export default function JogadorVttPage() {
         setUnreadChatMessages(0);
       }
     });
+
     return () => unsubscribe();
   }, [showTeamChat, myTeam?.id, chatOpen, lastOpenedChat, currentVttSession?.id]);
 
@@ -625,6 +619,7 @@ export default function JogadorVttPage() {
       }
   };
 
+  // --- HELPER: BUSCAR COR DO TIME NO MODO PVP ---
   const getTeamColor = (tokenName) => {
       if (!currentVttSession || !currentVttSession.equipes) return null;
       for (let eq of currentVttSession.equipes) {
@@ -633,38 +628,80 @@ export default function JogadorVttPage() {
       return null;
   };
 
-  // --- RENDER ÁRVORE VISUAL DINÂMICA (Baseada no tree.json) ---
+  // --- RENDER ÁRVORE VISUAL ELEGANTE (FLEXBOX/GLASS PANEL) ---
   const renderClassTree = () => {
-      const raceData = treeData[treeTab];
-      if (!raceData) return <p style={{color:'#666', textAlign:'center'}}>Dados de classe não encontrados para esta raça.</p>;
-
-      return (
-          <div className="tree-container">
-              {raceData.map((line, idx) => (
-                  <div key={idx} className="tree-line">
-                      <div className={`fc-node ${line.special ? 'special' : line.isolated ? 'legendary' : 'base'}`}>
-                          {line.base}
+      if (treeTab === 'Bangaa') {
+          return (
+              <div className="modern-tree-flow">
+                  <div className="tree-branch">
+                      <div className="tree-node base">Guerreiro</div><div className="tree-arrow">➔</div>
+                      <div className="tree-col">
+                          <div className="tree-row"><div className="tree-node adv">Gladiador</div><div className="tree-arrow">➔</div><div className="tree-node max">Viking</div></div>
+                          <div className="tree-row"><div className="tree-node adv">Lanceiro</div><div className="tree-arrow">➔</div><div className="tree-node max">Bangalor</div></div>
                       </div>
-                      {line.paths && line.paths.length > 0 && (
-                          <div className="tree-paths">
-                              {line.paths.map((path, i) => (
-                                  <div key={i} className="tree-path">
-                                      <div className="fc-arrow">↓</div>
-                                      <div className="fc-node adv">{path.adv}</div>
-                                      {path.max && (
-                                          <>
-                                              <div className="fc-arrow">↓</div>
-                                              <div className="fc-node max">{path.max}</div>
-                                          </>
-                                      )}
-                                  </div>
-                              ))}
-                          </div>
-                      )}
                   </div>
-              ))}
-          </div>
-      );
+                  <div className="tree-divider"></div>
+                  <div className="tree-branch">
+                      <div className="tree-node base">Monge</div><div className="tree-arrow">➔</div>
+                      <div className="tree-col">
+                          <div className="tree-row"><div className="tree-node adv">Artista Marcial</div><div className="tree-arrow">➔</div><div className="tree-node max">Mestre Artes</div></div>
+                          <div className="tree-row"><div className="tree-node adv">Lutador Rua</div><div className="tree-arrow">➔</div><div className="tree-node max">Brutamontes</div></div>
+                      </div>
+                  </div>
+                  <div className="tree-divider"></div>
+                  <div className="tree-branch">
+                      <div className="tree-node legend">Cavaleiro Dragão</div><div className="tree-arrow">➔</div><div className="tree-node legend" style={{borderColor:'#f44', color:'#fff'}}>Dragonslayer</div>
+                  </div>
+              </div>
+          );
+      }
+      if (treeTab === 'Elvaan') {
+          return (
+              <div className="modern-tree-flow">
+                  <div className="tree-branch">
+                      <div className="tree-node base">Soldado</div><div className="tree-arrow">➔</div>
+                      <div className="tree-col">
+                          <div className="tree-row"><div className="tree-node adv">Paladino</div><div className="tree-arrow">➔</div><div className="tree-node max">Templário</div></div>
+                          <div className="tree-row"><div className="tree-node adv">Lâminas Mágicas</div><div className="tree-arrow">➔</div><div className="tree-node max">Saber</div></div>
+                      </div>
+                  </div>
+                  <div className="tree-divider"></div>
+                  <div className="tree-branch">
+                      <div className="tree-node base">Espadachim</div><div className="tree-arrow">➔</div>
+                      <div className="tree-col">
+                          <div className="tree-row"><div className="tree-node adv">Duelista</div><div className="tree-arrow">➔</div><div className="tree-node max">Ronin</div></div>
+                          <div className="tree-row"><div className="tree-node adv" style={{opacity:0.5}}>Lâminas Mágicas</div><div className="tree-arrow" style={{opacity:0.5}}>➔</div><div className="tree-node max" style={{opacity:0.5}}>Saber</div></div>
+                      </div>
+                  </div>
+              </div>
+          );
+      }
+      if (treeTab === 'Viera') {
+          return (
+              <div className="modern-tree-flow">
+                  <div className="tree-branch"><div className="tree-node base">Arqueira</div><div className="tree-arrow">➔</div><div className="tree-node adv">Caçadora</div><div className="tree-arrow">➔</div><div className="tree-node max">Patrulheira</div></div>
+                  <div className="tree-divider"></div>
+                  <div className="tree-branch">
+                      <div className="tree-node base">Curandeiro</div><div className="tree-arrow">➔</div>
+                      <div className="tree-col">
+                          <div className="tree-row"><div className="tree-node adv">Espiritualista</div><div className="tree-arrow">➔</div><div className="tree-node max">Tecelã</div></div>
+                          <div className="tree-row"><div className="tree-node adv">Maga Vermelha</div><div className="tree-arrow">➔</div><div className="tree-node max">Spellblade</div></div>
+                      </div>
+                  </div>
+                  <div className="tree-divider"></div>
+                  <div className="tree-branch">
+                      <div className="tree-node base">Esgrimista</div><div className="tree-arrow">➔</div>
+                      <div className="tree-col">
+                          <div className="tree-row"><div className="tree-node adv" style={{opacity:0.5}}>Maga Vermelha</div><div className="tree-arrow" style={{opacity:0.5}}>➔</div><div className="tree-node max" style={{opacity:0.5}}>Spellblade</div></div>
+                          <div className="tree-row"><div className="tree-node adv">Floretista</div><div className="tree-arrow">➔</div><div className="tree-node max">Mosqueteira</div></div>
+                      </div>
+                  </div>
+                  <div className="tree-divider"></div>
+                  <div className="tree-branch"><div className="tree-node legend">Exilado</div><div className="tree-arrow">➔</div><div className="tree-node adv">Mercenário</div><div className="tree-arrow">➔</div><div className="tree-node legend" style={{borderColor:'#f44', color:'#fff'}}>Mestre Armas</div></div>
+              </div>
+          );
+      }
+      return null;
   };
 
   if (loading || !minTimeElapsed) {
@@ -680,9 +717,6 @@ export default function JogadorVttPage() {
           fontSize: '18px', letterSpacing: '2px', textTransform: 'uppercase',
           animation: 'pulseText 2s infinite ease-in-out' 
         }}>Sintonizando Éter...</p>
-        <style>{`
-          @keyframes pulseText { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
-        `}</style>
       </div>
     );
   }
@@ -690,19 +724,30 @@ export default function JogadorVttPage() {
   if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
   const isBencaoWinner = currentVttSession?.bencao_deuses?.vencedores?.includes(personagem?.name);
-  const meuInventario = personagem?.character_sheet?.inventory?.items?.filter(i => i && i.name && i.name.trim() !== '') || [];
+  const meuInventario = personagem?.character_sheet?.inventory?.slots?.filter(s => s && s.item_name && s.item_name.trim() !== '') || [];
   const meuGil = personagem?.character_sheet?.inventory?.gil || 0;
 
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
       
-      {bencaoVencedorAtivo && (
-          <div className="bencao-victory-overlay">
-              <div className="bencao-victory-box">
-                  <h2>OS DEUSES SORRIEM PARA VOCÊ!</h2>
-                  <p>O Narrador rolou o seu Número do Destino ({numeroDestino}).</p>
-                  <p className="subtext">Você recebeu a Bênção dos Deuses nesta sessão!</p>
+      {/* ALERTA GLOBAL DO DADO DOS DEUSES */}
+      {bencaoAlert && (
+          <div className="global-bencao-alert-overlay">
+              <div className="global-bencao-alert-box">
+                  <h3 className="alert-subtitle">OS DEUSES ROLARAM O DADO...</h3>
+                  <h1 className="alert-number">{bencaoAlert.resultado}</h1>
+                  
+                  {bencaoAlert.vencedores.length > 0 ? (
+                      <div className="alert-winners">
+                          <h4>✨ AGRACIADOS ✨</h4>
+                          <p>{bencaoAlert.vencedores.join(', ')}</p>
+                      </div>
+                  ) : (
+                      <div className="alert-losers">
+                          <p>Nenhum aventureiro foi digno da Bênção desta vez.</p>
+                      </div>
+                  )}
               </div>
           </div>
       )}
@@ -723,7 +768,7 @@ export default function JogadorVttPage() {
         {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
-        {/* --- COMBAT TRACKER --- */}
+        {/* --- COMBAT TRACKER COM LÓGICA DE FURTIVIDADE PVP E CORES DO TIME --- */}
         {showCombatTracker && currentVttSession && (
             <div 
                 className="combat-tracker-panel player-view fade-in"
@@ -738,6 +783,8 @@ export default function JogadorVttPage() {
                 </div>
                 <div className="tracker-list">
                     {currentVttSession.tokens?.map((t, i) => ({...t, originalIndex: i})).filter(t => t.type !== 'object').map((token) => {
+                        
+                        // LÓGICA DE VISIBILIDADE (INCLUI FURTIVIDADE)
                         const isBaseVisible = token.visible !== false;
                         const isOwner = token.uid === auth.currentUser.uid;
                         const isPvP = currentVttSession.pvp_mode;
@@ -765,6 +812,7 @@ export default function JogadorVttPage() {
                         let hpDisplay = "?", mpDisplay = "?";
                         let hpMax = "?", mpMax = "?";
 
+                        // LÓGICA DE HP PARA TODOS OS JOGADORES (E NÃO APENAS O SEU)
                         if (token.type === 'player') {
                             const charObj = allPersonagens.find(p => p.uid === token.uid);
                             if (charObj) {
@@ -786,6 +834,7 @@ export default function JogadorVttPage() {
                             mpMax = token.stats?.mp?.max;
                         }
 
+                        // --- ADICIONA A COR DO TIME NA BORDA SE O MODO PVP ESTIVER ATIVADO ---
                         const teamColor = isPvP ? getTeamColor(token.name) : null;
                         const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
 
@@ -899,50 +948,64 @@ export default function JogadorVttPage() {
         {sessoesFuturas.length > 0 && sessoesAtivas.length === 0 && !hasJoinedSession && <div className="upcoming-sessions-banner"><h3>A SESSÃO VAI COMEÇAR EM BREVE</h3>{sessoesFuturas.map(s => <div key={s.id} className="countdown-row"><span className="sessao-nome-future">{s.missaoNome}</span><CountdownTimer targetDate={s.dataInicio} /></div>)}</div>}
         {sessoesAtivas.length > 0 && !hasJoinedSession && <div className="active-sessions-banner fade-in"><h3>SESSÃO EM ANDAMENTO!</h3>{sessoesAtivas.map(s => <div key={s.id} className="session-entry-row"><span className="sessao-nome-active">{s.missaoNome}</span><button className="btn-enter-session" onClick={() => enterVTT(s)}>ENTRAR AGORA</button></div>)}</div>}
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
-
-        {/* --- BOTÕES FLUTUANTES ENVOLTOS EM UM FLEX CONTAINER --- */}
-        <div className="hud-columns-container">
-            {/* Coluna 1: Principal (Sempre visível ou global) */}
-            <div className="hud-col">
-                <button className="hud-btn btn-tree" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
-                <button className="hud-btn btn-trocas" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
-                    🏮
-                    {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
-                </button>
-                <button className="hud-btn btn-arena" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
-                <button className="hud-btn btn-calendar" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
-                <button className="hud-btn btn-book" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
-                {resenhas.length > 0 && <button className="hud-btn btn-sanches" onClick={handleOpenSanches} title="Resenhas">
-                    <div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-                    {unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}
-                </button>}
-                <button className="hud-btn btn-mission" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
-            </div>
-
-            {/* Coluna 2: Apenas durante VTT Ativo */}
-            {currentVttSession && (
-                <div className="hud-col">
-                    {showTeamChat && (
-                        <button className="hud-btn" style={{borderColor: myTeam.cor, color: '#fff'}} onClick={() => {
-                            setChatOpen(!chatOpen);
-                            if (!chatOpen) { setLastOpenedChat(Date.now()); setUnreadChatMessages(0); }
-                        }} title="Chat de Equipe">
-                            💬
-                            {unreadChatMessages > 0 && <span className="notification-badge">{unreadChatMessages}</span>}
-                        </button>
-                    )}
-                    <button className={`hud-btn btn-bencao ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
-                    <button className="hud-btn btn-combat" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>
-                    <button className="hud-btn btn-dice" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>
+        
+        {/* --- DOCK DE FERRAMENTAS CENTRALIZADO E LIMPO --- */}
+        <div className="dm-tools-dock">
+            <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMissionModal(true)}>📜</button><div className="tool-label">MISSÕES E CONTRATOS</div></div>
+            <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowCalendar(true)}>📅</button><div className="tool-label">AGENDA DE SESSÕES</div></div>
+            <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowArenaModal(true)}>⚔️</button><div className="tool-label">ARENAS PVP</div></div>
+            
+            {resenhas.length > 0 && (
+                <div className="tool-group">
+                    <button className="tool-btn-placeholder" onClick={handleOpenSanches} style={{position: 'relative', overflow: 'hidden'}}>
+                        <div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>
+                        {unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}
+                    </button>
+                    <div className="tool-label">RESENHAS DO SANCHES</div>
                 </div>
+            )}
+
+            <div className="tool-group"><Bazar isMestre={false} playerData={personagem} vttDock={true} /><div className="tool-label">BAZAR DE ITENS</div></div>
+            <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA MÁGICA</div></div>
+            <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank')}><IconBook /></button><div className="tool-label">LIVRO OFICIAL</div></div>
+            
+            {/* NOVAS FERRAMENTAS QUEUE 01 (VISÍVEIS SEMPRE, MAS COM REGRAS) */}
+            <div className="tool-group">
+                <button className="tool-btn-placeholder" onClick={() => setShowClassTree(true)}>🌳</button>
+                <div className="tool-label">ÁRVORE DE CLASSES</div>
+            </div>
+            
+            {currentVttSession && (
+                <>
+                    <div className="tool-group">
+                        <button className="tool-btn-placeholder" onClick={() => setShowTrocas(true)} style={{position: 'relative', borderColor: '#a855f7', color: '#a855f7'}}>
+                            🏮
+                            {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
+                        </button>
+                        <div className="tool-label">SISTEMA DE TROCAS</div>
+                    </div>
+
+                    <div className="tool-group">
+                        <button className={`tool-btn-placeholder ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} style={{borderColor: '#ffcc00', color: '#ffcc00'}}>
+                            ✨
+                        </button>
+                        <div className="tool-label">BÊNÇÃO DOS DEUSES</div>
+                    </div>
+                    
+                    <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowCombatTracker(!showCombatTracker)}><CombatIcon /></button><div className="tool-label">COMBATE</div></div>
+                    <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowDiceSelector(true)}><IconDice /></button><div className="tool-label">ROLAR DADOS</div></div>
+                </>
             )}
         </div>
 
-        <Bazar isMestre={false} playerData={personagem} />
         <GuildBoard isMaster={false} />
 
         {showCalendar && (
-          <CalendarSystemPlayer onClose={() => setShowCalendar(false)} disponibilidades={disponibilidades} sessoes={allSessoes} />
+          <CalendarSystemPlayer 
+            onClose={() => setShowCalendar(false)} 
+            disponibilidades={disponibilidades}
+            sessoes={allSessoes} 
+          />
         )}
         
         {/* MODAL DE LISTA DE MISSÕES */}
@@ -1060,82 +1123,164 @@ export default function JogadorVttPage() {
         
         {showFicha && personagem && <Ficha characterData={personagem} isMaster={false} onClose={() => setShowFicha(false)} />}
 
-        {/* MODAL: SISTEMA DE TROCAS GLOBAIS */}
-        {showTrocas && (
-            <div className="modal-overlay-custom" onClick={() => setShowTrocas(false)}>
-                <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header-c"><h3>🏮 MERCADO DOS LANTERNAS</h3><button className="close-c" onClick={() => setShowTrocas(false)}>✕</button></div>
-                    <div style={{display:'flex', gap:'20px'}}>
-                        
-                        {/* Enviar Proposta */}
-                        <div style={{flex:1, background:'#111', padding:'15px', borderRadius:'4px', border:'1px solid #333'}}>
-                            <h4 style={{color:'#00f2ff', margin:'0 0 15px 0'}}>Oferecer Troca</h4>
-                            {iAmActive ? (
-                                <div style={{background: 'rgba(244, 68, 68, 0.1)', border: '1px solid #f44', padding: '15px', borderRadius: '4px', textAlign: 'center'}}>
-                                    <span style={{fontSize: '24px'}}>⚔️</span>
-                                    <p style={{color: '#f44', fontSize: '13px', fontWeight: 'bold', margin: '10px 0'}}>Acesso Negado</p>
-                                    <p style={{color: '#ccc', fontSize: '11px', margin: 0}}>Você está atualmente em uma sessão ativa (combate/rp). As leis do mercado não permitem negociações nestas condições.</p>
+        {showTeamChat && chatOpen && (
+            <div 
+                className="team-chat-panel fade-in"
+                style={{ 
+                    top: chatPos.y, 
+                    left: chatPos.x, 
+                    zIndex: 2100,
+                    '--team-color': myTeam.cor || '#a855f7',
+                    '--team-color-alpha': `${myTeam.cor || '#a855f7'}66`,
+                    '--team-color-faded': `${myTeam.cor || '#a855f7'}22`
+                }}
+            >
+                <div 
+                    className="chat-header"
+                    onMouseDown={handleChatMouseDown}
+                    style={{ cursor: 'grab' }}
+                >
+                    <h3>💬 CHAT: {myTeam.nome}</h3>
+                    <div className="chat-header-actions">
+                        <button 
+                            type="button" 
+                            onClick={() => {
+                                setChatOpen(false);
+                                setLastOpenedChat(Date.now());
+                                setUnreadChatMessages(0);
+                            }}
+                            title="Minimizar"
+                        >
+                            ➖
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="chat-messages-container custom-scrollbar">
+                    {chatMessages.map((msg) => {
+                        const isMe = msg.senderUid === auth.currentUser?.uid;
+                        const senderChar = allPersonagens.find(p => p.name === msg.senderName);
+                        const avatarUrl = senderChar?.character_sheet?.imgUrl || '';
+
+                        let timeStr = "";
+                        if (msg.createdAt) {
+                            const date = msg.createdAt.toDate();
+                            timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        } else {
+                            timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        }
+
+                        return (
+                            <div key={msg.id} className={`chat-message-bubble ${isMe ? 'me' : 'other'}`}>
+                                {avatarUrl ? (
+                                    <div 
+                                        className="chat-avatar-mini" 
+                                        style={{ backgroundImage: `url(${avatarUrl})` }}
+                                        title={msg.senderName}
+                                    />
+                                ) : (
+                                    <div className="chat-avatar-mini-default" title={msg.senderName}>
+                                        {msg.senderName ? msg.senderName.substring(0, 2).toUpperCase() : '?'}
+                                    </div>
+                                )}
+                                <div className="chat-bubble-content">
+                                    {!isMe && <span className="chat-sender-name">{msg.senderName}</span>}
+                                    <span className="chat-message-text">{msg.content}</span>
+                                    <span className="chat-message-time">{timeStr}</span>
                                 </div>
-                            ) : (
-                                <form onSubmit={handleEnviarProposta}>
-                                    <div style={{marginBottom:'10px'}}>
-                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>DESTINATÁRIO</label>
-                                        <select className="file-input-dark" value={trocaForm.destinatarioUid} onChange={e => setTrocaForm({...trocaForm, destinatarioUid: e.target.value})} required>
-                                            <option value="">-- Escolha um Aventureiro Livre --</option>
-                                            {allPersonagens.filter(p => p.uid !== personagem?.uid && !isPlayerActive(p.name)).map(p => (
-                                                <option key={p.uid} value={p.uid}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                            </div>
+                        );
+                    })}
+                    <div ref={chatEndRef} />
+                </div>
+                
+                <form className="chat-input-area" onSubmit={handleSendChatMessage}>
+                    <input 
+                        type="text" 
+                        className="chat-input-field" 
+                        placeholder="Mensagem para equipe..." 
+                        value={chatInputText}
+                        onChange={(e) => setChatInputText(e.target.value)}
+                    />
+                    <button type="submit" className="chat-send-btn">➤</button>
+                </form>
+            </div>
+        )}
 
-                                    <div style={{marginBottom:'10px'}}>
-                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>SEUS ITENS DISPONÍVEIS</label>
-                                        <div className="itens-troca-lista custom-scrollbar">
-                                            {meuInventario.length === 0 && <p style={{color:'#666', fontSize:'12px', fontStyle:'italic'}}>Seu inventário está vazio.</p>}
-                                            {meuInventario.map((item, idx) => (
-                                                <label key={idx} className="item-checkbox-label">
-                                                    <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.index === idx)} onChange={() => toggleItemTroca(idx, item.name)} />
-                                                    {item.name} (Qtd: {item.quantity})
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
+        {/* --- MODAIS QUEUE 01 (REFINADOS) --- */}
 
-                                    <div style={{marginBottom:'10px'}}>
-                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>GIL ENVIADO (Máx: {meuGil})</label>
-                                        <input type="number" min="0" max={meuGil} className="file-input-dark" value={trocaForm.gil} onChange={e => setTrocaForm({...trocaForm, gil: Number(e.target.value)})} />
-                                    </div>
+        {/* 1. MODAL: SISTEMA DE TROCAS */}
+        {showTrocas && currentVttSession && (
+            <div className="glass-modal-overlay" onClick={() => setShowTrocas(false)}>
+                <div className="glass-modal-box wide" onClick={e => e.stopPropagation()}>
+                    <div className="glass-modal-header">
+                        <h3>🏮 SISTEMA DE TROCAS E OFERTAS</h3>
+                        <button className="glass-close-btn" onClick={() => setShowTrocas(false)}>✕</button>
+                    </div>
+                    
+                    <div className="glass-split-layout">
+                        
+                        {/* Nova Proposta */}
+                        <div className="glass-section">
+                            <h4 className="glass-section-title">Oferecer Itens para Aventureiro</h4>
+                            <form onSubmit={handleEnviarProposta}>
+                                <div className="glass-input-group">
+                                    <label>Aventureiro Destinatário</label>
+                                    <select className="glass-input" value={trocaForm.destinatarioUid} onChange={e => setTrocaForm({...trocaForm, destinatarioUid: e.target.value})} required>
+                                        <option value="">-- Selecione o Alvo --</option>
+                                        {/* Agora lista todos os jogadores logados na sessão atual (exceto o próprio jogador) */}
+                                        {allPersonagens.filter(p => p.uid !== personagem?.uid && currentVttSession?.participantes?.includes(p.name)).map(p => (
+                                            <option key={p.uid} value={p.uid}>{p.name} ({p.class})</option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                                    <div style={{marginBottom:'15px'}}>
-                                        <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>MENSAGEM (RP)</label>
-                                        <textarea className="file-input-dark" style={{resize:'none', height:'60px'}} placeholder="Descreva sua oferta (opcional)..." value={trocaForm.mensagem} onChange={e => setTrocaForm({...trocaForm, mensagem: e.target.value})} />
+                                <div className="glass-input-group">
+                                    <label>Itens da Sua Mochila</label>
+                                    <div className="glass-inventory-list custom-scrollbar">
+                                        {meuInventario.length === 0 && <p className="glass-empty-text">A sua mochila está vazia. Não há nada para ofertar.</p>}
+                                        {meuInventario.map(slot => (
+                                            <label key={slot.slot_id} className="glass-checkbox-row">
+                                                <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.slot_id === slot.slot_id)} onChange={() => toggleItemTroca(slot)} />
+                                                <span>{slot.item_name}</span>
+                                            </label>
+                                        ))}
                                     </div>
-                                    <button type="submit" className="btn-save-m" style={{width:'100%', padding:'15px'}}>ENVIAR PROPOSTA</button>
-                                </form>
-                            )}
+                                </div>
+
+                                <div className="glass-input-group">
+                                    <label>Ofertar Gil (Máximo na Ficha: {meuGil} Gil)</label>
+                                    <input type="number" min="0" max={meuGil} className="glass-input" placeholder="0" value={trocaForm.gil} onChange={e => setTrocaForm({...trocaForm, gil: Number(e.target.value)})} />
+                                </div>
+
+                                <div className="glass-input-group">
+                                    <label>Mensagem de Roleplay (Opcional)</label>
+                                    <textarea className="glass-input" rows="3" placeholder="O que você diz ao entregar os itens?" value={trocaForm.mensagem} onChange={e => setTrocaForm({...trocaForm, mensagem: e.target.value})} />
+                                </div>
+                                <button type="submit" className="glass-btn-primary">ENVIAR PROPOSTA</button>
+                            </form>
                         </div>
 
                         {/* Histórico */}
-                        <div style={{flex:1, display:'flex', flexDirection:'column'}}>
-                            <h4 style={{color:'#ffcc00', margin:'0 0 15px 0'}}>Meus Registros Mercantis</h4>
-                            <div className="custom-scrollbar" style={{flex:1, background:'#0a0a0a', border:'1px solid #333', padding:'10px', overflowY:'auto', maxHeight:'450px'}}>
-                                {minhasTrocas.length === 0 && <p style={{color:'#666', fontSize:'12px', textAlign:'center'}}>Nenhum registro encontrado.</p>}
+                        <div className="glass-section">
+                            <h4 className="glass-section-title" style={{color: '#ffcc00'}}>Meu Livro-Caixa (Histórico)</h4>
+                            <div className="glass-history-list custom-scrollbar">
+                                {minhasTrocas.length === 0 && <p className="glass-empty-text">Nenhuma movimentação comercial registrada nesta sessão.</p>}
                                 {minhasTrocas.map(t => {
                                     const isSent = t.remetenteUid === personagem?.uid;
-                                    const statusColor = t.status === 'aprovado' ? '#0f0' : t.status === 'recusado' ? '#f44' : '#ffcc00';
-                                    const statusText = t.status === 'aprovado' ? '✓ Aprovado' : t.status === 'recusado' ? '✕ Recusado' : '⏳ Pendente';
-                                    const dataHora = new Date(t.createdAt).toLocaleString('pt-BR');
-
+                                    const statusColor = t.status === 'aprovado' ? '#22c55e' : t.status === 'recusado' ? '#ef4444' : '#fbbf24';
+                                    const statusText = t.status === 'aprovado' ? '✓ Transação Aprovada' : t.status === 'recusado' ? '✕ Transação Recusada' : '⏳ Aguardando Mestre';
                                     return (
-                                        <div key={t.id} style={{background:'#111', border:'1px solid #333', padding:'10px', marginBottom:'10px', borderRadius:'4px', borderLeft:`3px solid ${isSent ? '#00f2ff' : '#a855f7'}`}}>
-                                            <div style={{display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#888', marginBottom:'5px'}}>
-                                                <span>{isSent ? `ENVIADO PARA: ${t.destinatario}` : `RECEBIDO DE: ${t.remetente}`}</span>
+                                        <div key={t.id} className={`glass-history-card ${isSent ? 'sent' : 'received'}`}>
+                                            <div className="gh-header">
+                                                <span>{isSent ? `Enviado para: ${t.destinatario}` : `Recebido de: ${t.remetente}`}</span>
                                                 <strong style={{color: statusColor}}>{statusText}</strong>
                                             </div>
-                                            <p style={{margin:'2px 0', fontSize:'10px', color:'#555'}}>{dataHora}</p>
-                                            <p style={{margin:'5px 0', fontSize:'12px', color:'#ccc'}}>Itens: {t.itens?.map(i => i.name).join(', ') || 'Nenhum'}</p>
-                                            <p style={{margin:'5px 0', fontSize:'12px', color:'#fcd34d'}}>Gil: {t.gil}</p>
-                                            {t.mensagem && <p style={{margin:'5px 0', fontSize:'11px', color:'#aaa', fontStyle:'italic'}}>"{t.mensagem}"</p>}
+                                            <div className="gh-body">
+                                                <p><strong>Itens:</strong> {t.itens?.length > 0 ? t.itens.map(i => i.name).join(', ') : 'Nenhum'}</p>
+                                                <p><strong>Gil Envolvido:</strong> {t.gil} moedas</p>
+                                                {t.mensagem && <p className="gh-msg">"{t.mensagem}"</p>}
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -1147,43 +1292,72 @@ export default function JogadorVttPage() {
             </div>
         )}
 
-        {/* MODAL DRAGGABLE / TOUCH: ÁRVORE DE CLASSES */}
+        {/* 2. MODAL: BÊNÇÃO DOS DEUSES */}
+        {showBencao && currentVttSession && (
+            <div className="glass-modal-overlay" onClick={() => setShowBencao(false)}>
+                <div className="glass-modal-box compact" onClick={e => e.stopPropagation()}>
+                    <div className="glass-modal-header" style={{borderBottomColor: '#fbbf24'}}>
+                        <h3 style={{color: '#fbbf24'}}>✨ BÊNÇÃO DOS DEUSES (D100)</h3>
+                        <button className="glass-close-btn" onClick={() => setShowBencao(false)}>✕</button>
+                    </div>
+                    <div className="glass-bencao-body">
+                        <p>
+                            Os Deuses o observam... Escolha o seu <strong>Número do Destino</strong> (entre 1 e 100).
+                            Se o Mestre rolar este número na Mesa, a Bênção será derramada sobre você nesta sessão!
+                        </p>
+                        
+                        <form onSubmit={handleApostarNumero} className="glass-bencao-form">
+                            <input 
+                                type="number" min="1" max="100" required
+                                className="glass-huge-input"
+                                placeholder="00"
+                                value={numeroDestino} onChange={e => setNumeroDestino(e.target.value)}
+                            />
+                            <button type="submit" className="glass-btn-gold">REGISTRAR DESTINO</button>
+                        </form>
+                        
+                        <div className="glass-bencao-status">
+                            <label>Sua aposta atual com os Deuses:</label>
+                            <span>{currentVttSession?.bencao_deuses?.numeros_escolhidos?.[personagem?.name] || "Nenhum"}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* 3. MODAL: ÁRVORE DE CLASSES */}
         {showClassTree && (
             <div 
                 className="draggable-card fade-in" 
-                style={{ position: 'absolute', top: treePos.y, left: treePos.x, zIndex: 3000, width: '700px', background: '#0d0d10', border: '2px solid #00f2ff', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.9)' }}
+                style={{ position: 'absolute', top: treePos.y, left: treePos.x, zIndex: 3000, width: '700px', maxWidth: '95vw' }}
                 onClick={e => e.stopPropagation()}
             >
-                <div 
-                    className="md-header" 
-                    onMouseDown={handleTreeMouseDown}
-                    onTouchStart={handleTreeTouchStart}
-                    onTouchMove={handleTreeTouchMove}
-                    onTouchEnd={handleTreeTouchEnd}
-                    style={{ background: 'linear-gradient(90deg, #001a33, #000)', padding: '15px', borderBottom: '1px solid #00f2ff', cursor: 'grab', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                    <h3 style={{ margin: 0, color: '#00f2ff', fontFamily: 'Cinzel, serif', letterSpacing: '2px' }}>🌳 ÁRVORE DE CLASSES</h3>
-                    <button onClick={() => setShowClassTree(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}>✕</button>
-                </div>
-                <div style={{ padding: '15px' }}>
-                    <div className="tree-tabs-container">
-                        {Object.keys(treeData).map(r => (
-                            <button 
-                                key={r} 
-                                className={`tree-tab-btn ${treeTab === r ? 'active' : ''}`} 
-                                onClick={() => setTreeTab(r)} 
-                            >
-                                {r}
-                            </button>
+                <div className="glass-modal-box huge" style={{margin: 0, height: 'auto', border: '2px solid #00f2ff'}}>
+                    <div 
+                        className="glass-modal-header drag-handle" 
+                        onMouseDown={handleTreeMouseDown} onTouchStart={handleTreeTouchStart}
+                        onTouchMove={handleTreeTouchMove} onTouchEnd={handleTreeTouchEnd}
+                    >
+                        <h3>🌳 PROGRESSÃO DE CLASSES (VOCAÇÕES)</h3>
+                        <button className="glass-close-btn" onClick={() => setShowClassTree(false)}>✕</button>
+                    </div>
+                    
+                    <div className="glass-tree-tabs">
+                        {['Bangaa', 'Elvaan', 'Viera'].map(r => (
+                            <button key={r} className={treeTab === r ? 'active' : ''} onClick={() => setTreeTab(r)}>{r}</button>
                         ))}
                     </div>
-                    {renderClassTree()}
+                    
+                    <div className="glass-tree-content custom-scrollbar">
+                        {renderClassTree()}
+                    </div>
                 </div>
             </div>
         )}
 
       </div>
       <style>{`
+        /* --- ESTILOS PRINCIPAIS DO JOGADOR --- */
         .jogador-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Cinzel', serif; color: white; }
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
@@ -1194,39 +1368,159 @@ export default function JogadorVttPage() {
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
         .char-meta { font-size: 12px; color: #00f2ff; }
         
-        /* CONTAINER DOS BOTÕES FLUTUANTES (SOLUÇÃO DE ALINHAMENTO) */
-        .hud-columns-container { position: fixed; left: 20px; bottom: 30px; display: flex; gap: 15px; align-items: flex-end; z-index: 2000; }
-        .hud-col { display: flex; flex-direction: column; gap: 15px; }
-        .hud-btn { width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; position: relative; }
-        .hud-btn:hover { transform: scale(1.1); }
+        /* DOCK DE FERRAMENTAS CENTRALIZADO, LIMPO E ALINHADO */
+        .dm-tools-dock { position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 12px; z-index: 2000; align-items: flex-end; }
+        .tool-group { display: flex; align-items: center; gap: 10px; flex-direction: row-reverse; }
+        .tool-label { background: rgba(0,0,0,0.8); padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; border: 1px solid #444; opacity: 0; transition: 0.2s; pointer-events: none; transform: translateX(10px); }
+        .tool-group:hover .tool-label { opacity: 1; transform: translateX(0); border-color: #00f2ff; color: #00f2ff; }
         
-        .btn-mission { border: 2px solid #ffcc00; color: #fff; }
-        .btn-mission:hover { box-shadow: 0 0 15px #ffcc00; }
-        .btn-sanches { border: 2px solid #00f2ff; }
-        .btn-sanches:hover { box-shadow: 0 0 15px #00f2ff; }
-        .btn-book { border: 2px solid #fff; color: #fff; }
-        .btn-book:hover { border-color: #ffcc00; color: #ffcc00; box-shadow: 0 0 15px #fff; }
-        .btn-calendar { border: 2px solid #22c55e; color: #22c55e; }
-        .btn-calendar:hover { box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
-        .btn-arena { border: 2px solid #a855f7; color: #a855f7; }
-        .btn-arena:hover { box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-        .btn-trocas { border: 2px solid #f43f5e; color: #f43f5e; }
-        .btn-trocas:hover { box-shadow: 0 0 15px #f43f5e; color: #fff; border-color: #fff; }
-        .btn-tree { border: 2px solid #3b82f6; color: #3b82f6; }
-        .btn-tree:hover { box-shadow: 0 0 15px #3b82f6; color: #fff; border-color: #fff; }
+        .tool-btn-placeholder { 
+            width: 50px; height: 50px; border-radius: 50%; background: rgba(10,15,30, 0.9); 
+            border: 2px solid #fff; color: #fff; font-size: 20px; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; 
+            transition: 0.2s; box-shadow: 0 0 10px rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+        }
+        .tool-btn-placeholder:hover { border-color: #00f2ff; color: #00f2ff; transform: scale(1.1); box-shadow: 0 0 15px rgba(0,242,255, 0.5); }
+        .sanches-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; opacity: 0.9; }
         
-        .btn-dice { border: 2px solid #fff; background: #111; color: #fff; }
-        .btn-dice:hover { border-color: #ffcc00; box-shadow: 0 0 15px #ffcc00; }
-        .btn-combat { border: 2px solid #f44; background: #111; color: #f44; }
-        .btn-combat:hover { border-color: #fff; color: #fff; box-shadow: 0 0 15px #f44; }
-        .btn-bencao { border: 2px solid #ffcc00; color: #ffcc00; }
-        .btn-bencao:hover { box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
+        .notification-badge { position: absolute; top: -5px; right: -5px; background: #ef4444; color: #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid #000; z-index: 10; box-shadow: 0 0 8px #ef4444; }
 
-        .sanches-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
-        .btn-sanches:hover .sanches-icon-face { opacity: 1; }
-        .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
-        
-        .combat-tracker-panel { position: absolute; width: 300px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; z-index: 2100; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
+        /* DESTAQUE BÊNÇÃO E OVERLAY */
+        .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
+        @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
+        .bencao-victory-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 204, 0, 0.15); z-index: 10000; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flashScreen 0.5s ease-out; }
+        .bencao-victory-box { background: rgba(0,0,0,0.9); border: 3px solid #ffcc00; box-shadow: 0 0 50px #ffcc00; padding: 40px; text-align: center; border-radius: 10px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; }
+        .bencao-victory-box h2 { color: #ffcc00; font-size: 30px; margin: 0 0 10px 0; text-shadow: 0 0 10px #ffcc00; }
+        .bencao-victory-box p { color: #fff; font-size: 18px; margin: 5px 0; }
+        .bencao-victory-box .subtext { color: #0f0; font-weight: bold; margin-top: 15px; }
+
+        /* --- NOVO: ALERTA GLOBAL DO DADO DOS DEUSES --- */
+        .global-bencao-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.85); z-index: 999999;
+            display: flex; align-items: center; justify-content: center;
+            animation: fadeInOut 7s forwards; pointer-events: none;
+            backdrop-filter: blur(5px);
+        }
+        .global-bencao-alert-box {
+            background: linear-gradient(180deg, #111, #000); border: 3px solid #ffcc00;
+            padding: 40px 60px; border-radius: 12px; text-align: center;
+            box-shadow: 0 0 50px rgba(255,204,0,0.5), inset 0 0 20px rgba(255,204,0,0.2);
+            animation: scalePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .alert-subtitle { color: #aaa; font-size: 18px; letter-spacing: 3px; margin: 0 0 10px 0; font-family: 'Cinzel', serif; }
+        .alert-number { color: #ffcc00; font-size: 120px; margin: 0; text-shadow: 0 0 30px #ffcc00; font-weight: 900; line-height: 1; font-family: 'Cinzel', serif; }
+        .alert-winners h4 { color: #0f0; font-size: 24px; margin: 20px 0 5px 0; font-family: 'Cinzel', serif; }
+        .alert-winners p { color: #fff; font-size: 18px; font-weight: bold; }
+        .alert-losers p { color: #f44; font-size: 16px; margin-top: 20px; font-style: italic; }
+        @keyframes fadeInOut { 0% { opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes scalePop { 0% { transform: scale(0.5); } 100% { transform: scale(1); } }
+
+        /* --- GLASS PANEL SYSTEM (MODAIS REFINADOS) --- */
+        .glass-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        .glass-modal-box { background: rgba(10, 15, 30, 0.85); border: 1px solid rgba(0, 242, 255, 0.3); box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0, 242, 255, 0.05); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; animation: zoomIn 0.2s ease-out; }
+        .glass-modal-box.wide { width: 900px; max-width: 95vw; height: 600px; max-height: 90vh; }
+        .glass-modal-box.compact { width: 450px; max-width: 90vw; }
+        .glass-modal-box.huge { width: 100%; height: 100%; }
+
+        .glass-modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(0, 242, 255, 0.2); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.4); }
+        .drag-handle { cursor: grab; } .drag-handle:active { cursor: grabbing; }
+        .glass-modal-header h3 { margin: 0; color: #00f2ff; font-size: 1.2rem; letter-spacing: 2px; text-shadow: 0 0 8px rgba(0, 242, 255, 0.4); }
+        .glass-close-btn { background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .glass-close-btn:hover { color: #f44; transform: scale(1.1); }
+
+        .glass-split-layout { display: flex; flex: 1; overflow: hidden; }
+        .glass-section { flex: 1; padding: 25px; display: flex; flex-direction: column; overflow-y: auto; }
+        .glass-section:first-child { border-right: 1px solid rgba(0, 242, 255, 0.1); background: rgba(255,255,255,0.02); }
+        .glass-section-title { margin: 0 0 20px 0; color: #e2e8f0; font-size: 1rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+
+        .glass-input-group { margin-bottom: 15px; }
+        .glass-input-group label { display: block; font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
+        .glass-input { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid #334155; color: #fff; padding: 12px; border-radius: 6px; outline: none; transition: 0.2s; font-family: 'Lato', sans-serif; }
+        .glass-input:focus { border-color: #00f2ff; box-shadow: 0 0 10px rgba(0,242,255,0.2); }
+
+        .glass-inventory-list { background: rgba(0,0,0,0.5); border: 1px solid #334155; border-radius: 6px; padding: 10px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .glass-empty-text { font-size: 12px; color: #64748b; font-style: italic; text-align: center; margin: 10px 0; }
+        .glass-checkbox-row { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 6px; border-radius: 4px; transition: 0.2s; }
+        .glass-checkbox-row:hover { background: rgba(255,255,255,0.05); }
+        .glass-checkbox-row input { accent-color: #00f2ff; transform: scale(1.2); }
+        .glass-checkbox-row span { font-size: 13px; color: #e2e8f0; }
+
+        .glass-btn-primary { width: 100%; background: linear-gradient(90deg, #00f2ff, #0284c7); color: #000; font-weight: bold; padding: 15px; border: none; border-radius: 6px; font-family: 'Cinzel', serif; letter-spacing: 1px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(0,242,255,0.3); }
+        .glass-btn-primary:hover { filter: brightness(1.2); transform: translateY(-2px); }
+
+        .glass-history-list { display: flex; flex-direction: column; gap: 12px; }
+        .glass-history-card { background: rgba(0,0,0,0.6); border: 1px solid #334155; border-radius: 8px; padding: 15px; position: relative; overflow: hidden; }
+        .glass-history-card::before { content: ''; position: absolute; left: 0; top: 0; width: 4px; height: 100%; }
+        .glass-history-card.sent::before { background: #00f2ff; }
+        .glass-history-card.received::before { background: #a855f7; }
+        .gh-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 11px; color: #94a3b8; }
+        .gh-body p { margin: 4px 0; font-size: 13px; color: #cbd5e1; }
+        .gh-msg { font-style: italic; color: #fbbf24 !important; border-left: 2px solid #fbbf24; padding-left: 8px; margin-top: 8px !important; }
+
+        .glass-bencao-body { padding: 30px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .glass-bencao-body p { color: #cbd5e1; text-align: center; line-height: 1.5; margin: 0; }
+        .glass-bencao-form { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
+        .glass-huge-input { background: rgba(0,0,0,0.8); color: #fbbf24; border: 2px solid #fbbf24; border-radius: 12px; font-size: 48px; text-align: center; width: 120px; height: 100px; outline: none; font-weight: bold; text-shadow: 0 0 15px #fbbf24; box-shadow: inset 0 0 20px rgba(251,191,36,0.2); }
+        .glass-btn-gold { background: linear-gradient(90deg, #fbbf24, #d97706); color: #000; font-weight: bold; border: none; padding: 15px 30px; border-radius: 50px; font-family: 'Cinzel', serif; letter-spacing: 2px; cursor: pointer; transition: 0.2s; box-shadow: 0 0 20px rgba(251,191,36,0.4); }
+        .glass-btn-gold:hover { transform: scale(1.05); filter: brightness(1.2); }
+        .glass-bencao-status { background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 1px solid #334155; width: 100%; text-align: center; display: flex; flex-direction: column; gap: 5px; }
+        .glass-bencao-status label { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
+        .glass-bencao-status span { color: #00f2ff; font-size: 24px; font-weight: bold; }
+
+        .glass-tree-tabs { display: flex; padding: 0 25px; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); }
+        .glass-tree-tabs button { flex: 1; background: transparent; border: none; color: #64748b; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; padding: 15px 0; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; }
+        .glass-tree-tabs button:hover { color: #e2e8f0; }
+        .glass-tree-tabs button.active { color: #00f2ff; border-bottom-color: #00f2ff; text-shadow: 0 0 10px rgba(0,242,255,0.5); }
+        .glass-tree-content { padding: 30px; flex: 1; overflow: auto; display: flex; justify-content: center; }
+
+        /* NOVA ÁRVORE DE CLASSES (FLEXBOX DESIGN) */
+        .modern-tree-flow { display: flex; flex-direction: column; gap: 30px; width: 100%; align-items: flex-start; }
+        .tree-branch { display: flex; align-items: center; width: 100%; }
+        .tree-col { display: flex; flex-direction: column; gap: 15px; }
+        .tree-row { display: flex; align-items: center; }
+        .tree-node { padding: 12px 20px; border-radius: 8px; font-family: 'Cinzel', serif; font-weight: bold; font-size: 13px; text-align: center; min-width: 140px; text-transform: uppercase; letter-spacing: 1px; backdrop-filter: blur(4px); }
+        .tree-node.base { background: rgba(30, 58, 138, 0.6); border: 2px solid #3b82f6; color: #fff; box-shadow: 0 0 15px rgba(59,130,246,0.3); }
+        .tree-node.adv { background: rgba(184, 134, 11, 0.6); border: 2px solid #fbbf24; color: #fbbf24; }
+        .tree-node.max { background: rgba(220, 38, 38, 0.6); border: 2px solid #ef4444; color: #ef4444; box-shadow: 0 0 15px rgba(239,68,68,0.5); }
+        .tree-node.legend { background: rgba(147, 51, 234, 0.6); border: 2px solid #a855f7; color: #e9d5ff; box-shadow: 0 0 20px rgba(168,85,247,0.6); }
+        .tree-arrow { color: #475569; font-size: 20px; font-weight: bold; margin: 0 15px; }
+        .tree-divider { width: 100%; height: 1px; background: rgba(255,255,255,0.1); }
+
+        /* OUTROS ESTILOS JÁ EXISTENTES */
+        .session-status-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; padding: 5px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 40; transition: 0.3s; }
+        .session-status-top.pvp-active { border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); }
+        .status-indicator { width: 10px; height: 10px; border-radius: 50%; animation: pulse 2s infinite; }
+        .status-indicator.active { background: #00f2ff; box-shadow: 0 0 10px #00f2ff; }
+        .status-indicator.offline { background: #f44; box-shadow: 0 0 10px #f44; animation: none; }
+        .status-info h2 { margin: 0; font-size: 14px; color: #fff; }
+        .status-info p { margin: 0; font-size: 10px; color: #aaa; }
+        .pvp-active .status-info p { color: #c4b5fd; }
+
+        .dm-players-sidebar { position: absolute; top: 20px; left: 20px; width: 200px; background: rgba(0, 10, 20, 0.95); border: 2px solid #00f2ff; border-radius: 8px; padding: 10px; z-index: 50; max-height: 80vh; display: flex; flex-direction: column; }
+        .sidebar-title { color: #00f2ff; font-size: 12px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; text-align: center; }
+        .players-list-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .mini-player-card { display: flex; align-items: center; padding: 5px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .mini-player-card.online { border-left: 3px solid #00f2ff; }
+        .mini-avatar { position: relative; margin-right: 8px; }
+        .avatar-img, .avatar-placeholder { width: 30px; height: 30px; border-radius: 50%; background-size: cover; border: 1px solid #fff; }
+        .avatar-placeholder { background: #222; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; position: absolute; bottom: 0; right: 0; border: 1px solid #000; }
+        .status-dot.green { background: #00f2ff; } .status-dot.gray { background: #666; }
+        .p-name { font-size: 11px; font-weight: bold; display: block; }
+        .p-lvl { font-size: 9px; color: #ffcc00; }
+
+        .combat-tracker-panel { 
+            position: absolute; 
+            width: 300px; 
+            max-height: 70vh; 
+            background: linear-gradient(180deg, #0d0d10 0%, #000 100%);
+            border: 2px solid #b8860b; 
+            border-radius: 6px; 
+            z-index: 2100; 
+            display: flex; flex-direction: column; 
+            box-shadow: 0 0 25px rgba(0,0,0,0.9);
+        }
         .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
         .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
         .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
@@ -1235,6 +1529,7 @@ export default function JogadorVttPage() {
         .tracker-item { display: flex; align-items: center; background: rgba(20, 20, 25, 0.9); border: 1px solid #444; border-radius: 4px; padding: 8px 5px; gap: 8px; transition: 0.2s; }
         .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
+        
         .tracker-item.tracker-stealth-self { border-color: #a855f7; border-style: dashed; opacity: 0.8; box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.3); }
 
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
@@ -1269,6 +1564,7 @@ export default function JogadorVttPage() {
         .md-block { margin-bottom: 15px; }
         .md-block label { display: block; color: #b8860b; font-size: 10px; font-weight: bold; border-bottom: 1px solid #333; margin-bottom: 5px; }
         .md-block p { margin: 0; font-size: 13px; color: #ccc; line-height: 1.4; white-space: pre-wrap; }
+        .md-block.tips p { color: #00f2ff; font-style: italic; }
         .md-close-btn { width: 100%; padding: 15px; background: #111; color: #fff; border: none; border-top: 1px solid #b8860b; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .md-close-btn:hover { background: #b8860b; color: #000; }
 
@@ -1349,30 +1645,230 @@ export default function JogadorVttPage() {
         .lightbox-wrap { position: relative; max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center; }
         .cartaz-full-view { max-width: 100%; max-height: 90vh; border: 3px solid #ffcc00; box-shadow: 0 0 50px #000; }
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
-        
+        .btn-cyan { border: 1px solid #00f2ff; color: #00f2ff; padding: 10px 15px; background: transparent; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; text-transform: uppercase; }
+        .btn-cyan:hover { background: rgba(0, 242, 255, 0.1); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
+
         .fft-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .fft-dialog-box { position: relative; width: 800px; max-width: 95vw; height: 450px; background: linear-gradient(180deg, #001a4d 0%, #000022 100%); border: 4px solid #b8860b; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5); display: flex; align-items: flex-start; padding: 30px; gap: 20px; color: #fff; font-family: 'Cinzel', serif; }
-        .fft-portrait-section { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 150px; flex-shrink: 0; }
-        .fft-portrait-frame { width: 140px; height: 180px; border: 3px solid #b8860b; background: #000; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        .fft-portrait-frame img { width: 100%; height: 100%; object-fit: cover; }
-        .fft-name-plate { width: 100%; background: linear-gradient(90deg, #b8860b, #8a6e14); color: #000; text-align: center; font-weight: bold; padding: 5px 0; font-size: 0.9rem; border: 1px solid #ffd700; box-shadow: 0 2px 5px rgba(0,0,0,0.5); letter-spacing: 1px; }
-        .fft-content-section { flex: 1; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-        .fft-title { margin: 0 0 15px 0; font-size: 1.8rem; color: #00f2ff; text-shadow: 0 0 5px rgba(0, 242, 255, 0.5); border-bottom: 1px solid #b8860b; padding-bottom: 10px; letter-spacing: 1px; }
-        .fft-scroll-text { flex: 1; overflow-y: auto; font-family: 'Lato', sans-serif; font-size: 1.1rem; line-height: 1.6; color: #e0e0e0; padding-right: 10px; scrollbar-width: none; -ms-overflow-style: none; }
-        .fft-scroll-text::-webkit-scrollbar { display: none; }
-        .fft-close-btn { position: absolute; top: -15px; right: -15px; width: 40px; height: 40px; background: #b8860b; color: #000; font-weight: bold; border: 2px solid #fff; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: sans-serif; box-shadow: 0 0 10px #000; transition: 0.2s; }
-        .fft-close-btn:hover { background: #ffd700; transform: scale(1.1); }
+        
+        .fft-dialog-box {
+          position: relative;
+          width: 800px;
+          max-width: 95vw;
+          height: 450px;
+          background: linear-gradient(180deg, #001a4d 0%, #000022 100%);
+          border: 4px solid #b8860b;
+          border-radius: 8px;
+          box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: flex-start;
+          padding: 30px;
+          gap: 20px;
+          color: #fff;
+          font-family: 'Cinzel', serif;
+        }
 
-        .levelup-global-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 200000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .levelup-content { text-align: center; animation: zoomIn 0.5s ease-out; }
-        .levelup-title { font-family: 'Cinzel', serif; font-size: 80px; font-weight: bold; color: #ffcc00; text-transform: uppercase; letter-spacing: 10px; margin: 0 0 30px 0; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 20px #ffcc00, 0 0 40px #ffcc00; animation: pulseText 1.5s infinite alternate; }
-        .levelup-confirm-btn { background: linear-gradient(to bottom, #b8860b, #8a6e14); border: 2px solid #fff; color: #000; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; padding: 10px 40px; cursor: pointer; box-shadow: 0 0 15px #ffcc00; transition: 0.2s; border-radius: 50px; }
-        .levelup-confirm-btn:hover { transform: scale(1.1); background: #ffd700; color: #000; box-shadow: 0 0 30px #ffd700; }
+        .fft-portrait-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          width: 150px;
+          flex-shrink: 0;
+        }
+
+        .fft-portrait-frame {
+          width: 140px;
+          height: 180px;
+          border: 3px solid #b8860b;
+          background: #000;
+          overflow: hidden;
+          box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .fft-portrait-frame img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .fft-name-plate {
+          width: 100%;
+          background: linear-gradient(90deg, #b8860b, #8a6e14);
+          color: #000;
+          text-align: center;
+          font-weight: bold;
+          padding: 5px 0;
+          font-size: 0.9rem;
+          border: 1px solid #ffd700;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          letter-spacing: 1px;
+        }
+
+        .fft-content-section {
+          flex: 1;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .fft-title {
+          margin: 0 0 15px 0;
+          font-size: 1.8rem;
+          color: #00f2ff;
+          text-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
+          border-bottom: 1px solid #b8860b;
+          padding-bottom: 10px;
+          letter-spacing: 1px;
+        }
+
+        .fft-scroll-text {
+          flex: 1;
+          overflow-y: auto;
+          font-family: 'Lato', sans-serif;
+          font-size: 1.1rem;
+          line-height: 1.6;
+          color: #e0e0e0;
+          padding-right: 10px;
+          scrollbar-width: none; 
+          -ms-overflow-style: none; 
+        }
+        .fft-scroll-text::-webkit-scrollbar { 
+          display: none; 
+        }
+
+        .fft-close-btn {
+          position: absolute;
+          top: -15px;
+          right: -15px;
+          width: 40px;
+          height: 40px;
+          background: #b8860b;
+          color: #000;
+          font-weight: bold;
+          border: 2px solid #fff;
+          border-radius: 50%;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: sans-serif;
+          box-shadow: 0 0 10px #000;
+          transition: 0.2s;
+        }
+        .fft-close-btn:hover {
+          background: #ffd700;
+          transform: scale(1.1);
+        }
+
+        .levelup-global-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8);
+            z-index: 200000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .levelup-content {
+            text-align: center;
+            animation: zoomIn 0.5s ease-out;
+        }
+
+        .levelup-title {
+            font-family: 'Cinzel', serif;
+            font-size: 80px;
+            font-weight: bold;
+            color: #ffcc00;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+            margin: 0 0 30px 0;
+            text-shadow: 
+                3px 3px 0 #000,
+                -1px -1px 0 #000,  
+                1px -1px 0 #000,
+                -1px 1px 0 #000,
+                1px 1px 0 #000,
+                0 0 20px #ffcc00,
+                0 0 40px #ffcc00;
+            animation: pulseText 1.5s infinite alternate;
+        }
+
+        .levelup-confirm-btn {
+            background: linear-gradient(to bottom, #b8860b, #8a6e14);
+            border: 2px solid #fff;
+            color: #000;
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 10px 40px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #ffcc00;
+            transition: 0.2s;
+            border-radius: 50px;
+        }
+        
+        .levelup-confirm-btn:hover {
+            transform: scale(1.1);
+            background: #ffd700;
+            color: #000;
+            box-shadow: 0 0 30px #ffd700;
+        }
+
         @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes pulseText { from { text-shadow: 0 0 20px #ffcc00; } to { text-shadow: 0 0 40px #ffcc00, 0 0 10px #fff; } }
+        
+        .guild-btn-float {
+            top: auto !important;
+            left: auto !important;
+            transform: none !important;
+            bottom: 30px !important;
+            right: 110px !important; 
+            z-index: 2000 !important;
+        }
 
-        .team-chat-panel { position: absolute; width: 320px; height: 420px; background: rgba(10, 10, 12, 0.95); border: 2px solid var(--team-color, #a855f7); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); overflow: hidden; }
-        .chat-header { background: rgba(20, 20, 25, 0.9); border-bottom: 2px solid var(--team-color, #a855f7); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .chat-header h3 { margin: 0; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1px; color: var(--team-color, #fff); text-shadow: 0 0 8px var(--team-color-alpha, rgba(168, 85, 247, 0.4)); }
+        /* --- RESPONSIVIDADE ADICIONADA --- */
+        @media (max-width: 850px) {
+            .player-dashboard-grid { grid-template-columns: 1fr; }
+            .top-bar-flex { flex-direction: column; gap: 15px; text-align: center; }
+            .char-identity-box { width: 100%; justify-content: center; }
+            .ff-modal-compact { width: 95vw; max-height: 90vh; padding: 15px; }
+            .missions-grid-compact { grid-template-columns: 1fr; }
+            .mc-right { flex-direction: column; gap: 5px; align-items: stretch; }
+            .ff-modal-details-wide { width: 95vw; height: auto; max-height: 90vh; }
+            .detail-wide-header { flex-direction: column; height: auto; padding: 15px; text-align: center; gap: 10px; }
+            .dw-vagas-box { align-items: center; width: 100%; }
+            .detail-wide-body { flex-direction: column; overflow-y: auto; }
+            .dw-col-left { width: 100%; border-right: none; border-bottom: 1px solid #333; overflow-y: visible; }
+            .dw-col-right { width: 100%; padding: 15px; overflow-y: visible; }
+            .detail-wide-body > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+            .fft-dialog-box { flex-direction: column; height: auto; max-height: 90vh; align-items: center; padding: 20px; }
+            .fft-portrait-section { width: 100px; }
+            .fft-portrait-frame { width: 100px; height: 130px; }
+            .fft-title { font-size: 1.4rem; text-align: center; }
+        }
+
+        /* --- TEAM CHAT STYLES --- */
+        .floating-team-chat-btn { 
+            position: fixed; bottom: 450px; left: 15px; width: 50px; height: 50px; border-radius: 50%; 
+            background: #000; color: #fff; font-size: 20px; cursor: pointer; z-index: 2000; 
+            display: flex; align-items: center; justify-content: center; transition: 0.3s; 
+        }
+        .floating-team-chat-btn:hover { transform: scale(1.1); }
+        .team-chat-panel {
+            position: absolute; width: 320px; height: 420px; background: rgba(10, 10, 12, 0.95);
+            border: 2px solid var(--team-color, #a855f7); border-radius: 8px; display: flex;
+            flex-direction: column; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); overflow: hidden;
+        }
+        .chat-header {
+            background: rgba(20, 20, 25, 0.9); border-bottom: 2px solid var(--team-color, #a855f7);
+            padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .chat-header h3 {
+            margin: 0; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1px; color: var(--team-color, #fff);
+            text-shadow: 0 0 8px var(--team-color-alpha, rgba(168, 85, 247, 0.4));
+        }
         .chat-header-actions button { background: none; border: none; color: #fff; cursor: pointer; font-size: 14px; opacity: 0.7; transition: 0.2s; margin-left: 10px; }
         .chat-header-actions button:hover { opacity: 1; }
         .chat-messages-container { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -1391,48 +1887,6 @@ export default function JogadorVttPage() {
         .chat-input-field:focus { border-color: var(--team-color, #a855f7); box-shadow: 0 0 5px var(--team-color-alpha, rgba(168, 85, 247, 0.3)); }
         .chat-send-btn { background: var(--team-color, #a855f7); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: 0.2s; }
         .chat-send-btn:hover { transform: scale(1.1); box-shadow: 0 0 8px var(--team-color, #a855f7); }
-
-        /* MODAIS GERAIS (INCLUÍDO PARA CONSERTAR O DE TROCAS E DE BÊNÇÃO) */
-        .modal-overlay-custom { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .modal-box-custom { background: #080808; border: 2px solid #ffcc00; padding: 25px; border-radius: 8px; width: 500px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 0 30px #000; }
-        .modal-box-custom.wide { width: 800px; }
-        .modal-header-c { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; align-items: center; }
-        .modal-header-c h3 { margin: 0; color: #ffcc00; }
-        .close-c { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
-        .file-input-dark { background: #111; color: #fff; border: 1px solid #444; padding: 10px; width: 100%; border-radius: 4px; }
-        .btn-save-m { background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; border-radius: 4px; }
-        .btn-save-m:hover { background: #fff; box-shadow: 0 0 10px #ffcc00; }
-
-        .bencao-victory-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 204, 0, 0.15); z-index: 10000; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flashScreen 0.5s ease-out; }
-        .bencao-victory-box { background: rgba(0,0,0,0.9); border: 3px solid #ffcc00; box-shadow: 0 0 50px #ffcc00; padding: 40px; text-align: center; border-radius: 10px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; }
-        .bencao-victory-box h2 { color: #ffcc00; font-size: 30px; margin: 0 0 10px 0; text-shadow: 0 0 10px #ffcc00; }
-        .bencao-victory-box p { color: #fff; font-size: 18px; margin: 5px 0; }
-        .bencao-victory-box .subtext { color: #0f0; font-weight: bold; margin-top: 15px; }
-
-        .itens-troca-lista { background: #000; border: 1px solid #444; padding: 10px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border-radius: 4px; }
-        .item-checkbox-label { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #ccc; cursor: pointer; }
-        .item-checkbox-label input { accent-color: #00f2ff; transform: scale(1.2); }
-
-        /* NOVA ÁRVORE DE CLASSES */
-        .tree-tabs-container { display: flex; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; overflow-x: auto; scrollbar-width: thin; }
-        .tree-tab-btn { background: transparent; border: none; color: #888; font-weight: bold; font-size: 12px; text-transform: uppercase; cursor: pointer; padding-bottom: 5px; border-bottom: 2px solid transparent; white-space: nowrap; transition: 0.2s; }
-        .tree-tab-btn:hover { color: #ccc; }
-        .tree-tab-btn.active { color: #00f2ff; border-bottom-color: #00f2ff; }
-        
-        .tree-container { display: flex; flex-direction: column; gap: 20px; max-height: 60vh; overflow-y: auto; padding-right: 10px; }
-        .tree-line { background: rgba(0,0,0,0.4); border: 1px solid #222; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
-        .tree-paths { display: flex; gap: 30px; margin-top: 15px; width: 100%; justify-content: center; position: relative; }
-        .tree-path { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; }
-        
-        .fc-node { padding: 10px 15px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; min-width: 140px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .fc-node.base { background: #1f2937; border: 2px solid #3b82f6; color: #fff; }
-        .fc-node.adv { background: #111827; border: 2px solid #fbbf24; color: #fbbf24; }
-        .fc-node.max { background: #000; border: 2px solid #f44; color: #f44; box-shadow: 0 0 15px rgba(244, 68, 68, 0.4); }
-        .fc-node.special { background: #3b0764; border: 2px solid #a855f7; color: #e9d5ff; }
-        .fc-node.legendary { background: #020617; border: 2px solid #00f2ff; color: #00f2ff; box-shadow: 0 0 15px #00f2ff; }
-        .fc-arrow { color: #555; font-size: 16px; font-weight: bold; }
-        
-        .guild-btn-float { top: auto !important; left: auto !important; transform: none !important; bottom: 30px !important; right: 110px !important; z-index: 2000 !important; }
       `}</style>
 
       <WallpaperPicker
@@ -1440,9 +1894,9 @@ export default function JogadorVttPage() {
         current={wallpaper}
         onChange={setWallpaper}
         storageKey="jogador_wallpaper"
-        side="right"
+        side="left"
         bottom={30}
-        sideOffset={170}
+        sideOffset={22}
       />
     </div>
   );
