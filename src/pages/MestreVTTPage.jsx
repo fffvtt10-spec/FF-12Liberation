@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, arrayUnion, arrayRemove } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom';
 import fundoMestre from '../assets/fundo-mestre.jpg';
@@ -132,13 +131,10 @@ export default function MestreVTTPage() {
 
   const [showBencaoManager, setShowBencaoManager] = useState(false);
 
+  // Estados para Adicionar Mapas (Via URL apenas)
   const [showUploadManager, setShowUploadManager] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadingGeral, setUploadingGeral] = useState(false);
-  const [uploadedUrl, setUploadedUrl] = useState("");
+  const [uploadMapUrl, setUploadMapUrl] = useState("");
   const [uploadMapName, setUploadMapName] = useState("");
-  
-  const [uploadingImg, setUploadingImg] = useState(false); // Para modal de Bestiário
 
   const [viewMonsterDetails, setViewMonsterDetails] = useState(null);
   const [activeStatusMenu, setActiveStatusMenu] = useState(null); // ID do token com o menu de status aberto
@@ -248,50 +244,19 @@ export default function MestreVTTPage() {
     return () => unsubAll();
   }, [sessaoAtiva?.participantes]); 
 
-  // --- HANDLER DE UPLOADS E MAPAS ---
-  const handleUploadAction = async () => {
-    if (!uploadFile) return;
-    setUploadingGeral(true);
-    try {
-        const storage = getStorage();
-        const storageRef = ref(storage, `uploads/vtt_${Date.now()}_${uploadFile.name}`);
-        await uploadBytes(storageRef, uploadFile);
-        const url = await getDownloadURL(storageRef);
-        setUploadedUrl(url);
-    } catch (e) {
-        alert("Erro no upload: " + e.message);
-    }
-    setUploadingGeral(false);
-  };
-
-  const handleAddMapToSession = async (url, name) => {
-    if (!sessaoAtiva) return;
-    const novoMapa = { id: Date.now().toString(), name: name || "Novo Mapa VTT", url: url };
+  // --- HANDLER PARA ADICIONAR MAPA POR URL ---
+  const handleAddMapToSession = async (e) => {
+    e.preventDefault();
+    if (!sessaoAtiva || !uploadMapUrl) return;
+    const novoMapa = { id: Date.now().toString(), name: uploadMapName || "Novo Mapa VTT", url: uploadMapUrl };
     try {
         await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
-            mapas: arrayUnion(url),
+            mapas: arrayUnion(uploadMapUrl),
             saved_maps: arrayUnion(novoMapa)
         });
         alert("Mapa adicionado à sessão! Acesse pelo Tabletop.");
-        setUploadFile(null); setUploadedUrl(""); setUploadMapName(""); setShowUploadManager(false);
-    } catch(e) { alert("Erro ao vincular mapa: " + e.message); }
-  };
-
-  const handleImageUploadBestiary = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploadingImg(true);
-    try {
-        const storage = getStorage();
-        const storageRef = ref(storage, `uploads/bestiary_${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
-        setMonsterForm({ ...monsterForm, img: url });
-    } catch (error) {
-        console.error("Erro no upload", error);
-        alert("Erro ao fazer upload da imagem para o Storage.");
-    }
-    setUploadingImg(false);
+        setUploadMapUrl(""); setUploadMapName(""); setShowUploadManager(false);
+    } catch(err) { alert("Erro ao vincular mapa: " + err.message); }
   };
 
   // --- HANDLERS DO MERCADO DOS LANTERNAS ---
@@ -843,8 +808,8 @@ export default function MestreVTTPage() {
           </div>
 
           <div className="tool-group">
-              <button className="tool-btn-placeholder" onClick={() => setShowUploadManager(true)}>📤</button>
-              <div className="tool-label">CENTRAL DE UPLOADS (STORAGE)</div>
+              <button className="tool-btn-placeholder" onClick={() => setShowUploadManager(true)}>🗺️</button>
+              <div className="tool-label">ADICIONAR MAPA (URL)</div>
           </div>
 
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
@@ -931,35 +896,33 @@ export default function MestreVTTPage() {
         </div>
       )}
 
-      {/* 3. CENTRAL DE UPLOADS (STORAGE) */}
+      {/* 3. CENTRAL DE ADICIONAR MAPAS (URL) */}
       {showUploadManager && (
          <div className="modal-overlay-custom" onClick={() => setShowUploadManager(false)}>
             <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
                 <div className="modal-header-c">
-                    <h3>CENTRAL DE UPLOADS</h3>
+                    <h3>ADICIONAR MAPA (URL)</h3>
                     <button className="close-c" onClick={() => setShowUploadManager(false)}>✕</button>
                 </div>
-                <div className="upload-manager-body">
-                    <input type="file" className="file-input-dark" onChange={e => setUploadFile(e.target.files[0])} />
-                    <button className="btn-save-m" style={{width: '100%', padding: '15px'}} onClick={handleUploadAction} disabled={uploadingGeral}>
-                        {uploadingGeral ? "ENVIANDO PARA O ÉTER (STORAGE)..." : "ENVIAR ARQUIVO"}
-                    </button>
+                <form onSubmit={handleAddMapToSession} className="upload-manager-body">
+                    <div className="modal-input-group">
+                        <label style={{color: '#94a3b8', fontSize: '11px'}}>NOME DO MAPA</label>
+                        <input placeholder="Ex: Taverna do Javali" className="file-input-dark" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} required />
+                    </div>
+                    <div className="modal-input-group">
+                        <label style={{color: '#94a3b8', fontSize: '11px'}}>LINK DA IMAGEM (URL)</label>
+                        <input placeholder="https://..." className="file-input-dark" value={uploadMapUrl} onChange={e => setUploadMapUrl(e.target.value)} required />
+                    </div>
                     
-                    {uploadedUrl && (
-                        <div className="uploaded-result-box" style={{marginTop: '20px', background: '#111', padding: '15px', border: '1px solid #333', borderRadius: '4px'}}>
-                            <p style={{color: '#0f0', margin: '0 0 10px 0', fontWeight: 'bold'}}>✓ Upload Concluído!</p>
-                            <label style={{fontSize: '10px', color: '#888'}}>LINK GERADO (BASE DO STORAGE):</label>
-                            <input type="text" readOnly value={uploadedUrl} className="input-title" style={{fontSize:'11px', marginTop: '5px', cursor: 'copy'}} onClick={e => { e.target.select(); document.execCommand('copy'); alert('Link copiado!'); }} />
-                            
-                            <hr style={{borderColor:'#222', margin:'15px 0'}}/>
-                            <p style={{margin: '0 0 10px 0', color: '#ffcc00', fontSize: '14px'}}><strong>Deseja adicionar diretamente como Mapa nesta Sessão?</strong></p>
-                            <div style={{display:'flex', gap:'10px'}}>
-                                <input placeholder="Nome do Novo Mapa" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} className="input-title" />
-                                <button className="btn-approve" onClick={() => handleAddMapToSession(uploadedUrl, uploadMapName)}>VINCULAR</button>
-                            </div>
+                    {uploadMapUrl && (
+                        <div style={{marginBottom: '20px', textAlign: 'center', background: '#111', padding: '10px', borderRadius: '4px', border: '1px solid #333'}}>
+                            <p style={{fontSize: '10px', color: '#888', margin: '0 0 5px 0'}}>PRÉ-VISUALIZAÇÃO</p>
+                            <img src={uploadMapUrl} alt="Preview do Mapa" style={{maxHeight: '150px', maxWidth: '100%', borderRadius: '4px'}} />
                         </div>
                     )}
-                </div>
+                    
+                    <button type="submit" className="btn-save-m" style={{width: '100%', padding: '15px'}}>VINCULAR MAPA À SESSÃO</button>
+                </form>
             </div>
         </div>
       )}
@@ -1002,11 +965,7 @@ export default function MestreVTTPage() {
                           <div className="create-row">
                               <div className="img-upload-box">
                                   <div className="preview-img" style={{backgroundImage: `url(${monsterForm.img})`}}></div>
-                                  <input placeholder="Link Imagem (URL)..." value={monsterForm.img} onChange={e => setMonsterForm({...monsterForm, img: e.target.value})} />
-                                  <label className="btn-upload-file" style={{background:'#222', border: '1px solid #555', color:'#fff', padding:'8px', textAlign:'center', cursor:'pointer', fontSize:'10px', marginTop:'5px', fontWeight: 'bold'}}>
-                                      {uploadingImg ? "ENVIANDO..." : "📤 UPLOAD ARQUIVO (STORAGE)"}
-                                      <input type="file" style={{display:'none'}} accept="image/*" onChange={handleImageUploadBestiary} />
-                                  </label>
+                                  <input className="input-title" style={{marginTop: '5px', fontSize: '10px'}} placeholder="Link Imagem (URL)..." value={monsterForm.img} onChange={e => setMonsterForm({...monsterForm, img: e.target.value})} />
                               </div>
                               <div className="details-inputs">
                                   <input className="input-title" placeholder="Nome" value={monsterForm.name} onChange={e => setMonsterForm({...monsterForm, name: e.target.value})} />
@@ -1201,7 +1160,7 @@ export default function MestreVTTPage() {
         .modal-header-c h3 { margin: 0; color: #ffcc00; }
         .close-c { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
         
-        .file-input-dark { background: #111; color: #fff; border: 1px solid #444; padding: 10px; width: 100%; margin-bottom: 15px; border-radius: 4px; }
+        .file-input-dark { background: #111; color: #fff; border: 1px solid #444; padding: 10px; width: 100%; margin-bottom: 15px; border-radius: 4px; outline: none; }
         .btn-approve { background: #00f2ff; color: #000; font-weight: bold; padding: 8px 15px; border: none; cursor: pointer; border-radius: 4px; transition: 0.2s; }
         .btn-approve:hover { background: #fff; box-shadow: 0 0 10px #00f2ff; }
         .btn-deny { background: #f44; color: #fff; font-weight: bold; padding: 8px 15px; border: none; cursor: pointer; border-radius: 4px; transition: 0.2s; }
