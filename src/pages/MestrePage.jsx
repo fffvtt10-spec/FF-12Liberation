@@ -10,7 +10,8 @@ import Bazar from '../components/Bazar';
 import Forja from '../components/Forja'; 
 import Ficha from '../components/Ficha'; 
 import GuildBoard from '../components/GuildBoard';
-import { getCharacterClass, getCharacterRace } from '../utils/characterHelpers'; 
+import { getCharacterClass, getCharacterRace } from '../utils/characterHelpers';
+import { exportCharactersAsMarkdown } from '../utils/exportCharacterMarkdown'; 
 
 // --- COMPONENTE DE CALENDÁRIO INTERNO ---
 const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
@@ -229,6 +230,7 @@ export default function MestrePage() {
   const [showDetails, setShowDetails] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
   const [viewMembers, setViewMembers] = useState(null); 
+  const [exportSelectedIds, setExportSelectedIds] = useState([]);
 
   const [form, setForm] = useState({
     nome: '', local: '', contratante: '', descricaoMissao: '', objetivosMissao: '', requisitos: '', grupo: '', recompensa: '', rank: 'E', imagem: '', duracao: '', gilRecompensa: ''
@@ -614,6 +616,18 @@ export default function MestrePage() {
       if (personagem) setSelectedFicha(personagem);
   };
 
+  const handleToggleExportSelect = (charId) => {
+      setExportSelectedIds(prev =>
+          prev.includes(charId) ? prev.filter(id => id !== charId) : [...prev, charId]
+      );
+  };
+
+  const handleExportSelectedCharacters = () => {
+      const selected = personagensDb.filter(p => exportSelectedIds.includes(p.id));
+      if (selected.length === 0) return alert("Nenhum personagem selecionado.");
+      exportCharactersAsMarkdown(selected);
+  };
+
   const handleDeleteSession = async (sessao) => {
       if (!window.confirm(`Tem certeza que deseja cancelar a sessão "${sessao.missaoNome}"?`)) return;
       
@@ -661,6 +675,20 @@ export default function MestrePage() {
       <div className="mestre-bg-image-full" style={{backgroundImage: `url(${fundoMestre})`}}></div>
       
       <div className="mestre-content">
+        {exportSelectedIds.length > 0 && (
+            <div className="export-float-bar">
+                <span className="export-float-count">
+                    {exportSelectedIds.length} selecionado{exportSelectedIds.length > 1 ? 's' : ''}
+                </span>
+                <button className="btn-export-md" onClick={handleExportSelectedCharacters}>
+                    📥 EXPORTAR DADOS (.MD)
+                </button>
+                <button className="btn-export-clear" onClick={() => setExportSelectedIds([])} title="Limpar seleção">
+                    ✕
+                </button>
+            </div>
+        )}
+
         <div className="top-bar-flex">
             <h1 className="ff-title">HUB DO NARRADOR</h1>
             
@@ -738,6 +766,8 @@ export default function MestrePage() {
                 isMaster={true}
                 embedded={true}
                 onOpenFicha={handleOpenFicha}
+                selectedCharIds={exportSelectedIds}
+                onToggleSelect={handleToggleExportSelect}
               />
             </div>
           </div>
@@ -1092,6 +1122,68 @@ export default function MestrePage() {
         @keyframes slowPan { from { transform: scale(1.0); } to { transform: scale(1.1); } }
         
         .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+
+        .export-float-bar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #00f2ff;
+            border-radius: 8px;
+            padding: 10px 18px;
+            box-shadow: 0 0 25px rgba(0, 242, 255, 0.25);
+            backdrop-filter: blur(8px);
+            animation: exportBarIn 0.25s ease-out;
+        }
+        @keyframes exportBarIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        .export-float-count {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .btn-export-md {
+            background: linear-gradient(135deg, #00f2ff, #0891b2);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            font-family: 'Cinzel', serif;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        .btn-export-md:hover {
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+            transform: scale(1.02);
+        }
+        .btn-export-clear {
+            background: transparent;
+            border: 1px solid #475569;
+            color: #94a3b8;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        .btn-export-clear:hover { border-color: #ef4444; color: #ef4444; }
         .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .ff-title { font-size: 2rem; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); letter-spacing: 4px; margin: 0; }
         .mestre-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); border: 1px solid #fbbf24; border-radius: 4px; }

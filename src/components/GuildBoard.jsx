@@ -24,7 +24,7 @@ const getRankBorderColor = (idx) => {
   return '#334155';
 };
 
-const GuildBoard = ({ isMaster, embedded = false, onOpenFicha }) => {
+const GuildBoard = ({ isMaster, embedded = false, onOpenFicha, selectedCharIds = [], onToggleSelect }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -192,6 +192,15 @@ const GuildBoard = ({ isMaster, embedded = false, onOpenFicha }) => {
     setSelectedMember(null);
   };
 
+  const handleToggleExportSelect = (member, e) => {
+    e.stopPropagation();
+    if (!onToggleSelect || !member?.originalCharId) return;
+    onToggleSelect(member.originalCharId);
+  };
+
+  const isCharSelected = (member) =>
+    member?.originalCharId && selectedCharIds.includes(member.originalCharId);
+
   useEffect(() => {
     if (selectedMember) {
         const liveData = members.find(m => m.id === selectedMember.id);
@@ -207,11 +216,26 @@ const GuildBoard = ({ isMaster, embedded = false, onOpenFicha }) => {
         <button className="close-btn" onClick={() => setSelectedMember(null)}>×</button>
         
         <div className="member-header">
-          <img 
-            src={selectedMember.photo || "https://via.placeholder.com/100"} 
-            alt="Char" 
-            className="member-photo" 
-          />
+          <div className="member-photo-wrap">
+            {isMaster && onToggleSelect && (
+              <label
+                className={`export-select-box ${isCharSelected(selectedMember) ? 'checked' : ''}`}
+                title="Selecionar para exportar"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={isCharSelected(selectedMember)}
+                  onChange={(e) => handleToggleExportSelect(selectedMember, e)}
+                />
+              </label>
+            )}
+            <img 
+              src={selectedMember.photo || "https://via.placeholder.com/100"} 
+              alt="Char" 
+              className="member-photo" 
+            />
+          </div>
           <div>
             <h2 style={{margin:0, color:'#fff'}}>{selectedMember.name}</h2>
             <p style={{margin:0, color:'#aaa'}}>
@@ -348,19 +372,34 @@ const GuildBoard = ({ isMaster, embedded = false, onOpenFicha }) => {
           }}>
             #{index + 1}
           </div>
-          <div
-            className="rank-avatar"
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundImage: `url(${member.photo || ''})`,
-              backgroundSize: 'cover',
-              backgroundColor: '#1e293b',
-              border: '1px solid #444',
-              flexShrink: 0
-            }}
-          />
+          <div className="rank-avatar-wrap">
+            {isMaster && onToggleSelect && (
+              <label
+                className={`export-select-box compact ${isCharSelected(member) ? 'checked' : ''}`}
+                title="Selecionar para exportar"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={isCharSelected(member)}
+                  onChange={(e) => handleToggleExportSelect(member, e)}
+                />
+              </label>
+            )}
+            <div
+              className="rank-avatar"
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundImage: `url(${member.photo || ''})`,
+                backgroundSize: 'cover',
+                backgroundColor: '#1e293b',
+                border: '1px solid #444',
+                flexShrink: 0
+              }}
+            />
+          </div>
           <div className="rank-info" style={{ flex: 1, minWidth: 0 }}>
             <h4 style={{ margin: '0 0 5px 0', color: '#e2e8f0', fontSize: '1rem', textTransform: 'uppercase' }}>
               {member.name}
@@ -549,6 +588,47 @@ const GuildBoard = ({ isMaster, embedded = false, onOpenFicha }) => {
         transition: 0.2s;
     }
     .rank-ficha-btn:hover { background: rgba(0, 242, 255, 0.1); }
+
+    .rank-avatar-wrap, .member-photo-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .export-select-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid #475569;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: 0.2s;
+        flex-shrink: 0;
+    }
+    .export-select-box.compact {
+        width: 18px;
+        height: 18px;
+    }
+    .export-select-box:hover { border-color: #00f2ff; }
+    .export-select-box.checked {
+        border-color: #00f2ff;
+        background: rgba(0, 242, 255, 0.15);
+        box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+    }
+    .export-select-box input {
+        width: 12px;
+        height: 12px;
+        margin: 0;
+        cursor: pointer;
+        accent-color: #00f2ff;
+    }
+    .export-select-box.compact input {
+        width: 10px;
+        height: 10px;
+    }
 
     .member-modal {
         position: absolute; top: 0; left: 0; width: 100%; height: 100%;
