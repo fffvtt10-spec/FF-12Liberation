@@ -245,6 +245,7 @@ export default function MestrePage() {
   // Assinatura vinculada agora ao banco de dados por conta
   const [mestreIdentidade, setMestreIdentidade] = useState("Narrador");
   const [mestreCor, setMestreCor] = useState("#fbbf24");
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -259,14 +260,19 @@ export default function MestrePage() {
     const unsub = onAuthStateChanged(auth, async (user) => {
         if (user) {
             setCurrentUser(user);
-            
+            setProfileLoaded(false);
+
             // Busca os dados do Narrador específicos dessa conta no Firestore
             const profileRef = doc(db, "mestres_profiles", user.uid);
             const profileSnap = await getDoc(profileRef);
             if (profileSnap.exists()) {
                 setMestreIdentidade(profileSnap.data().nome || "Narrador");
                 setMestreCor(profileSnap.data().cor || "#fbbf24");
+            } else {
+                setMestreIdentidade("Narrador");
+                setMestreCor("#fbbf24");
             }
+            setProfileLoaded(true);
 
             const qM = query(collection(db, "missoes"), orderBy("createdAt", "desc"));
             const qS = query(collection(db, "sessoes"), orderBy("dataInicio", "asc"));
@@ -288,6 +294,7 @@ export default function MestrePage() {
 
             return () => { unsubM(); unsubS(); unsubC(); unsubD(); unsubT(); };
         } else {
+            setProfileLoaded(false);
             setLoading(false);
             navigate('/login'); 
         }
@@ -296,15 +303,15 @@ export default function MestrePage() {
     return () => unsub();
   }, [navigate]);
 
-  // Salva no Firestore sempre que o Narrador mudar o nome ou a cor
+  // Salva no Firestore após carregar o perfil, quando o Narrador mudar nome ou cor
   useEffect(() => {
-      if (currentUser) {
+      if (currentUser && profileLoaded) {
           setDoc(doc(db, "mestres_profiles", currentUser.uid), {
               nome: mestreIdentidade,
               cor: mestreCor
           }, { merge: true }).catch(console.error);
       }
-  }, [mestreIdentidade, mestreCor, currentUser]);
+  }, [mestreIdentidade, mestreCor, currentUser, profileLoaded]);
 
   useEffect(() => {
       if (selectedFicha) {
