@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { db, auth } from '../firebase';
 import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -230,7 +231,7 @@ export default function MestreVTTPage() {
       if (lastBencaoTsRef.current === bencao.timestamp) return;
       lastBencaoTsRef.current = bencao.timestamp;
       setBencaoFlash(true);
-      const t = setTimeout(() => setBencaoFlash(false), 1000);
+      const t = setTimeout(() => setBencaoFlash(false), 4000);
       return () => clearTimeout(t);
   }, [sessaoAtiva?.bencao_deuses?.timestamp, sessaoAtiva?.bencao_deuses?.vencedores]);
 
@@ -522,14 +523,15 @@ export default function MestreVTTPage() {
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
 
-      {bencaoFlash && sessaoAtiva?.bencao_deuses?.vencedores?.length > 0 && (
+      {bencaoFlash && sessaoAtiva?.bencao_deuses?.vencedores?.length > 0 && createPortal(
           <div className="bencao-roll-flash">
               <div className="bencao-roll-flash-inner">
                   <span className="bencao-flash-label">BÊNÇÃO DOS DEUSES</span>
                   <span className="bencao-flash-number">{sessaoAtiva.bencao_deuses.resultado_d100}</span>
                   <span className="bencao-flash-winners">Bênção para: {sessaoAtiva.bencao_deuses.vencedores.join(', ')}</span>
               </div>
-          </div>
+          </div>,
+          document.body
       )}
       
       {/* SIDEBAR AVENTUREIROS (Com Destaque para Bênção dos Deuses) */}
@@ -1111,13 +1113,13 @@ export default function MestreVTTPage() {
         @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
         .t-bencao-icon { margin-left: 6px; font-size: 14px; filter: drop-shadow(0 0 4px #ffcc00); }
 
-        .bencao-roll-flash { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; pointer-events: none; background: rgba(0,0,0,0.6); animation: bencaoFlashBg 1s ease-out forwards; }
-        .bencao-roll-flash-inner { display: flex; flex-direction: column; align-items: center; text-align: center; animation: bencaoFlashPop 1s ease-out forwards; }
+        .bencao-roll-flash { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; pointer-events: none; background: rgba(0,0,0,0.75); animation: bencaoFlashBg 4s ease-out forwards; }
+        .bencao-roll-flash-inner { display: flex; flex-direction: column; align-items: center; text-align: center; animation: bencaoFlashPop 4s ease-out forwards; }
         .bencao-flash-label { font-family: 'Cinzel', serif; font-size: clamp(18px, 4vw, 32px); color: #ffcc00; letter-spacing: 6px; text-transform: uppercase; text-shadow: 0 0 20px #ffcc00; margin-bottom: 10px; }
         .bencao-flash-number { font-family: 'Cinzel', serif; font-size: clamp(80px, 20vw, 160px); font-weight: bold; color: #ffcc00; line-height: 1; text-shadow: 0 0 40px #ffcc00, 0 0 80px rgba(255,204,0,0.5); }
         .bencao-flash-winners { font-family: 'Cinzel', serif; font-size: clamp(14px, 3vw, 24px); color: #0f0; margin-top: 15px; letter-spacing: 2px; text-shadow: 0 0 10px #0f0; }
-        @keyframes bencaoFlashBg { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
-        @keyframes bencaoFlashPop { 0% { transform: scale(0.5); opacity: 0; } 15% { transform: scale(1.1); opacity: 1; } 85% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.2); opacity: 0; } }
+        @keyframes bencaoFlashBg { 0% { opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes bencaoFlashPop { 0% { transform: scale(0.5); opacity: 0; } 10% { transform: scale(1.1); opacity: 1; } 80% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.05); opacity: 0; } }
 
         .session-status-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; padding: 5px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 40; }
         .status-indicator { width: 10px; height: 10px; background: #00f2ff; border-radius: 50%; box-shadow: 0 0 10px #00f2ff; animation: pulse 2s infinite; }
