@@ -145,6 +145,7 @@ const CharacterCreation = () => {
           basic_info: { 
               character_name: charName,
               race: selectedRace.name,
+              class: selectedClass,
               level: 1,
               experience: { current: 0, max: 100 },
               guild_insignia: "",

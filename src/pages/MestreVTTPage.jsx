@@ -130,6 +130,8 @@ export default function MestreVTTPage() {
   const [trocasPendentes, setTrocasPendentes] = useState([]);
 
   const [showBencaoManager, setShowBencaoManager] = useState(false);
+  const [bencaoFlash, setBencaoFlash] = useState(false);
+  const lastBencaoTsRef = useRef(null);
 
   // Estados para Adicionar Mapas (Via URL apenas)
   const [showUploadManager, setShowUploadManager] = useState(false);
@@ -222,6 +224,16 @@ export default function MestreVTTPage() {
     return () => { unsubscribeAuth(); unsubSession(); unsubTrocas(); };
   }, [navigate]); 
 
+  useEffect(() => {
+      const bencao = sessaoAtiva?.bencao_deuses;
+      if (!bencao?.timestamp || !bencao?.vencedores?.length) return;
+      if (lastBencaoTsRef.current === bencao.timestamp) return;
+      lastBencaoTsRef.current = bencao.timestamp;
+      setBencaoFlash(true);
+      const t = setTimeout(() => setBencaoFlash(false), 1000);
+      return () => clearTimeout(t);
+  }, [sessaoAtiva?.bencao_deuses?.timestamp, sessaoAtiva?.bencao_deuses?.vencedores]);
+
   // Online Check
   useEffect(() => {
     if (sessaoAtiva?.id) {
@@ -302,10 +314,24 @@ export default function MestreVTTPage() {
                 numeros_escolhidos: numeros,
                 resultado_d100: resultado,
                 vencedores: vencedores,
+                buff_ativo: [...vencedores],
                 timestamp: Date.now()
             }
         });
     } catch(e) { console.error("Erro ao rolar DdD", e); }
+  };
+
+  const handleRemoverBuffSinalizacao = async (playerName) => {
+      if (!sessaoAtiva) return;
+      const buffAtivo = (sessaoAtiva.bencao_deuses?.buff_ativo || sessaoAtiva.bencao_deuses?.vencedores || []).filter(n => n !== playerName);
+      try {
+          await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
+              bencao_deuses: {
+                  ...(sessaoAtiva.bencao_deuses || {}),
+                  buff_ativo: buffAtivo
+              }
+          });
+      } catch (e) { console.error("Erro ao remover buff", e); }
   };
 
   // Handler Piscar Token no VTT
@@ -471,7 +497,7 @@ export default function MestreVTTPage() {
 
   const filteredBestiary = bestiary.filter(b => bestiaryTab === 'monsters' ? (b.category !== 'object') : (b.category === 'object'));
 
-  const vencedoresBencao = sessaoAtiva?.bencao_deuses?.vencedores || [];
+  const buffAtivo = sessaoAtiva?.bencao_deuses?.buff_ativo || sessaoAtiva?.bencao_deuses?.vencedores || [];
 
   // --- LOADING SCREEN ---
   if (loading || !minTimeElapsed) {
@@ -495,6 +521,16 @@ export default function MestreVTTPage() {
   return (
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
+
+      {bencaoFlash && sessaoAtiva?.bencao_deuses?.vencedores?.length > 0 && (
+          <div className="bencao-roll-flash">
+              <div className="bencao-roll-flash-inner">
+                  <span className="bencao-flash-label">BÊNÇÃO DOS DEUSES</span>
+                  <span className="bencao-flash-number">{sessaoAtiva.bencao_deuses.resultado_d100}</span>
+                  <span className="bencao-flash-winners">Bênção para: {sessaoAtiva.bencao_deuses.vencedores.join(', ')}</span>
+              </div>
+          </div>
+      )}
       
       {/* SIDEBAR AVENTUREIROS (Com Destaque para Bênção dos Deuses) */}
       <div className="dm-players-sidebar">
@@ -502,7 +538,7 @@ export default function MestreVTTPage() {
           <div className="players-list-scroll">
               {personagensData.map(char => {
                   const isOnline = connectedPlayers.includes(char.uid); 
-                  const isBencaoWinner = vencedoresBencao.includes(char.name);
+                  const isBencaoWinner = buffAtivo.includes(char.name);
                   const bgImage = char.character_sheet?.imgUrl; 
                   return (
                       <div key={char.id} className={`mini-player-card ${isOnline ? 'online' : 'offline'} ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setSelectedFicha(char)} title="Ficha">
@@ -579,9 +615,10 @@ export default function MestreVTTPage() {
                       const isPvP = sessaoAtiva.pvp_mode;
                       const teamColor = isPvP ? getTeamColor(token.name) : null;
                       const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
+                      const hasBencaoBuff = token.type === 'player' && buffAtivo.includes(token.name);
 
                       return (
-                          <div key={token.id} className="tracker-item-wrapper">
+                          <div key={token.id} className={`tracker-item-wrapper ${hasBencaoBuff ? 'bencao-highlight' : ''}`}>
                               <div 
                                 className={`tracker-item ${token.type} ${!isVisible ? 'hidden' : ''} ${token.stealth ? 'stealth-active' : ''}`}
                                 draggable
@@ -598,6 +635,7 @@ export default function MestreVTTPage() {
                                   <div className="t-col-info">
                                       <div className="t-name" style={teamColor ? {color: teamColor} : {}}>
                                           {token.name}
+                                          {hasBencaoBuff && <span className="t-bencao-icon" title="Bênção dos Deuses ativa">✨</span>}
                                           <span className="t-active-statuses">
                                               {token.statuses?.map(s => {
                                                   const effect = STATUS_EFFECTS.find(e => e.id === s);
@@ -652,6 +690,9 @@ export default function MestreVTTPage() {
                                           <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
                                               {isVisible ? '👁️' : '🙈'}
                                           </button>
+                                          {hasBencaoBuff && (
+                                              <button className="btn-icon-sm" title="Remover sinalização da Bênção" onClick={() => handleRemoverBuffSinalizacao(token.name)} style={{color: '#ffcc00'}}>✨</button>
+                                          )}
                                           {token.type === 'enemy' && (
                                               <button className="btn-icon-sm" title="Detalhes" onClick={() => setViewMonsterDetails({ ...token.details, img: token.img })}>📜</button>
                                           )}
@@ -1068,6 +1109,15 @@ export default function MestreVTTPage() {
         /* DESTAQUE BÊNÇÃO DOS DEUSES */
         .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
         @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
+        .t-bencao-icon { margin-left: 6px; font-size: 14px; filter: drop-shadow(0 0 4px #ffcc00); }
+
+        .bencao-roll-flash { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; pointer-events: none; background: rgba(0,0,0,0.6); animation: bencaoFlashBg 1s ease-out forwards; }
+        .bencao-roll-flash-inner { display: flex; flex-direction: column; align-items: center; text-align: center; animation: bencaoFlashPop 1s ease-out forwards; }
+        .bencao-flash-label { font-family: 'Cinzel', serif; font-size: clamp(18px, 4vw, 32px); color: #ffcc00; letter-spacing: 6px; text-transform: uppercase; text-shadow: 0 0 20px #ffcc00; margin-bottom: 10px; }
+        .bencao-flash-number { font-family: 'Cinzel', serif; font-size: clamp(80px, 20vw, 160px); font-weight: bold; color: #ffcc00; line-height: 1; text-shadow: 0 0 40px #ffcc00, 0 0 80px rgba(255,204,0,0.5); }
+        .bencao-flash-winners { font-family: 'Cinzel', serif; font-size: clamp(14px, 3vw, 24px); color: #0f0; margin-top: 15px; letter-spacing: 2px; text-shadow: 0 0 10px #0f0; }
+        @keyframes bencaoFlashBg { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes bencaoFlashPop { 0% { transform: scale(0.5); opacity: 0; } 15% { transform: scale(1.1); opacity: 1; } 85% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.2); opacity: 0; } }
 
         .session-status-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; padding: 5px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 40; }
         .status-indicator { width: 10px; height: 10px; background: #00f2ff; border-radius: 50%; box-shadow: 0 0 10px #00f2ff; animation: pulse 2s infinite; }

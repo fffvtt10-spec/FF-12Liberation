@@ -35,7 +35,7 @@
     { "base": "Animista", "paths": [ { "adv": "Mago Moogle", "max": "Mago do Tempo" }, { "adv": "Influencer", "max": "Malabarista" } ] },
     { "base": "Chocobo Rider", "isolated": true }
   ],
-  "No Muo": [
+  "Nu Mou": [
     { "base": "Mago Negro", "paths": [ { "adv": "Mago Real", "max": "Mago Primordial" }, { "adv": "Professor", "max": "Sábio" } ] },
     { "base": "Adestrador", "paths": [ { "adv": "Domador", "max": "Mestre das Bestas" } ] },
     { "base": "Estudioso", "special": true, "paths": [ { "adv": "Magia Vender" } ] }

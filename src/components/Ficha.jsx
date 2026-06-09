@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { getCharacterClass, buildCharacterSheetSavePayload } from '../utils/characterHelpers';
 
 // --- LISTA DE ÍCONES DE HABILIDADE ---
 const SKILL_ICONS = [
@@ -106,13 +107,17 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const saveSheetToDb = async () => {
       try {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
-        await updateDoc(charRef, { character_sheet: sheet });
+        const payload = buildCharacterSheetSavePayload(sheet);
+        await updateDoc(charRef, payload);
+        if (payload.class) setSheet(payload.character_sheet);
         setHasUnsavedChanges(false);
       } catch (error) {
           console.error("Erro ao salvar:", error);
           alert("Erro ao salvar ficha.");
       }
   };
+
+  const displayClass = getCharacterClass({ ...characterData, character_sheet: sheet });
 
   const openUploadModal = (label, callback) => {
       if(!isMaster) return;
@@ -426,7 +431,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             
             <div className="header-info">
                 <h1 className="responsive-title">{sheet.basic_info.character_name}</h1>
-                <span className="sub-header">{sheet.basic_info.race} // {characterData.class}</span>
+                <span className="sub-header">{sheet.basic_info.race} // {displayClass}</span>
                 <div className="xp-container">
                     <div className="lvl-box"><small>LVL</small>{isMaster ? <input className="lvl-input" type="number" value={sheet.basic_info.level} onChange={e => updateField('basic_info.level', Number(e.target.value))} /> : <span>{sheet.basic_info.level}</span>}</div>
                     <div className="xp-bar-box">

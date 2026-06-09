@@ -20,7 +20,8 @@ import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
-import treeData from '../data/tree.json'; 
+import treeData from '../data/tree.json';
+import { getCharacterClass, getCharacterRace, hasClassMismatch } from '../utils/characterHelpers'; 
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -266,7 +267,8 @@ export default function JogadorVttPage() {
   // --- NOVOS ESTADOS - QUEUE 01 ---
   const [showBencao, setShowBencao] = useState(false);
   const [numeroDestino, setNumeroDestino] = useState("");
-  const [bencaoVencedorAtivo, setBencaoVencedorAtivo] = useState(false);
+  const [bencaoFlash, setBencaoFlash] = useState(false);
+  const lastBencaoTsRef = useRef(null);
 
   const [showTrocas, setShowTrocas] = useState(false);
   const [minhasTrocas, setMinhasTrocas] = useState([]);
@@ -412,12 +414,30 @@ export default function JogadorVttPage() {
   }, [personagem?.uid]);
 
   useEffect(() => {
-      if(currentVttSession?.bencao_deuses?.active && currentVttSession.bencao_deuses.vencedores?.includes(personagem?.name)) {
-          setBencaoVencedorAtivo(true);
-          const t = setTimeout(() => setBencaoVencedorAtivo(false), 5000); 
-          return () => clearTimeout(t);
-      }
-  }, [currentVttSession?.bencao_deuses?.timestamp, personagem?.name, currentVttSession?.bencao_deuses?.active, currentVttSession?.bencao_deuses?.vencedores]);
+      if (!personagem?.uid || !hasClassMismatch(personagem)) return;
+      const primaryClass = personagem.character_sheet?.job_system?.primary_class?.name;
+      if (!primaryClass) return;
+      updateDoc(doc(db, "characters", personagem.uid), {
+          class: primaryClass,
+          'character_sheet.basic_info.class': primaryClass
+      }).catch(console.error);
+  }, [personagem?.uid, personagem?.class, personagem?.character_sheet?.job_system?.primary_class?.name]);
+
+  useEffect(() => {
+      const bencao = currentVttSession?.bencao_deuses;
+      if (!bencao?.timestamp || !bencao?.vencedores?.length) return;
+      if (lastBencaoTsRef.current === bencao.timestamp) return;
+      lastBencaoTsRef.current = bencao.timestamp;
+      setBencaoFlash(true);
+      const t = setTimeout(() => setBencaoFlash(false), 1000);
+      return () => clearTimeout(t);
+  }, [currentVttSession?.bencao_deuses?.timestamp, currentVttSession?.bencao_deuses?.vencedores]);
+
+  useEffect(() => {
+      if (!showBencao || !currentVttSession || !personagem) return;
+      const saved = currentVttSession.bencao_deuses?.numeros_escolhidos?.[personagem.name];
+      setNumeroDestino(saved ? String(saved) : "");
+  }, [showBencao, currentVttSession?.bencao_deuses?.numeros_escolhidos, personagem?.name, currentVttSession, personagem]);
 
   // Função helper para verificar se um jogador X está com sessão ativa rolando
   const isPlayerActive = (playerName) => {
@@ -437,7 +457,7 @@ export default function JogadorVttPage() {
     if (!personagem) return;
     if (missao.candidatos?.some(c => c.uid === auth.currentUser.uid)) return alert("Já candidatado!");
     const isLeader = !missao.candidatos || missao.candidatos.length === 0;
-    const candidatoObj = { uid: auth.currentUser.uid, nome: personagem.name, classe: personagem.class, isLeader, dataCandidatura: new Date().toISOString() };
+    const candidatoObj = { uid: auth.currentUser.uid, nome: personagem.name, classe: getCharacterClass(personagem), isLeader, dataCandidatura: new Date().toISOString() };
     try {
       await updateDoc(doc(db, "missoes", missao.id), { candidatos: arrayUnion(candidatoObj) });
       alert(isLeader ? "Você é o LÍDER DO GRUPO!" : "Candidatura realizada!");
@@ -526,13 +546,24 @@ export default function JogadorVttPage() {
   // --- HANDLER BÊNÇÃO DOS DEUSES ---
   const handleApostarNumero = async (e) => {
       e.preventDefault();
-      if(!currentVttSession || !personagem || !numeroDestino) return;
+      if (!currentVttSession || !personagem || !numeroDestino) return;
+      const num = Number(numeroDestino);
+      if (num < 1 || num > 100 || !Number.isInteger(num)) return alert("Escolha um número inteiro entre 1 e 100.");
+      if (currentVttSession.bencao_deuses?.resultado_d100 > 0) return alert("O dado dos deuses já foi rolado nesta sessão.");
+      const bencaoAtual = currentVttSession.bencao_deuses || {};
       try {
           await updateDoc(doc(db, "sessoes", currentVttSession.id), {
-              [`bencao_deuses.numeros_escolhidos.${personagem.name}`]: Number(numeroDestino)
+              bencao_deuses: {
+                  ...bencaoAtual,
+                  numeros_escolhidos: {
+                      ...(bencaoAtual.numeros_escolhidos || {}),
+                      [personagem.name]: num
+                  }
+              }
           });
-          alert(`Número ${numeroDestino} cravado! Os deuses o observam.`);
-      } catch(err) { alert("Erro ao apostar: " + err.message); }
+          alert(`Número ${num} cravado! Os deuses o observam.`);
+          setShowBencao(false);
+      } catch (err) { alert("Erro ao apostar: " + err.message); }
   };
 
   // --- HANDLERS ARRASTAR ---
@@ -689,7 +720,10 @@ export default function JogadorVttPage() {
 
   if (!personagem) return <div className="loading-screen">Nenhum personagem encontrado.</div>;
 
-  const isBencaoWinner = currentVttSession?.bencao_deuses?.vencedores?.includes(personagem?.name);
+  const buffAtivo = currentVttSession?.bencao_deuses?.buff_ativo || currentVttSession?.bencao_deuses?.vencedores || [];
+  const isBencaoWinner = buffAtivo.includes(personagem?.name);
+  const meuNumeroDestino = currentVttSession?.bencao_deuses?.numeros_escolhidos?.[personagem?.name];
+  const bencaoJaRolado = (currentVttSession?.bencao_deuses?.resultado_d100 || 0) > 0;
   const meuInventario = personagem?.character_sheet?.inventory?.items?.filter(i => i && i.name && i.name.trim() !== '') || [];
   const meuGil = personagem?.character_sheet?.inventory?.gil || 0;
 
@@ -697,12 +731,14 @@ export default function JogadorVttPage() {
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
       
-      {bencaoVencedorAtivo && (
-          <div className="bencao-victory-overlay">
-              <div className="bencao-victory-box">
-                  <h2>OS DEUSES SORRIEM PARA VOCÊ!</h2>
-                  <p>O Narrador rolou o seu Número do Destino ({numeroDestino}).</p>
-                  <p className="subtext">Você recebeu a Bênção dos Deuses nesta sessão!</p>
+      {bencaoFlash && currentVttSession?.bencao_deuses?.vencedores?.length > 0 && (
+          <div className="bencao-roll-flash">
+              <div className="bencao-roll-flash-inner">
+                  <span className="bencao-flash-label">BÊNÇÃO DOS DEUSES</span>
+                  <span className="bencao-flash-number">{currentVttSession.bencao_deuses.resultado_d100}</span>
+                  <span className="bencao-flash-winners">
+                      {isBencaoWinner ? 'OS DEUSES SORRIEM PARA VOCÊ!' : `Bênção para: ${currentVttSession.bencao_deuses.vencedores.join(', ')}`}
+                  </span>
               </div>
           </div>
       )}
@@ -711,7 +747,7 @@ export default function JogadorVttPage() {
 
         <div className={`char-hud clickable-hud ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowFicha(true)} title="Abrir Ficha">
           <div className="char-avatar"><div className="avatar-circle"><span className="hud-level">{personagem.character_sheet?.basic_info?.level || 1}</span></div></div>
-          <div className="char-info"><h2 className="char-name">{personagem.name}</h2><span className="char-meta">{personagem.race} // {personagem.class}</span></div>
+          <div className="char-info"><h2 className="char-name">{personagem.name}</h2><span className="char-meta">{getCharacterRace(personagem)} // {getCharacterClass(personagem)}</span></div>
         </div>
 
         {currentVttSession && currentVttSession.active_map && (
@@ -788,11 +824,12 @@ export default function JogadorVttPage() {
 
                         const teamColor = isPvP ? getTeamColor(token.name) : null;
                         const customBorder = teamColor ? { borderLeft: `4px solid ${teamColor}` } : {};
+                        const hasBencaoBuff = token.type === 'player' && buffAtivo.includes(token.name);
 
                         return (
                             <div 
                                 key={token.id} 
-                                className={`tracker-item readonly ${isMyStealth ? 'tracker-stealth-self' : ''}`}
+                                className={`tracker-item readonly ${isMyStealth ? 'tracker-stealth-self' : ''} ${hasBencaoBuff ? 'bencao-highlight' : ''}`}
                                 style={customBorder}
                             >
                                 <div className="t-col-img">
@@ -800,7 +837,10 @@ export default function JogadorVttPage() {
                                     <div className="t-img" style={{backgroundImage: `url(${imgUrl})`, backgroundPosition: `${token.imgX||50}% ${token.imgY||50}%`}}></div>
                                 </div>
                                 <div className="t-col-info">
-                                    <div className="t-name" style={teamColor ? {color: teamColor} : {}}>{token.name}</div>
+                                    <div className="t-name" style={teamColor ? {color: teamColor} : {}}>
+                                        {token.name}
+                                        {hasBencaoBuff && <span className="t-bencao-icon" title="Bênção dos Deuses ativa">✨</span>}
+                                    </div>
                                     <div className="t-stats-row">
                                         <div className="t-stat hp">
                                             <label>HP</label>
@@ -1147,6 +1187,57 @@ export default function JogadorVttPage() {
             </div>
         )}
 
+        {/* MODAL: BÊNÇÃO DOS DEUSES (JOGADOR) */}
+        {showBencao && currentVttSession && (
+            <div className="modal-overlay-custom" onClick={() => setShowBencao(false)}>
+                <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header-c">
+                        <h3>✨ BÊNÇÃO DOS DEUSES (D100)</h3>
+                        <button className="close-c" onClick={() => setShowBencao(false)}>✕</button>
+                    </div>
+                    <div className="bencao-player-body">
+                        <p style={{ color: '#aaa', fontSize: '13px', lineHeight: 1.5, margin: '0 0 20px 0' }}>
+                            Escolha seu <strong style={{ color: '#ffcc00' }}>Número do Destino</strong> (1–100) para esta sessão.
+                            Se o Narrador rolar esse número no d100, você recebe a Bênção dos Deuses.
+                        </p>
+                        {meuNumeroDestino ? (
+                            <div className="bencao-numero-salvo">
+                                <span className="bencao-numero-label">SEU NÚMERO</span>
+                                <span className="bencao-numero-valor">{meuNumeroDestino}</span>
+                                {bencaoJaRolado && (
+                                    <p className="bencao-numero-status">
+                                        {(currentVttSession.bencao_deuses?.vencedores || []).includes(personagem.name)
+                                            ? '✨ Os deuses escolheram você!'
+                                            : 'O dado já foi rolado nesta sessão.'}
+                                    </p>
+                                )}
+                            </div>
+                        ) : bencaoJaRolado ? (
+                            <p style={{ color: '#666', textAlign: 'center', fontStyle: 'italic' }}>O dado dos deuses já foi rolado. Não é possível apostar agora.</p>
+                        ) : (
+                            <form onSubmit={handleApostarNumero}>
+                                <label style={{ display: 'block', fontSize: '11px', color: '#aaa', marginBottom: '8px' }}>NÚMERO DO DESTINO (1–100)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    className="file-input-dark"
+                                    value={numeroDestino}
+                                    onChange={e => setNumeroDestino(e.target.value)}
+                                    placeholder="Ex: 42"
+                                    required
+                                    style={{ fontSize: '24px', textAlign: 'center', color: '#ffcc00', fontWeight: 'bold' }}
+                                />
+                                <button type="submit" className="btn-save-m" style={{ width: '100%', marginTop: '20px', padding: '15px', fontSize: '16px' }}>
+                                    CRAVAR NÚMERO
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* MODAL DRAGGABLE / TOUCH: ÁRVORE DE CLASSES */}
         {showClassTree && (
             <div 
@@ -1403,11 +1494,23 @@ export default function JogadorVttPage() {
         .btn-save-m { background: #ffcc00; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; border-radius: 4px; }
         .btn-save-m:hover { background: #fff; box-shadow: 0 0 10px #ffcc00; }
 
-        .bencao-victory-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255, 204, 0, 0.15); z-index: 10000; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flashScreen 0.5s ease-out; }
-        .bencao-victory-box { background: rgba(0,0,0,0.9); border: 3px solid #ffcc00; box-shadow: 0 0 50px #ffcc00; padding: 40px; text-align: center; border-radius: 10px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; }
-        .bencao-victory-box h2 { color: #ffcc00; font-size: 30px; margin: 0 0 10px 0; text-shadow: 0 0 10px #ffcc00; }
-        .bencao-victory-box p { color: #fff; font-size: 18px; margin: 5px 0; }
-        .bencao-victory-box .subtext { color: #0f0; font-weight: bold; margin-top: 15px; }
+        .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
+        @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
+        .t-bencao-icon { margin-left: 6px; font-size: 14px; filter: drop-shadow(0 0 4px #ffcc00); }
+
+        .bencao-roll-flash { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; pointer-events: none; background: rgba(0,0,0,0.6); animation: bencaoFlashBg 1s ease-out forwards; }
+        .bencao-roll-flash-inner { display: flex; flex-direction: column; align-items: center; text-align: center; animation: bencaoFlashPop 1s ease-out forwards; }
+        .bencao-flash-label { font-family: 'Cinzel', serif; font-size: clamp(18px, 4vw, 32px); color: #ffcc00; letter-spacing: 6px; text-transform: uppercase; text-shadow: 0 0 20px #ffcc00; margin-bottom: 10px; }
+        .bencao-flash-number { font-family: 'Cinzel', serif; font-size: clamp(80px, 20vw, 160px); font-weight: bold; color: #ffcc00; line-height: 1; text-shadow: 0 0 40px #ffcc00, 0 0 80px rgba(255,204,0,0.5); }
+        .bencao-flash-winners { font-family: 'Cinzel', serif; font-size: clamp(14px, 3vw, 24px); color: #0f0; margin-top: 15px; letter-spacing: 2px; text-shadow: 0 0 10px #0f0; }
+        @keyframes bencaoFlashBg { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes bencaoFlashPop { 0% { transform: scale(0.5); opacity: 0; } 15% { transform: scale(1.1); opacity: 1; } 85% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.2); opacity: 0; } }
+
+        .bencao-player-body { padding: 5px 0; }
+        .bencao-numero-salvo { text-align: center; background: rgba(255,204,0,0.08); border: 2px solid #ffcc00; border-radius: 8px; padding: 30px 20px; }
+        .bencao-numero-label { display: block; font-size: 11px; color: #aaa; letter-spacing: 3px; margin-bottom: 10px; }
+        .bencao-numero-valor { display: block; font-family: 'Cinzel', serif; font-size: 72px; color: #ffcc00; font-weight: bold; text-shadow: 0 0 20px #ffcc00; }
+        .bencao-numero-status { margin: 15px 0 0 0; font-size: 14px; color: #0f0; font-weight: bold; }
 
         .itens-troca-lista { background: #000; border: 1px solid #444; padding: 10px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border-radius: 4px; }
         .item-checkbox-label { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #ccc; cursor: pointer; }

@@ -9,8 +9,8 @@ import chocoboGif from '../assets/chocobo-loading.gif';
 import Bazar from '../components/Bazar'; 
 import Forja from '../components/Forja'; 
 import Ficha from '../components/Ficha'; 
-import fichaIcon from '../assets/ficha-icon.png'; 
-import GuildBoard from '../components/GuildBoard'; 
+import GuildBoard from '../components/GuildBoard';
+import { getCharacterClass, getCharacterRace } from '../utils/characterHelpers'; 
 
 // --- COMPONENTE DE CALENDÁRIO INTERNO ---
 const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
@@ -207,7 +207,6 @@ export default function MestrePage() {
   const [showModal, setShowModal] = useState(false); 
   const [showSessionModal, setShowSessionModal] = useState(false); 
   const [showCalendar, setShowCalendar] = useState(false); 
-  const [showFichasList, setShowFichasList] = useState(false); 
   const [selectedFicha, setSelectedFicha] = useState(null); 
   
   // --- ARENA STATES ---
@@ -280,7 +279,10 @@ export default function MestrePage() {
             const unsubD = onSnapshot(qD, (snap) => setDisponibilidades(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubT = onSnapshot(qT, (snap) => setAllTrocas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
             const unsubC = onSnapshot(qC, (snap) => {
-                setPersonagensDb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                setPersonagensDb(snap.docs.map(d => {
+                    const data = { id: d.id, ...d.data() };
+                    return { ...data, class: getCharacterClass(data), race: getCharacterRace(data) };
+                }));
                 setLoading(false); 
             });
 
@@ -600,6 +602,11 @@ export default function MestrePage() {
       navigate('/mestre-vtt');
   };
 
+  const handleOpenFicha = (charId) => {
+      const personagem = personagensDb.find(p => p.id === charId);
+      if (personagem) setSelectedFicha(personagem);
+  };
+
   const handleDeleteSession = async (sessao) => {
       if (!window.confirm(`Tem certeza que deseja cancelar a sessão "${sessao.missaoNome}"?`)) return;
       
@@ -714,30 +721,17 @@ export default function MestrePage() {
             </div>
           </div>
 
-          {/* COLUNA 2: RANK DA TEMPORADA */}
+          {/* COLUNA 2: RANK DA TEMPORADA + GESTÃO DE PERSONAGENS */}
           <div className="ff-card rank-card board-column">
             <div className="card-header no-border">
               <h3>RANK DA TEMPORADA</h3>
             </div>
-            <div className="mission-scroll">
-              {personagensDb
-                .slice()
-                .sort((a, b) => (b.character_sheet?.basic_info?.level || 1) - (a.character_sheet?.basic_info?.level || 1))
-                .map((p, idx) => (
-                  <div key={p.id} className="rank-item-card" style={{ display: 'flex', alignItems: 'center', gap: '15px', background: '#0f172a', border: '1px solid #334155', padding: '15px', borderRadius: '4px', borderLeft: idx === 0 ? '4px solid #fbbf24' : idx === 1 ? '4px solid #94a3b8' : idx === 2 ? '4px solid #b45309' : '4px solid #334155' }}>
-                    <div className="rank-pos" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: idx === 0 ? '#fbbf24' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#475569' }}>
-                      #{idx + 1}
-                    </div>
-                    <div className="rank-avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundImage: `url(${p.character_sheet?.imgUrl || ''})`, backgroundSize: 'cover', backgroundColor: '#1e293b', border: '1px solid #444' }}></div>
-                    <div className="rank-info" style={{ flex: 1 }}>
-                      <h4 style={{ margin: '0 0 5px 0', color: '#e2e8f0', fontSize: '1rem', textTransform: 'uppercase' }}>{p.name}</h4>
-                      <div style={{ display: 'flex', gap: '10px', fontSize: '0.8rem', color: '#94a3b8' }}>
-                        <span>Nível {p.character_sheet?.basic_info?.level || 1}</span>
-                        <span>{p.class}</span>
-                      </div>
-                    </div>
-                  </div>
-              ))}
+            <div className="mission-scroll rank-scroll-panel">
+              <GuildBoard
+                isMaster={true}
+                embedded={true}
+                onOpenFicha={handleOpenFicha}
+              />
             </div>
           </div>
 
@@ -781,19 +775,13 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- BOTÕES FLUTUANTES ALINHADOS VERTICALMENTE --- */}
+      {/* --- BOTÃO FLUTUANTE MERCADO --- */}
       <div className="dm-floating-container">
-          <button className="dm-float-btn btn-fichas-dm" onClick={() => setShowFichasList(true)} title="Acessar Fichas">
-              <img src={fichaIcon} alt="Fichas" style={{ width: '60%', height: '60%', objectFit: 'contain' }} />
-          </button>
-
           <button className="dm-float-btn btn-trocas-dm" onClick={() => setShowMercadoModal(true)} title="Mercado dos Lanternas">
               🏮
               {trocasPendentes.length > 0 && <span className="notification-badge-dm">{trocasPendentes.length}</span>}
           </button>
       </div>
-
-      <GuildBoard isMaster={true} />
       <Bazar isMestre={true} />
       <Forja />
 
@@ -808,27 +796,6 @@ export default function MestrePage() {
             onUpdateSession={updateSessionTime}
             onDeleteSlot={deleteAvailabilitySlot}
         />
-      )}
-
-      {/* MODAL DE LISTA DE FICHAS */}
-      {showFichasList && (
-          <div className="ff-modal-overlay-fixed" onClick={() => setShowFichasList(false)}>
-              <div className="ff-modal-scrollable ff-card fichas-modal-container" onClick={e => e.stopPropagation()}>
-                  <h3 className="modal-title-ff">PERSONAGENS REGISTRADOS</h3>
-                  <div className="fichas-grid-large">
-                      {personagensDb.map(p => (
-                          <div key={p.id} className="ficha-list-item">
-                              <div className="ficha-row-name">
-                                  <strong>{p.name}</strong> 
-                                  <small>{p.race} // {p.class}</small>
-                              </div>
-                              <button className="btn-cyan" onClick={() => { setSelectedFicha(p); setShowFichasList(false); }}>ABRIR FICHA ➔</button>
-                          </div>
-                      ))}
-                  </div>
-                  <button className="btn-cancelar-main" style={{marginTop:'20px'}} onClick={() => setShowFichasList(false)}>FECHAR</button>
-              </div>
-          </div>
       )}
 
       {/* MODAL GESTÃO MERCADO DOS LANTERNAS (TROCAS) */}
@@ -1160,6 +1127,7 @@ export default function MestrePage() {
         
         /* RANK DA TEMPORADA */
         .rank-card { border-color: #fbbf24; }
+        .rank-scroll-panel { padding: 15px; position: relative; display: flex; flex-direction: column; overflow: hidden; }
         
         /* SESSÕES E ARENA */
         .sessao-card { background: #1e293b; border: 1px solid #fbbf24; padding: 15px; border-radius: 4px; position: relative; margin-bottom: 15px; }
@@ -1198,9 +1166,6 @@ export default function MestrePage() {
         .ff-modal-overlay-fixed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .ff-modal-scrollable { background: #0f172a; border: 1px solid #fbbf24; width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto; padding: 25px; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
         
-        .fichas-modal-container { width: 900px; max-width: 95vw; }
-        .fichas-grid-large { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-height: 60vh; overflow-y: auto; background: #020617; padding: 15px; border: 1px solid #334155; border-radius: 4px; }
-
         .modal-title-ff { color: #fbbf24; text-align: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; letter-spacing: 2px; font-size: 1.5rem; }
         .modal-input-group { margin-bottom: 15px; }
         .modal-input-group label { display: block; color: #94a3b8; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; }
@@ -1264,8 +1229,6 @@ export default function MestrePage() {
         .dm-float-btn { width: 70px; height: 70px; border-radius: 50%; border: 2px solid; background: #000; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; position: relative; }
         .dm-float-btn:hover { transform: scale(1.1); }
         
-        .btn-fichas-dm { border-color: #00f2ff; }
-        .btn-fichas-dm:hover { box-shadow: 0 0 25px #00f2ff; }
         .btn-trocas-dm { border-color: #f43f5e; color: #f43f5e; font-size: 30px; }
         .btn-trocas-dm:hover { box-shadow: 0 0 25px #f43f5e; }
         .notification-badge-dm { position: absolute; top: 0; right: 0; background: #f00; color: #fff; font-size: 12px; font-weight: bold; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
@@ -1298,18 +1261,6 @@ export default function MestrePage() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
 
-        /* LISTA DE FICHAS */
-        .ficha-list-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #334155; }
-        .ficha-row-name strong { display: block; color: #fff; font-size: 1.1rem; }
-        .ficha-row-name small { color: #94a3b8; }
-        
-        .guild-btn-float {
-            top: auto !important;
-            left: auto !important;
-            transform: none !important;
-            bottom: 30px !important;
-            right: 190px !important;
-        }
       `}</style>
     </div>
   );
