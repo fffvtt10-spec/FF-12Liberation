@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from "firebase/firestore";
 
-export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseManager }) {
+export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseManager, npcLibrary = [] }) {
   const [activeNPC, setActiveNPC] = useState(null);
   
   // Estados do Gerenciador (Mestre)
@@ -16,12 +16,10 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
       setActiveNPC(sessaoData.active_npc || null);
 
       if (isMaster) {
-        // Carrega a lista de 'npcs' salva no MestrePage
-        const rawLinks = sessaoData.npcs || [];
-        setNpcList(rawLinks);
+        setNpcList(npcLibrary);
       }
     }
-  }, [sessaoData, isMaster]);
+  }, [sessaoData, isMaster, npcLibrary]);
 
   // --- AÇÕES DO MESTRE ---
   const handleProject = async (isVisible) => {
@@ -110,16 +108,18 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
                 </div>
 
                 <div className="npc-grid-list">
-                    {npcList.length === 0 && <p className="empty-msg">Nenhum NPC cadastrado na sessão.</p>}
-                    {npcList.map((url, i) => (
+                    {npcList.length === 0 && <p className="empty-msg">Nenhum NPC na biblioteca global.</p>}
+                    {npcList.map((item, i) => {
+                        const url = item.url || item;
+                        return (
                         <div 
-                            key={i} 
+                            key={item.id || i} 
                             className={`npc-thumb ${selectedUrl === url ? 'selected' : ''}`}
-                            onClick={() => { setSelectedUrl(url); setEditingName(""); }}
+                            onClick={() => { setSelectedUrl(url); setEditingName(item.name || ""); }}
                         >
-                            <img src={url} alt="NPC Thumb" />
+                            <img src={url} alt={item.name || "NPC Thumb"} />
                         </div>
-                    ))}
+                    );})}
                 </div>
 
                 <div className="npc-controls-row">

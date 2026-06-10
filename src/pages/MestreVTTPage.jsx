@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db, auth } from '../firebase';
-import { doc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, collection, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from 'react-router-dom';
+import {
+  subscribeVTTLibrary,
+  migrateLegacyData,
+  addLibraryItem,
+  updateLibraryItem,
+  deleteLibraryItem,
+  VTT_TYPES,
+} from '../services/vttLibrary';
 import fundoMestre from '../assets/fundo-mestre.jpg';
 import fundoJogador from '../assets/fundo-jogador.jpg';
 import fundoJogador1 from '../assets/fundo-jogador1.jpeg';
@@ -122,21 +130,19 @@ export default function MestreVTTPage() {
   const [showMapManager, setShowMapManager] = useState(false);
   const [showSceneryManager, setShowSceneryManager] = useState(false); 
   const [showNPCManager, setShowNPCManager] = useState(false); 
-  const [showMonsterManager, setShowMonsterManager] = useState(false); 
   const [showPlayerManager, setShowPlayerManager] = useState(false);   
   const [showCombatTracker, setShowCombatTracker] = useState(false);
-  
-  // --- NOVOS MODAIS E ESTADOS (ATT V2.2) ---
+
   const [showMercadoManager, setShowMercadoManager] = useState(false);
   const [trocasPendentes, setTrocasPendentes] = useState([]);
-
   const [showBencaoManager, setShowBencaoManager] = useState(false);
   const [bencaoFlash, setBencaoFlash] = useState(false);
   const lastBencaoTsRef = useRef(null);
-
-  // Estados para Biblioteca de Mídia da Sessão (Mapas, Cenários, NPCs)
-  const [showUploadManager, setShowUploadManager] = useState(false);
-  const [uploadTab, setUploadTab] = useState('mapas');
+  
+  // Biblioteca VTT global (mapas, cenários, NPCs, monstros, objetos)
+  const [vttLibrary, setVttLibrary] = useState([]);
+  const [showLibraryManager, setShowLibraryManager] = useState(false);
+  const [libraryTab, setLibraryTab] = useState(VTT_TYPES.MAP);
   const [uploadMapUrl, setUploadMapUrl] = useState("");
   const [uploadMapName, setUploadMapName] = useState("");
 
@@ -163,8 +169,6 @@ export default function MestreVTTPage() {
       hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10,
       xp: 0, drops: '', tips: '', description: '', visibleBars: false
   });
-  const [bestiary, setBestiary] = useState([]);
-  const [bestiaryTab, setBestiaryTab] = useState('monsters'); // 'monsters' | 'objects'
   const [creatingMonsterStep, setCreatingMonsterStep] = useState('list'); 
 
   const [allCharacters, setAllCharacters] = useState([]);
@@ -183,6 +187,12 @@ export default function MestreVTTPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    migrateLegacyData().catch(console.error);
+    const unsubLib = subscribeVTTLibrary(setVttLibrary);
+    return () => unsubLib();
+  }, []);
+
   // Auth & Data Sync
   useEffect(() => {
     let unsubSession = () => {};
@@ -195,11 +205,15 @@ export default function MestreVTTPage() {
             const q = query(collection(db, "sessoes"));
             unsubSession = onSnapshot(q, (snap) => {
               const sessoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-              const ativa = sessoes.find(s => {
-                  const agora = new Date();
-                  const fim = new Date(s.expiraEm);
-                  return agora <= fim && (s.mestreId === user.uid || s.dm_online || s.participantes); // Ajustado para ser flexível
-              });
+              const agora = new Date();
+              const minhasSessoesAtivas = sessoes
+                .filter(s => s.mestreId === user.uid && agora <= new Date(s.expiraEm))
+                .sort((a, b) => {
+                  if (a.dm_online && !b.dm_online) return -1;
+                  if (!a.dm_online && b.dm_online) return 1;
+                  return new Date(b.dataInicio || 0) - new Date(a.dataInicio || 0);
+                });
+              const ativa = minhasSessoesAtivas[0] || null;
               if (ativa) {
                 setSessaoAtiva(ativa);
                 setConnectedPlayers(ativa.connected_players || []); 
@@ -216,11 +230,12 @@ export default function MestreVTTPage() {
                 unsubTrocas = onSnapshot(qTrocas, (trocasSnap) => {
                     setTrocasPendentes(trocasSnap.docs.map(tDoc => ({id: tDoc.id, ...tDoc.data()})));
                 });
+              } else {
+                setSessaoAtiva(null);
+                setConnectedPlayers([]);
               }
               setLoading(false); 
             });
-            const qBestiary = query(collection(db, "bestiary"), where("mestreId", "==", user.uid));
-            onSnapshot(qBestiary, (snap) => setBestiary(snap.docs.map(d => ({id: d.id, ...d.data()}))));
         } else { setLoading(false); navigate('/login'); }
     });
     return () => { unsubscribeAuth(); unsubSession(); unsubTrocas(); };
@@ -263,79 +278,67 @@ export default function MestreVTTPage() {
     setUploadMapName("");
   };
 
-  const handleAddMediaToSession = async (e) => {
+  const openLibrary = (tab = VTT_TYPES.MAP) => {
+    setLibraryTab(tab);
+    setCreatingMonsterStep('list');
+    setShowLibraryManager(true);
+  };
+
+  const closeLibrary = () => {
+    setShowLibraryManager(false);
+    resetUploadForm();
+    setCreatingMonsterStep('list');
+  };
+
+  const clearActiveSessionMedia = async (item) => {
+    if (!sessaoAtiva) return;
+    const updates = {};
+    if (item.type === VTT_TYPES.MAP && sessaoAtiva.active_map?.url === item.url) updates.active_map = null;
+    if (item.type === VTT_TYPES.SCENERY && sessaoAtiva.active_scenery?.url === item.url) updates.active_scenery = null;
+    if (item.type === VTT_TYPES.NPC && sessaoAtiva.active_npc?.url === item.url) updates.active_npc = null;
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
+    }
+  };
+
+  const handleAddToLibrary = async (e) => {
     e.preventDefault();
-    if (!sessaoAtiva || !uploadMapUrl) return;
+    if (!uploadMapUrl) return;
+
+    const defaultNames = {
+      [VTT_TYPES.MAP]: uploadMapName || "Novo Mapa VTT",
+      [VTT_TYPES.SCENERY]: uploadMapName || "Novo Cenário",
+      [VTT_TYPES.NPC]: uploadMapName || "Novo NPC",
+    };
 
     try {
-      if (uploadTab === 'mapas') {
-        const novoMapa = { id: Date.now().toString(), name: uploadMapName || "Novo Mapa VTT", url: uploadMapUrl };
-        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
-          mapas: arrayUnion(uploadMapUrl),
-          saved_maps: arrayUnion(novoMapa)
-        });
-        alert("Mapa adicionado! Acesse pelo Tabletop.");
-      } else if (uploadTab === 'cenarios') {
-        const jaExiste = (sessaoAtiva.cenarios || []).includes(uploadMapUrl);
-        if (jaExiste) return alert("Este cenário já está na sessão.");
-        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
-          cenarios: arrayUnion(uploadMapUrl)
-        });
-        alert("Cenário adicionado! Projete pelo botão CENÁRIOS.");
-      } else if (uploadTab === 'npcs') {
-        const jaExiste = (sessaoAtiva.npcs || []).includes(uploadMapUrl);
-        if (jaExiste) return alert("Este NPC já está na sessão.");
-        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
-          npcs: arrayUnion(uploadMapUrl)
-        });
-        alert("NPC adicionado! Convocar pelo botão NPCS.");
-      }
+      const jaExiste = vttLibrary.some((item) => item.type === libraryTab && (item.url || item.img) === uploadMapUrl);
+      if (jaExiste) return alert("Este item já está na biblioteca global.");
+
+      await addLibraryItem({
+        type: libraryTab,
+        name: defaultNames[libraryTab] || "Sem nome",
+        url: uploadMapUrl,
+      });
       resetUploadForm();
+      alert("Item adicionado à biblioteca global!");
     } catch (err) {
-      alert("Erro ao vincular mídia: " + err.message);
+      alert("Erro ao salvar na biblioteca: " + err.message);
     }
   };
 
-  const handleRemoveMapFromSession = async (mapItem) => {
-    if (!sessaoAtiva || !window.confirm(`Remover o mapa "${mapItem.name}" da sessão?`)) return;
+  const handleDeleteLibraryItem = async (item) => {
+    if (!window.confirm(`Excluir "${item.name}" da biblioteca global?`)) return;
     try {
-      const updates = {
-        saved_maps: arrayRemove(mapItem),
-        mapas: arrayRemove(mapItem.url)
-      };
-      if (sessaoAtiva.active_map?.url === mapItem.url) {
-        updates.active_map = null;
-      }
-      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
+      await clearActiveSessionMedia(item);
+      await deleteLibraryItem(item.id);
     } catch (err) {
-      alert("Erro ao remover mapa: " + err.message);
+      alert("Erro ao excluir: " + err.message);
     }
   };
 
-  const handleRemoveSceneryFromSession = async (url) => {
-    if (!sessaoAtiva || !window.confirm("Remover este cenário da sessão?")) return;
-    try {
-      const updates = { cenarios: arrayRemove(url) };
-      if (sessaoAtiva.active_scenery?.url === url) {
-        updates.active_scenery = null;
-      }
-      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
-    } catch (err) {
-      alert("Erro ao remover cenário: " + err.message);
-    }
-  };
-
-  const handleRemoveNPCFromSession = async (url) => {
-    if (!sessaoAtiva || !window.confirm("Remover este NPC da sessão?")) return;
-    try {
-      const updates = { npcs: arrayRemove(url) };
-      if (sessaoAtiva.active_npc?.url === url) {
-        updates.active_npc = null;
-      }
-      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
-    } catch (err) {
-      alert("Erro ao remover NPC: " + err.message);
-    }
+  const handleUpdateMapItem = async (id, updates) => {
+    await updateLibraryItem(id, updates);
   };
 
   // --- HANDLERS DO MERCADO DOS LANTERNAS ---
@@ -407,21 +410,14 @@ export default function MestreVTTPage() {
       setTimeout(() => setHighlightTokenId(null), 3000); 
   };
 
-  // Bestiary Handlers
-  const handleDeleteBestiary = async (id) => {
-      if(!window.confirm("Excluir item permanentemente?")) return;
-      try { await deleteDoc(doc(db, "bestiary", id)); } 
-      catch(e) { console.error(e); }
-  };
-
   const handleSaveMonster = async () => {
       try {
-          const cat = bestiaryTab === 'objects' ? 'object' : 'monster';
-          await addDoc(collection(db, "bestiary"), { 
-              ...monsterForm, 
-              category: cat,
-              mestreId: auth.currentUser.uid, 
-              createdAt: new Date().toISOString() 
+          const type = libraryTab === VTT_TYPES.OBJECT ? VTT_TYPES.OBJECT : VTT_TYPES.MONSTER;
+          await addLibraryItem({
+              ...monsterForm,
+              type,
+              category: type === VTT_TYPES.OBJECT ? 'object' : 'monster',
+              url: monsterForm.img,
           });
           setCreatingMonsterStep('list');
           setMonsterForm({ name: '', img: '', stars: 1, difficultyQ: false, hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10, xp: 0, drops: '', tips: '', description: '', visibleBars: false });
@@ -430,12 +426,13 @@ export default function MestreVTTPage() {
 
   const handleDeployMonster = async (item) => {
       if(!sessaoAtiva) return;
-      const tType = item.category === 'object' ? 'object' : 'enemy';
+      const tType = item.type === VTT_TYPES.OBJECT || item.category === 'object' ? 'object' : 'enemy';
+      const img = item.img || item.url || '';
       const newToken = {
           id: `${tType}_${Date.now()}`,
           type: tType,
           name: item.name,
-          img: item.img,
+          img,
           x: 0, y: 0, size: 1,
           visible: true, 
           visibleBars: item.visibleBars,
@@ -444,7 +441,7 @@ export default function MestreVTTPage() {
           details: { ...item } 
       };
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: [...(sessaoAtiva.tokens||[]), newToken] });
-      setShowMonsterManager(false); 
+      setShowLibraryManager(false); 
   };
 
   const handleDeployPlayer = async (char) => {
@@ -562,7 +559,14 @@ export default function MestreVTTPage() {
       return null;
   };
 
-  const filteredBestiary = bestiary.filter(b => bestiaryTab === 'monsters' ? (b.category !== 'object') : (b.category === 'object'));
+  const filteredCreatures = vttLibrary.filter((item) =>
+    libraryTab === VTT_TYPES.MONSTER ? item.type === VTT_TYPES.MONSTER : item.type === VTT_TYPES.OBJECT
+  );
+  const filteredMedia = vttLibrary.filter((item) => item.type === libraryTab);
+  const libraryMaps = vttLibrary.filter((item) => item.type === VTT_TYPES.MAP);
+  const libraryScenery = vttLibrary.filter((item) => item.type === VTT_TYPES.SCENERY);
+  const libraryNpcs = vttLibrary.filter((item) => item.type === VTT_TYPES.NPC);
+  const isCreatureTab = libraryTab === VTT_TYPES.MONSTER || libraryTab === VTT_TYPES.OBJECT;
 
   const buffAtivo = sessaoAtiva?.bencao_deuses?.buff_ativo || sessaoAtiva?.bencao_deuses?.vencedores || [];
 
@@ -639,11 +643,13 @@ export default function MestreVTTPage() {
         sessaoData={sessaoAtiva} isMaster={true} showManager={showMapManager}
         onCloseManager={() => setShowMapManager(false)} personagensData={personagensData}
         onEditToken={(token) => setEditingToken(JSON.parse(JSON.stringify(token)))}
-        highlightTokenId={highlightTokenId} 
+        highlightTokenId={highlightTokenId}
+        libraryMaps={libraryMaps}
+        onUpdateMapItem={handleUpdateMapItem}
       />
       
-      <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} />
-      <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showNPCManager} onCloseManager={() => setShowNPCManager(false)} />
+      <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} sceneryLibrary={libraryScenery} />
+      <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showNPCManager} onCloseManager={() => setShowNPCManager(false)} npcLibrary={libraryNpcs} />
       {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
       {showDiceSelector && <DiceSelector sessaoId={sessaoAtiva.id} playerName="MESTRE" onClose={() => setShowDiceSelector(false)} />}
 
@@ -917,8 +923,8 @@ export default function MestreVTTPage() {
           </div>
 
           <div className="tool-group">
-              <button className="tool-btn-placeholder" onClick={() => setShowUploadManager(true)}>📁</button>
-              <div className="tool-label">MÍDIA DA SESSÃO</div>
+              <button className="tool-btn-placeholder" onClick={() => openLibrary(VTT_TYPES.MAP)}>📁</button>
+              <div className="tool-label">BIBLIOTECA VTT</div>
           </div>
 
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
@@ -927,7 +933,7 @@ export default function MestreVTTPage() {
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank')}><IconBook /></button><div className="tool-label">LIVRO</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowSceneryManager(true)}><IconScenery /></button><div className="tool-label">CENÁRIOS</div></div>
           
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMonsterManager(true)}><IconMonsters /></button><div className="tool-label">BESTIÁRIO & OBJETOS</div></div>
+          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => openLibrary(VTT_TYPES.MONSTER)}><IconMonsters /></button><div className="tool-label">BESTIÁRIO & OBJETOS</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowNPCManager(true)}><IconNPC /></button><div className="tool-label">NPCS</div></div>
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowPlayerManager(true)}><IconPlayers /></button><div className="tool-label">JOGADORES</div></div>
       </div>
@@ -1005,128 +1011,78 @@ export default function MestreVTTPage() {
         </div>
       )}
 
-      {/* 3. BIBLIOTECA DE MÍDIA DA SESSÃO (Mapas, Cenários, NPCs) */}
-      {showUploadManager && (
-         <div className="modal-overlay-custom" onClick={() => { setShowUploadManager(false); resetUploadForm(); }}>
+      {/* 3. BIBLIOTECA VTT GLOBAL */}
+      {showLibraryManager && (
+         <div className="modal-overlay-custom" onClick={closeLibrary}>
             <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
                 <div className="modal-header-c">
-                    <h3>MÍDIA DA SESSÃO</h3>
+                    <h3>BIBLIOTECA VTT</h3>
                     <div className="media-tabs">
-                        <button type="button" className={uploadTab === 'mapas' ? 'active' : ''} onClick={() => { setUploadTab('mapas'); resetUploadForm(); }}>MAPAS</button>
-                        <button type="button" className={uploadTab === 'cenarios' ? 'active' : ''} onClick={() => { setUploadTab('cenarios'); resetUploadForm(); }}>CENÁRIOS</button>
-                        <button type="button" className={uploadTab === 'npcs' ? 'active' : ''} onClick={() => { setUploadTab('npcs'); resetUploadForm(); }}>NPCS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.MAP ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.MAP); setCreatingMonsterStep('list'); resetUploadForm(); }}>MAPAS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.SCENERY ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.SCENERY); setCreatingMonsterStep('list'); resetUploadForm(); }}>CENÁRIOS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.NPC ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.NPC); setCreatingMonsterStep('list'); resetUploadForm(); }}>NPCS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.MONSTER ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.MONSTER); setCreatingMonsterStep('list'); resetUploadForm(); }}>MONSTROS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.OBJECT ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.OBJECT); setCreatingMonsterStep('list'); resetUploadForm(); }}>OBJETOS</button>
                     </div>
-                    <button className="close-c" onClick={() => { setShowUploadManager(false); resetUploadForm(); }}>✕</button>
+                    <button className="close-c" onClick={closeLibrary}>✕</button>
                 </div>
 
-                <form onSubmit={handleAddMediaToSession} className="upload-manager-body">
-                    {uploadTab === 'mapas' && (
+                {!isCreatureTab ? (
+                  <>
+                    <form onSubmit={handleAddToLibrary} className="upload-manager-body">
+                        {(libraryTab === VTT_TYPES.MAP || libraryTab === VTT_TYPES.SCENERY || libraryTab === VTT_TYPES.NPC) && (
+                            <div className="modal-input-group">
+                                <label style={{color: '#94a3b8', fontSize: '11px'}}>NOME</label>
+                                <input placeholder={libraryTab === VTT_TYPES.MAP ? "Ex: Taverna do Javali" : "Opcional"} className="file-input-dark" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} required={libraryTab === VTT_TYPES.MAP} />
+                            </div>
+                        )}
                         <div className="modal-input-group">
-                            <label style={{color: '#94a3b8', fontSize: '11px'}}>NOME DO MAPA</label>
-                            <input placeholder="Ex: Taverna do Javali" className="file-input-dark" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} required />
+                            <label style={{color: '#94a3b8', fontSize: '11px'}}>LINK DA IMAGEM (URL)</label>
+                            <input placeholder="https://..." className="file-input-dark" value={uploadMapUrl} onChange={e => setUploadMapUrl(e.target.value)} required />
                         </div>
-                    )}
-                    <div className="modal-input-group">
-                        <label style={{color: '#94a3b8', fontSize: '11px'}}>LINK DA IMAGEM (URL)</label>
-                        <input placeholder="https://..." className="file-input-dark" value={uploadMapUrl} onChange={e => setUploadMapUrl(e.target.value)} required />
+
+                        {uploadMapUrl && (
+                            <div style={{marginBottom: '20px', textAlign: 'center', background: '#111', padding: '10px', borderRadius: '4px', border: '1px solid #333'}}>
+                                <p style={{fontSize: '10px', color: '#888', margin: '0 0 5px 0'}}>PRÉ-VISUALIZAÇÃO</p>
+                                <img src={uploadMapUrl} alt="Preview" style={{maxHeight: '150px', maxWidth: '100%', borderRadius: '4px'}} />
+                            </div>
+                        )}
+
+                        <button type="submit" className="btn-save-m" style={{width: '100%', padding: '15px', marginBottom: '25px'}}>
+                            ADICIONAR À BIBLIOTECA GLOBAL
+                        </button>
+                    </form>
+
+                    <div className="media-library-section">
+                        <h4 className="media-library-title">ITENS CADASTRADOS</h4>
+                        <div className="media-library-grid">
+                            {filteredMedia.length === 0 && (
+                                <p className="media-empty">Nenhum item nesta categoria.</p>
+                            )}
+                            {filteredMedia.map((item) => (
+                                <div key={item.id} className="media-library-item">
+                                    <div className={`media-thumb ${libraryTab === VTT_TYPES.SCENERY ? 'scenery' : ''} ${libraryTab === VTT_TYPES.NPC ? 'npc' : ''}`} style={{backgroundImage: `url(${item.url || item.img})`}}></div>
+                                    <span className="media-name">{item.name}</span>
+                                    <button type="button" className="btn-media-delete" onClick={() => handleDeleteLibraryItem(item)}>EXCLUIR</button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-
-                    {uploadMapUrl && (
-                        <div style={{marginBottom: '20px', textAlign: 'center', background: '#111', padding: '10px', borderRadius: '4px', border: '1px solid #333'}}>
-                            <p style={{fontSize: '10px', color: '#888', margin: '0 0 5px 0'}}>PRÉ-VISUALIZAÇÃO</p>
-                            <img src={uploadMapUrl} alt="Preview" style={{maxHeight: '150px', maxWidth: '100%', borderRadius: '4px'}} />
-                        </div>
-                    )}
-
-                    <button type="submit" className="btn-save-m" style={{width: '100%', padding: '15px', marginBottom: '25px'}}>
-                        {uploadTab === 'mapas' && 'VINCULAR MAPA À SESSÃO'}
-                        {uploadTab === 'cenarios' && 'ADICIONAR CENÁRIO À SESSÃO'}
-                        {uploadTab === 'npcs' && 'ADICIONAR NPC À SESSÃO'}
-                    </button>
-                </form>
-
-                <div className="media-library-section">
-                    <h4 className="media-library-title">
-                        {uploadTab === 'mapas' && 'MAPAS NA SESSÃO'}
-                        {uploadTab === 'cenarios' && 'CENÁRIOS NA SESSÃO'}
-                        {uploadTab === 'npcs' && 'NPCS NA SESSÃO'}
-                    </h4>
-
-                    {uploadTab === 'mapas' && (
-                        <div className="media-library-grid">
-                            {(sessaoAtiva?.saved_maps || []).length === 0 && (
-                                <p className="media-empty">Nenhum mapa carregado ainda.</p>
-                            )}
-                            {(sessaoAtiva?.saved_maps || []).map((mapItem) => (
-                                <div key={mapItem.id} className="media-library-item">
-                                    <div className="media-thumb" style={{backgroundImage: `url(${mapItem.url})`}}></div>
-                                    <span className="media-name">{mapItem.name}</span>
-                                    <button type="button" className="btn-media-delete" onClick={() => handleRemoveMapFromSession(mapItem)}>EXCLUIR</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {uploadTab === 'cenarios' && (
-                        <div className="media-library-grid">
-                            {(sessaoAtiva?.cenarios || []).length === 0 && (
-                                <p className="media-empty">Nenhum cenário carregado ainda.</p>
-                            )}
-                            {(sessaoAtiva?.cenarios || []).map((url, i) => (
-                                <div key={`${url}-${i}`} className="media-library-item">
-                                    <div className="media-thumb scenery" style={{backgroundImage: `url(${url})`}}></div>
-                                    <button type="button" className="btn-media-delete" onClick={() => handleRemoveSceneryFromSession(url)}>EXCLUIR</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {uploadTab === 'npcs' && (
-                        <div className="media-library-grid">
-                            {(sessaoAtiva?.npcs || []).length === 0 && (
-                                <p className="media-empty">Nenhum NPC carregado ainda.</p>
-                            )}
-                            {(sessaoAtiva?.npcs || []).map((url, i) => (
-                                <div key={`${url}-${i}`} className="media-library-item">
-                                    <div className="media-thumb npc" style={{backgroundImage: `url(${url})`}}></div>
-                                    <button type="button" className="btn-media-delete" onClick={() => handleRemoveNPCFromSession(url)}>EXCLUIR</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-      )}
-
-
-      {/* --- MODAL DE BESTIÁRIO/OBJETOS --- */}
-      {showMonsterManager && (
-          <div className="modal-overlay-custom" onClick={() => setShowMonsterManager(false)}>
-              <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
-                  <div className="modal-header-c">
-                      <h3>{bestiaryTab === 'monsters' ? 'BESTIÁRIO' : 'OBJETOS'}</h3>
-                      <div className="bestiary-tabs">
-                           <button className={bestiaryTab === 'monsters' ? 'active' : ''} onClick={() => {setBestiaryTab('monsters'); setCreatingMonsterStep('list');}}>MONSTROS</button>
-                           <button className={bestiaryTab === 'objects' ? 'active' : ''} onClick={() => {setBestiaryTab('objects'); setCreatingMonsterStep('list');}}>OBJETOS</button>
-                      </div>
-                      <button className="close-c" onClick={() => setShowMonsterManager(false)}>✕</button>
-                  </div>
-                  
-                  {creatingMonsterStep === 'list' ? (
+                  </>
+                ) : creatingMonsterStep === 'list' ? (
                       <div className="monster-list-view">
-                          <button className="btn-create-monster" onClick={() => setCreatingMonsterStep('create')}>+ CRIAR NOVO {bestiaryTab === 'monsters' ? 'MONSTRO' : 'OBJETO'}</button>
+                          <button className="btn-create-monster" onClick={() => setCreatingMonsterStep('create')}>+ CRIAR NOVO {libraryTab === VTT_TYPES.MONSTER ? 'MONSTRO' : 'OBJETO'}</button>
                           <div className="bestiary-grid">
-                              {filteredBestiary.map(mon => (
+                              {filteredCreatures.map((mon) => (
                                   <div key={mon.id} className="monster-card-db">
-                                      <div className="m-thumb" style={{backgroundImage: `url(${mon.img})`}}></div>
+                                      <div className="m-thumb" style={{backgroundImage: `url(${mon.img || mon.url})`}}></div>
                                       <div className="m-info">
                                           <strong>{mon.name}</strong>
-                                          {mon.category !== 'object' && <small>HP: {mon.hpMax}</small>}
+                                          {mon.type !== VTT_TYPES.OBJECT && <small>HP: {mon.hpMax}</small>}
                                       </div>
                                       <div className="m-actions">
                                           <button className="btn-deploy" onClick={() => handleDeployMonster(mon)}>INSERIR</button>
-                                          <button className="btn-delete" onClick={() => handleDeleteBestiary(mon.id)}>EXCLUIR</button>
+                                          <button className="btn-delete" onClick={() => handleDeleteLibraryItem(mon)}>EXCLUIR</button>
                                       </div>
                                   </div>
                               ))}
@@ -1142,7 +1098,7 @@ export default function MestreVTTPage() {
                               <div className="details-inputs">
                                   <input className="input-title" placeholder="Nome" value={monsterForm.name} onChange={e => setMonsterForm({...monsterForm, name: e.target.value})} />
                                   
-                                  {bestiaryTab === 'monsters' && (
+                                  {libraryTab === VTT_TYPES.MONSTER && (
                                     <div className="stats-row-c">
                                         <div><label>HP Max</label><input type="number" value={monsterForm.hpMax} onChange={e => setMonsterForm({...monsterForm, hpMax: Number(e.target.value), hpCurrent: Number(e.target.value)})} /></div>
                                         <div><label>MP Max</label><input type="number" value={monsterForm.mpMax} onChange={e => setMonsterForm({...monsterForm, mpMax: Number(e.target.value), mpCurrent: Number(e.target.value)})} /></div>
@@ -1155,18 +1111,18 @@ export default function MestreVTTPage() {
                           <div className="text-areas-row" style={{flexDirection:'column', height:'auto'}}>
                               <textarea style={{height:'60px'}} placeholder="Descrição (Lore)..." value={monsterForm.description} onChange={e => setMonsterForm({...monsterForm, description: e.target.value})} />
                               
-                              {bestiaryTab === 'monsters' && (
+                              {libraryTab === VTT_TYPES.MONSTER && (
                                   <>
                                       <textarea style={{height:'60px'}} placeholder="Drops (Use Enter para tópicos)" value={monsterForm.drops} onChange={(e) => setMonsterForm({...monsterForm, drops: e.target.value})} />
                                       <textarea style={{height:'60px'}} placeholder="Dicas do Sanches (Secreto)" value={monsterForm.tips} onChange={e => setMonsterForm({...monsterForm, tips: e.target.value})} />
                                   </>
                               )}
                           </div>
-                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR NO BESTIÁRIO</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
+                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR NA BIBLIOTECA</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
                       </div>
                   )}
-              </div>
-          </div>
+            </div>
+        </div>
       )}
 
       {/* --- MODAL INSERIR JOGADOR --- */}

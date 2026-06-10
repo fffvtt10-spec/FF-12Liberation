@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
 
-export default function SceneryViewer({ sessaoData, isMaster, showManager, onCloseManager }) {
+export default function SceneryViewer({ sessaoData, isMaster, showManager, onCloseManager, sceneryLibrary = [] }) {
   const [activeScenery, setActiveScenery] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   
@@ -17,12 +17,10 @@ export default function SceneryViewer({ sessaoData, isMaster, showManager, onClo
       setActiveScenery(sessaoData.active_scenery || null);
 
       if (isMaster) {
-        // Carrega a lista de 'cenarios' salva na criação da sessão
-        const rawLinks = sessaoData.cenarios || [];
-        setSceneryList(rawLinks);
+        setSceneryList(sceneryLibrary);
       }
     }
-  }, [sessaoData, isMaster]);
+  }, [sessaoData, isMaster, sceneryLibrary]);
 
   // Se ativou um novo cenário, maximiza automaticamente
   useEffect(() => {
@@ -33,11 +31,13 @@ export default function SceneryViewer({ sessaoData, isMaster, showManager, onClo
 
   const handleActivate = async () => {
     if (!selectedUrl) return;
-    const name = editingName || "Ambiente";
+    const selectedItem = sceneryList.find((item) => (item.url || item) === selectedUrl);
+    const name = editingName || selectedItem?.name || "Ambiente";
+    const url = selectedItem?.url || selectedUrl;
     
     const sceneryObj = {
-        url: selectedUrl,
-        name: name,
+        url,
+        name,
         timestamp: Date.now()
     };
 
@@ -118,16 +118,18 @@ export default function SceneryViewer({ sessaoData, isMaster, showManager, onClo
                 <h3 className="manager-title">PROJETOR DE AMBIENTES</h3>
                 
                 <div className="scenery-grid">
-                    {sceneryList.length === 0 && <p className="empty-txt">Nenhuma imagem de cenário carregada na sessão.</p>}
-                    {sceneryList.map((url, i) => (
+                    {sceneryList.length === 0 && <p className="empty-txt">Nenhuma imagem de cenário na biblioteca global.</p>}
+                    {sceneryList.map((item, i) => {
+                        const url = item.url || item;
+                        return (
                         <div 
-                            key={i} 
+                            key={item.id || i} 
                             className={`scenery-thumb ${selectedUrl === url ? 'selected' : ''}`}
                             onClick={() => setSelectedUrl(url)}
                         >
-                            <img src={url} alt={`Opção ${i}`} />
+                            <img src={url} alt={item.name || `Opção ${i}`} />
                         </div>
-                    ))}
+                    );})}
                 </div>
 
                 <div className="scenery-input-row">

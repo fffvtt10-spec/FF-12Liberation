@@ -169,7 +169,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
     );
 };
 
-export default function Tabletop({ sessaoData, isMaster, showManager, onCloseManager, currentUserUid, personagensData, highlightTokenId }) {
+export default function Tabletop({ sessaoData, isMaster, showManager, onCloseManager, currentUserUid, personagensData, highlightTokenId, libraryMaps = [], onUpdateMapItem }) {
   const [activeMap, setActiveMap] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [tokens, setTokens] = useState([]);
@@ -213,17 +213,14 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       else setPings([]);
 
       if (isMaster) {
-        const rawLinks = sessaoData.mapas || []; 
-        const savedMaps = sessaoData.saved_maps || [];
-        const combinedList = rawLinks.map((link, index) => {
-            const existing = savedMaps.find(m => m.url === link);
-            if (existing) return existing;
-            return { id: `temp_${index}`, name: `Mapa Importado ${index + 1}`, url: link, isTemp: true };
-        });
-        setMapList(combinedList);
+        setMapList(libraryMaps.map((item) => ({
+          id: item.id,
+          name: item.name || 'Mapa',
+          url: item.url || item.img,
+        })));
       }
     }
-  }, [sessaoData, isMaster]); 
+  }, [sessaoData, isMaster, libraryMaps]);
 
   useEffect(() => {
       if (!isMaster) return;
@@ -508,11 +505,12 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
   };
 
   const handleSaveMapInfo = async (mapItem) => {
-    const mapToSave = { id: mapItem.id.toString().startsWith('temp') ? Date.now().toString() : mapItem.id, name: editingName || mapItem.name, url: mapItem.url };
-    const sessaoRef = doc(db, "sessoes", sessaoData.id);
-    if (!mapItem.isTemp) await updateDoc(sessaoRef, { saved_maps: arrayRemove(mapItem) });
-    await updateDoc(sessaoRef, { saved_maps: arrayUnion(mapToSave) });
-    setEditingId(null); setEditingName("");
+    const mapToSave = { name: editingName || mapItem.name };
+    if (onUpdateMapItem) {
+      await onUpdateMapItem(mapItem.id, mapToSave);
+    }
+    setEditingId(null);
+    setEditingName("");
   };
 
   const handleActivateMap = async (mapItem) => {

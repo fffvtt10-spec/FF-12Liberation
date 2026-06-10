@@ -484,10 +484,6 @@ export default function MestrePage() {
             dataInicio: slot.start, 
             expiraEm: fim.toISOString(),
             participantes: sessaoDestinatarios, 
-            mapas: [],
-            cenarios: [],
-            monstros: [],
-            npcs: [],
             jogadores: sessionForm.jogadores,
             connected_players: [],
             dm_online: false,
@@ -564,10 +560,7 @@ export default function MestrePage() {
               equipes: equipesParaSalvar,
               isArena: true,
               pvp_mode: true,
-              mapas: [],       
-              cenarios: [],  
-              npcs: [],         
-              monstros: [], jogadores: [],
+              jogadores: [],
               connected_players: [], dm_online: false,
               createdAt: serverTimestamp()
           });
