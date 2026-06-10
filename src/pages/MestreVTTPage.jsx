@@ -134,8 +134,9 @@ export default function MestreVTTPage() {
   const [bencaoFlash, setBencaoFlash] = useState(false);
   const lastBencaoTsRef = useRef(null);
 
-  // Estados para Adicionar Mapas (Via URL apenas)
+  // Estados para Biblioteca de Mídia da Sessão (Mapas, Cenários, NPCs)
   const [showUploadManager, setShowUploadManager] = useState(false);
+  const [uploadTab, setUploadTab] = useState('mapas');
   const [uploadMapUrl, setUploadMapUrl] = useState("");
   const [uploadMapName, setUploadMapName] = useState("");
 
@@ -257,19 +258,84 @@ export default function MestreVTTPage() {
     return () => unsubAll();
   }, [sessaoAtiva?.participantes]); 
 
-  // --- HANDLER PARA ADICIONAR MAPA POR URL ---
-  const handleAddMapToSession = async (e) => {
+  const resetUploadForm = () => {
+    setUploadMapUrl("");
+    setUploadMapName("");
+  };
+
+  const handleAddMediaToSession = async (e) => {
     e.preventDefault();
     if (!sessaoAtiva || !uploadMapUrl) return;
-    const novoMapa = { id: Date.now().toString(), name: uploadMapName || "Novo Mapa VTT", url: uploadMapUrl };
+
     try {
+      if (uploadTab === 'mapas') {
+        const novoMapa = { id: Date.now().toString(), name: uploadMapName || "Novo Mapa VTT", url: uploadMapUrl };
         await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
-            mapas: arrayUnion(uploadMapUrl),
-            saved_maps: arrayUnion(novoMapa)
+          mapas: arrayUnion(uploadMapUrl),
+          saved_maps: arrayUnion(novoMapa)
         });
-        alert("Mapa adicionado à sessão! Acesse pelo Tabletop.");
-        setUploadMapUrl(""); setUploadMapName(""); setShowUploadManager(false);
-    } catch(err) { alert("Erro ao vincular mapa: " + err.message); }
+        alert("Mapa adicionado! Acesse pelo Tabletop.");
+      } else if (uploadTab === 'cenarios') {
+        const jaExiste = (sessaoAtiva.cenarios || []).includes(uploadMapUrl);
+        if (jaExiste) return alert("Este cenário já está na sessão.");
+        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
+          cenarios: arrayUnion(uploadMapUrl)
+        });
+        alert("Cenário adicionado! Projete pelo botão CENÁRIOS.");
+      } else if (uploadTab === 'npcs') {
+        const jaExiste = (sessaoAtiva.npcs || []).includes(uploadMapUrl);
+        if (jaExiste) return alert("Este NPC já está na sessão.");
+        await updateDoc(doc(db, "sessoes", sessaoAtiva.id), {
+          npcs: arrayUnion(uploadMapUrl)
+        });
+        alert("NPC adicionado! Convocar pelo botão NPCS.");
+      }
+      resetUploadForm();
+    } catch (err) {
+      alert("Erro ao vincular mídia: " + err.message);
+    }
+  };
+
+  const handleRemoveMapFromSession = async (mapItem) => {
+    if (!sessaoAtiva || !window.confirm(`Remover o mapa "${mapItem.name}" da sessão?`)) return;
+    try {
+      const updates = {
+        saved_maps: arrayRemove(mapItem),
+        mapas: arrayRemove(mapItem.url)
+      };
+      if (sessaoAtiva.active_map?.url === mapItem.url) {
+        updates.active_map = null;
+      }
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
+    } catch (err) {
+      alert("Erro ao remover mapa: " + err.message);
+    }
+  };
+
+  const handleRemoveSceneryFromSession = async (url) => {
+    if (!sessaoAtiva || !window.confirm("Remover este cenário da sessão?")) return;
+    try {
+      const updates = { cenarios: arrayRemove(url) };
+      if (sessaoAtiva.active_scenery?.url === url) {
+        updates.active_scenery = null;
+      }
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
+    } catch (err) {
+      alert("Erro ao remover cenário: " + err.message);
+    }
+  };
+
+  const handleRemoveNPCFromSession = async (url) => {
+    if (!sessaoAtiva || !window.confirm("Remover este NPC da sessão?")) return;
+    try {
+      const updates = { npcs: arrayRemove(url) };
+      if (sessaoAtiva.active_npc?.url === url) {
+        updates.active_npc = null;
+      }
+      await updateDoc(doc(db, "sessoes", sessaoAtiva.id), updates);
+    } catch (err) {
+      alert("Erro ao remover NPC: " + err.message);
+    }
   };
 
   // --- HANDLERS DO MERCADO DOS LANTERNAS ---
@@ -851,8 +917,8 @@ export default function MestreVTTPage() {
           </div>
 
           <div className="tool-group">
-              <button className="tool-btn-placeholder" onClick={() => setShowUploadManager(true)}>🗺️</button>
-              <div className="tool-label">ADICIONAR MAPA (URL)</div>
+              <button className="tool-btn-placeholder" onClick={() => setShowUploadManager(true)}>📁</button>
+              <div className="tool-label">MÍDIA DA SESSÃO</div>
           </div>
 
           <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
@@ -939,33 +1005,96 @@ export default function MestreVTTPage() {
         </div>
       )}
 
-      {/* 3. CENTRAL DE ADICIONAR MAPAS (URL) */}
+      {/* 3. BIBLIOTECA DE MÍDIA DA SESSÃO (Mapas, Cenários, NPCs) */}
       {showUploadManager && (
-         <div className="modal-overlay-custom" onClick={() => setShowUploadManager(false)}>
-            <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+         <div className="modal-overlay-custom" onClick={() => { setShowUploadManager(false); resetUploadForm(); }}>
+            <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
                 <div className="modal-header-c">
-                    <h3>ADICIONAR MAPA (URL)</h3>
-                    <button className="close-c" onClick={() => setShowUploadManager(false)}>✕</button>
-                </div>
-                <form onSubmit={handleAddMapToSession} className="upload-manager-body">
-                    <div className="modal-input-group">
-                        <label style={{color: '#94a3b8', fontSize: '11px'}}>NOME DO MAPA</label>
-                        <input placeholder="Ex: Taverna do Javali" className="file-input-dark" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} required />
+                    <h3>MÍDIA DA SESSÃO</h3>
+                    <div className="media-tabs">
+                        <button type="button" className={uploadTab === 'mapas' ? 'active' : ''} onClick={() => { setUploadTab('mapas'); resetUploadForm(); }}>MAPAS</button>
+                        <button type="button" className={uploadTab === 'cenarios' ? 'active' : ''} onClick={() => { setUploadTab('cenarios'); resetUploadForm(); }}>CENÁRIOS</button>
+                        <button type="button" className={uploadTab === 'npcs' ? 'active' : ''} onClick={() => { setUploadTab('npcs'); resetUploadForm(); }}>NPCS</button>
                     </div>
+                    <button className="close-c" onClick={() => { setShowUploadManager(false); resetUploadForm(); }}>✕</button>
+                </div>
+
+                <form onSubmit={handleAddMediaToSession} className="upload-manager-body">
+                    {uploadTab === 'mapas' && (
+                        <div className="modal-input-group">
+                            <label style={{color: '#94a3b8', fontSize: '11px'}}>NOME DO MAPA</label>
+                            <input placeholder="Ex: Taverna do Javali" className="file-input-dark" value={uploadMapName} onChange={e => setUploadMapName(e.target.value)} required />
+                        </div>
+                    )}
                     <div className="modal-input-group">
                         <label style={{color: '#94a3b8', fontSize: '11px'}}>LINK DA IMAGEM (URL)</label>
                         <input placeholder="https://..." className="file-input-dark" value={uploadMapUrl} onChange={e => setUploadMapUrl(e.target.value)} required />
                     </div>
-                    
+
                     {uploadMapUrl && (
                         <div style={{marginBottom: '20px', textAlign: 'center', background: '#111', padding: '10px', borderRadius: '4px', border: '1px solid #333'}}>
                             <p style={{fontSize: '10px', color: '#888', margin: '0 0 5px 0'}}>PRÉ-VISUALIZAÇÃO</p>
-                            <img src={uploadMapUrl} alt="Preview do Mapa" style={{maxHeight: '150px', maxWidth: '100%', borderRadius: '4px'}} />
+                            <img src={uploadMapUrl} alt="Preview" style={{maxHeight: '150px', maxWidth: '100%', borderRadius: '4px'}} />
                         </div>
                     )}
-                    
-                    <button type="submit" className="btn-save-m" style={{width: '100%', padding: '15px'}}>VINCULAR MAPA À SESSÃO</button>
+
+                    <button type="submit" className="btn-save-m" style={{width: '100%', padding: '15px', marginBottom: '25px'}}>
+                        {uploadTab === 'mapas' && 'VINCULAR MAPA À SESSÃO'}
+                        {uploadTab === 'cenarios' && 'ADICIONAR CENÁRIO À SESSÃO'}
+                        {uploadTab === 'npcs' && 'ADICIONAR NPC À SESSÃO'}
+                    </button>
                 </form>
+
+                <div className="media-library-section">
+                    <h4 className="media-library-title">
+                        {uploadTab === 'mapas' && 'MAPAS NA SESSÃO'}
+                        {uploadTab === 'cenarios' && 'CENÁRIOS NA SESSÃO'}
+                        {uploadTab === 'npcs' && 'NPCS NA SESSÃO'}
+                    </h4>
+
+                    {uploadTab === 'mapas' && (
+                        <div className="media-library-grid">
+                            {(sessaoAtiva?.saved_maps || []).length === 0 && (
+                                <p className="media-empty">Nenhum mapa carregado ainda.</p>
+                            )}
+                            {(sessaoAtiva?.saved_maps || []).map((mapItem) => (
+                                <div key={mapItem.id} className="media-library-item">
+                                    <div className="media-thumb" style={{backgroundImage: `url(${mapItem.url})`}}></div>
+                                    <span className="media-name">{mapItem.name}</span>
+                                    <button type="button" className="btn-media-delete" onClick={() => handleRemoveMapFromSession(mapItem)}>EXCLUIR</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {uploadTab === 'cenarios' && (
+                        <div className="media-library-grid">
+                            {(sessaoAtiva?.cenarios || []).length === 0 && (
+                                <p className="media-empty">Nenhum cenário carregado ainda.</p>
+                            )}
+                            {(sessaoAtiva?.cenarios || []).map((url, i) => (
+                                <div key={`${url}-${i}`} className="media-library-item">
+                                    <div className="media-thumb scenery" style={{backgroundImage: `url(${url})`}}></div>
+                                    <button type="button" className="btn-media-delete" onClick={() => handleRemoveSceneryFromSession(url)}>EXCLUIR</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {uploadTab === 'npcs' && (
+                        <div className="media-library-grid">
+                            {(sessaoAtiva?.npcs || []).length === 0 && (
+                                <p className="media-empty">Nenhum NPC carregado ainda.</p>
+                            )}
+                            {(sessaoAtiva?.npcs || []).map((url, i) => (
+                                <div key={`${url}-${i}`} className="media-library-item">
+                                    <div className="media-thumb npc" style={{backgroundImage: `url(${url})`}}></div>
+                                    <button type="button" className="btn-media-delete" onClick={() => handleRemoveNPCFromSession(url)}>EXCLUIR</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
       )}
@@ -1221,10 +1350,22 @@ export default function MestreVTTPage() {
         .troca-card-dm p { margin: 5px 0; font-size: 13px; color: #ccc; }
         .troca-actions { display: flex; gap: 10px; margin-top: 15px; }
 
-        /* TABS DO BESTIÁRIO E OBJETOS */
-        .bestiary-tabs { display: flex; gap: 15px; margin: 0 20px; }
-        .bestiary-tabs button { background: transparent; border: none; color: #aaa; font-family: 'Cinzel', serif; font-size: 12px; cursor: pointer; padding-bottom: 5px; font-weight: bold; }
-        .bestiary-tabs button.active { color: #ffcc00; border-bottom: 2px solid #ffcc00; }
+        /* TABS DO BESTIÁRIO E MÍDIA DA SESSÃO */
+        .bestiary-tabs, .media-tabs { display: flex; gap: 15px; margin: 0 20px; }
+        .bestiary-tabs button, .media-tabs button { background: transparent; border: none; color: #aaa; font-family: 'Cinzel', serif; font-size: 12px; cursor: pointer; padding-bottom: 5px; font-weight: bold; }
+        .bestiary-tabs button.active, .media-tabs button.active { color: #ffcc00; border-bottom: 2px solid #ffcc00; }
+
+        .media-library-section { border-top: 1px solid #333; padding-top: 15px; }
+        .media-library-title { color: #94a3b8; font-size: 11px; margin: 0 0 15px 0; letter-spacing: 1px; }
+        .media-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; max-height: 35vh; overflow-y: auto; padding: 5px; }
+        .media-library-item { background: #111; border: 1px solid #333; border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+        .media-thumb { width: 100%; height: 90px; background-size: cover; background-position: center; border-radius: 4px; border: 1px solid #444; }
+        .media-thumb.scenery { height: 70px; }
+        .media-thumb.npc { height: 110px; background-size: contain; background-repeat: no-repeat; background-color: #000; }
+        .media-name { font-size: 11px; color: #ccc; text-align: center; word-break: break-word; }
+        .media-empty { color: #666; text-align: center; grid-column: 1 / -1; font-style: italic; padding: 20px; margin: 0; }
+        .btn-media-delete { background: transparent; border: 1px solid #f44; color: #f44; font-size: 10px; font-weight: bold; padding: 5px 10px; cursor: pointer; width: 100%; transition: 0.2s; font-family: 'Cinzel', serif; }
+        .btn-media-delete:hover { background: #f44; color: #fff; }
         
         .monster-list-view { display: flex; flex-direction: column; gap: 15px; width: 100%; }
         .btn-create-monster { background: #222; border: 1px dashed #ffcc00; color: #ffcc00; padding: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; text-align: center; width: 100%; }
