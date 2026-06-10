@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { getCharacterClass, buildCharacterSheetSavePayload } from '../utils/characterHelpers';
 import { RARIDADES, DEFAULT_RARIDADE, getRaridadeById, getSlotAuraStyle, getSlotAuraClass } from '../utils/itemRarity';
+import { normalizeEquipmentSlots, slotHasItem, restoreEquippedItemsFromDb } from '../utils/equipmentHelpers';
 
 // --- LISTA DE ÍCONES DE HABILIDADE ---
 const SKILL_ICONS = [
@@ -80,14 +81,38 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const [iconSelectorTarget, setIconSelectorTarget] = useState(null);
 
   useEffect(() => {
-    if (characterData && characterData.character_sheet) {
-        const loadedSheet = characterData.character_sheet;
-        
+    if (!characterData?.character_sheet) return;
+
+    let cancelled = false;
+
+    const loadSheet = async () => {
+        const loadedSheet = JSON.parse(JSON.stringify(characterData.character_sheet));
+
         if (!loadedSheet.job_system.passives) loadedSheet.job_system.passives = [];
         if (!loadedSheet.job_system.reactions) loadedSheet.job_system.reactions = [];
+        if (!loadedSheet.equipment) loadedSheet.equipment = { slots: [] };
+        loadedSheet.equipment.slots = normalizeEquipmentSlots(loadedSheet.equipment.slots);
 
-        setSheet(loadedSheet);
-    }
+        const charId = characterData.uid || characterData.id;
+        let finalSheet = loadedSheet;
+
+        try {
+            const restored = await restoreEquippedItemsFromDb(db, charId, loadedSheet);
+            if (restored) {
+                finalSheet = restored;
+                await updateDoc(doc(db, 'characters', charId), {
+                    'character_sheet.equipment.slots': restored.equipment.slots,
+                });
+            }
+        } catch (err) {
+            console.error('Erro ao restaurar equipamentos:', err);
+        }
+
+        if (!cancelled) setSheet(finalSheet);
+    };
+
+    loadSheet();
+    return () => { cancelled = true; };
   }, [characterData]); 
 
   const updateField = (path, value) => {
@@ -108,7 +133,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
   const saveSheetToDb = async () => {
       try {
         const charRef = doc(db, "characters", characterData.uid || characterData.id);
-        const payload = buildCharacterSheetSavePayload(sheet);
+        const sheetToSave = JSON.parse(JSON.stringify(sheet));
+        if (sheetToSave.equipment) {
+            sheetToSave.equipment.slots = normalizeEquipmentSlots(sheetToSave.equipment.slots);
+        }
+        const payload = buildCharacterSheetSavePayload(sheetToSave);
         await updateDoc(charRef, payload);
         if (payload.class) setSheet(payload.character_sheet);
         setHasUnsavedChanges(false);
@@ -238,6 +267,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
   const handleEquipItem = async (item) => {
       const newSheet = JSON.parse(JSON.stringify(sheet));
+      newSheet.equipment.slots = normalizeEquipmentSlots(newSheet.equipment?.slots);
       newSheet.equipment.slots[activeSlotIndex] = {
           item_id: item.id,
           item_name: item.nome,
@@ -265,7 +295,8 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       if (!isMaster || viewItemDetails?.slotIndex == null) return;
       const slotIndex = viewItemDetails.slotIndex;
       const newSheet = JSON.parse(JSON.stringify(sheet));
-      if (!newSheet.equipment?.slots?.[slotIndex]) return;
+      newSheet.equipment.slots = normalizeEquipmentSlots(newSheet.equipment?.slots);
+      if (!slotHasItem(newSheet.equipment.slots[slotIndex])) return;
       newSheet.equipment.slots[slotIndex].raridade = raridade;
       setSheet(newSheet);
       setViewItemDetails((prev) => ({ ...prev, raridade }));
@@ -273,7 +304,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       try {
           const charRef = doc(db, 'characters', characterData.uid || characterData.id);
           await updateDoc(charRef, {
-              [`character_sheet.equipment.slots.${slotIndex}.raridade`]: raridade,
+              'character_sheet.equipment.slots': newSheet.equipment.slots,
           });
           if (viewItemDetails.item_id) {
               await updateDoc(doc(db, 'game_items', viewItemDetails.item_id), {
@@ -297,6 +328,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
           }
       }
       const newSheet = JSON.parse(JSON.stringify(sheet));
+      newSheet.equipment.slots = normalizeEquipmentSlots(newSheet.equipment?.slots);
       newSheet.equipment.slots[slotIndex] = { item_name: "", item_img: "", effect: "" };
       setSheet(newSheet);
       setHasUnsavedChanges(true);
@@ -524,8 +556,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 {id: 6, label: "PÉS", style: { bottom: '-20px', right: '60px' }} 
                             ].map((slot, idx) => {
                                 const equippedSlot = sheet.equipment?.slots?.[idx];
-                                const hasItem = !!equippedSlot?.item_img;
-                                const slotRaridade = getRaridadeById(equippedSlot?.raridade);
+                                const hasItem = slotHasItem(equippedSlot);
                                 const auraStyle = hasItem ? getSlotAuraStyle(equippedSlot?.raridade) : {};
 
                                 return (

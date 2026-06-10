@@ -1,3 +1,5 @@
+import { normalizeEquipmentSlots } from './equipmentHelpers';
+
 export const DEFAULT_RARIDADE = 'comum';
 
 export const RARIDADES = [
@@ -126,8 +128,7 @@ export async function syncRaridadeToEquippedSlots(db, updateDoc, getDocs, collec
 
   charsSnap.docs.forEach((charDoc) => {
     const sheet = charDoc.data().character_sheet;
-    const slots = sheet?.equipment?.slots;
-    if (!slots?.length) return;
+    const slots = normalizeEquipmentSlots(sheet?.equipment?.slots);
 
     let changed = false;
     const newSlots = slots.map((slot) => {
