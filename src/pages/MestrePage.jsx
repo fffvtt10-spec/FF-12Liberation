@@ -11,7 +11,8 @@ import Forja from '../components/Forja';
 import Ficha from '../components/Ficha'; 
 import GuildBoard from '../components/GuildBoard';
 import { getCharacterClass, getCharacterRace } from '../utils/characterHelpers';
-import { exportCharactersAsMarkdown } from '../utils/exportCharacterMarkdown'; 
+import { exportCharactersAsMarkdown } from '../utils/exportCharacterMarkdown';
+import { exportCharactersAsJson } from '../utils/exportCharacterJson'; 
 
 // --- COMPONENTE DE CALENDÁRIO INTERNO ---
 const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
@@ -615,10 +616,25 @@ export default function MestrePage() {
       );
   };
 
-  const handleExportSelectedCharacters = () => {
+  const getSelectedCharactersForExport = () => {
       const selected = personagensDb.filter(p => exportSelectedIds.includes(p.id));
-      if (selected.length === 0) return alert("Nenhum personagem selecionado.");
+      if (selected.length === 0) {
+          alert("Nenhum personagem selecionado.");
+          return null;
+      }
+      return selected;
+  };
+
+  const handleExportSelectedCharacters = () => {
+      const selected = getSelectedCharactersForExport();
+      if (!selected) return;
       exportCharactersAsMarkdown(selected);
+  };
+
+  const handleExportSelectedCharactersJson = () => {
+      const selected = getSelectedCharactersForExport();
+      if (!selected) return;
+      exportCharactersAsJson(selected);
   };
 
   const handleDeleteSession = async (sessao) => {
@@ -674,7 +690,10 @@ export default function MestrePage() {
                     {exportSelectedIds.length} selecionado{exportSelectedIds.length > 1 ? 's' : ''}
                 </span>
                 <button className="btn-export-md" onClick={handleExportSelectedCharacters}>
-                    📥 EXPORTAR DADOS (.MD)
+                    📥 EXPORTAR (.MD)
+                </button>
+                <button className="btn-export-json" onClick={handleExportSelectedCharactersJson}>
+                    📥 EXPORTAR (.JSON)
                 </button>
                 <button className="btn-export-clear" onClick={() => setExportSelectedIds([])} title="Limpar seleção">
                     ✕
@@ -1160,6 +1179,24 @@ export default function MestrePage() {
         }
         .btn-export-md:hover {
             box-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+            transform: scale(1.02);
+        }
+        .btn-export-json {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            font-family: 'Cinzel', serif;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        .btn-export-json:hover {
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
             transform: scale(1.02);
         }
         .btn-export-clear {
