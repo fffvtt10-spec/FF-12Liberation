@@ -622,6 +622,15 @@ export default function MestreVTTPage() {
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
 
+      <button
+        type="button"
+        className="btn-back-mestre-hub"
+        onClick={() => navigate('/mestre')}
+        title="Voltar ao painel do mestre"
+      >
+        ← Painel
+      </button>
+
       {bencaoFlash && sessaoAtiva?.bencao_deuses?.vencedores?.length > 0 && createPortal(
           <div className="bencao-roll-flash">
               <div className="bencao-roll-flash-inner">
@@ -1233,6 +1242,30 @@ export default function MestreVTTPage() {
       <style>{`
         .mestre-vtt-container { width: 100vw; height: 100vh; overflow: hidden; position: relative; background: #000; font-family: 'Cinzel', serif; color: #fff; }
         .mestre-bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.4; z-index: 0; }
+        .btn-back-mestre-hub {
+          position: fixed;
+          top: 16px;
+          right: 16px;
+          z-index: 60;
+          background: rgba(0, 0, 0, 0.45);
+          border: 1px solid rgba(255, 204, 0, 0.35);
+          color: rgba(255, 204, 0, 0.75);
+          font-family: 'Cinzel', serif;
+          font-size: 11px;
+          letter-spacing: 0.5px;
+          padding: 6px 12px;
+          border-radius: 20px;
+          cursor: pointer;
+          opacity: 0.55;
+          transition: opacity 0.2s, background 0.2s, border-color 0.2s, color 0.2s;
+          backdrop-filter: blur(4px);
+        }
+        .btn-back-mestre-hub:hover {
+          opacity: 1;
+          background: rgba(0, 0, 0, 0.75);
+          border-color: #ffcc00;
+          color: #ffcc00;
+        }
         .dm-players-sidebar { position: absolute; top: 20px; left: 20px; width: 200px; background: rgba(0, 10, 20, 0.95); border: 2px solid #ffcc00; border-radius: 8px; padding: 10px; z-index: 50; max-height: 80vh; display: flex; flex-direction: column; }
         .sidebar-title { color: #ffcc00; font-size: 12px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; text-align: center; }
         .players-list-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
