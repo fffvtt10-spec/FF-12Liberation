@@ -169,7 +169,8 @@ export default function MestreVTTPage() {
       hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10,
       xp: 0, drops: '', tips: '', description: '', visibleBars: false
   });
-  const [creatingMonsterStep, setCreatingMonsterStep] = useState('list'); 
+  const [creatingMonsterStep, setCreatingMonsterStep] = useState('list');
+  const [editingLibraryId, setEditingLibraryId] = useState(null);
 
   const [allCharacters, setAllCharacters] = useState([]);
   const [showDiceSelector, setShowDiceSelector] = useState(false);
@@ -278,9 +279,19 @@ export default function MestreVTTPage() {
     setUploadMapName("");
   };
 
+  const resetMonsterForm = () => {
+    setMonsterForm({
+      name: '', img: '', stars: 1, difficultyQ: false,
+      hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10,
+      xp: 0, drops: '', tips: '', description: '', visibleBars: false
+    });
+    setEditingLibraryId(null);
+  };
+
   const openLibrary = (tab = VTT_TYPES.MAP) => {
     setLibraryTab(tab);
     setCreatingMonsterStep('list');
+    resetMonsterForm();
     setShowLibraryManager(true);
   };
 
@@ -288,6 +299,7 @@ export default function MestreVTTPage() {
     setShowLibraryManager(false);
     resetUploadForm();
     setCreatingMonsterStep('list');
+    resetMonsterForm();
   };
 
   const clearActiveSessionMedia = async (item) => {
@@ -410,17 +422,44 @@ export default function MestreVTTPage() {
       setTimeout(() => setHighlightTokenId(null), 3000); 
   };
 
+  const handleEditMonster = (item) => {
+    setMonsterForm({
+      name: item.name || '',
+      img: item.img || item.url || '',
+      stars: item.stars ?? 1,
+      difficultyQ: item.difficultyQ ?? false,
+      hpCurrent: item.hpCurrent ?? item.hpMax ?? 10,
+      hpMax: item.hpMax ?? 10,
+      mpCurrent: item.mpCurrent ?? item.mpMax ?? 10,
+      mpMax: item.mpMax ?? 10,
+      xp: item.xp ?? 0,
+      drops: item.drops || '',
+      tips: item.tips || '',
+      description: item.description || '',
+      visibleBars: item.visibleBars ?? false,
+    });
+    setEditingLibraryId(item.id);
+    setCreatingMonsterStep('create');
+  };
+
   const handleSaveMonster = async () => {
+      if (!monsterForm.name?.trim()) return alert("Informe o nome.");
+      if (!monsterForm.img?.trim()) return alert("Informe a URL da imagem.");
       try {
           const type = libraryTab === VTT_TYPES.OBJECT ? VTT_TYPES.OBJECT : VTT_TYPES.MONSTER;
-          await addLibraryItem({
+          const payload = {
               ...monsterForm,
               type,
               category: type === VTT_TYPES.OBJECT ? 'object' : 'monster',
               url: monsterForm.img,
-          });
+          };
+          if (editingLibraryId) {
+            await updateLibraryItem(editingLibraryId, payload);
+          } else {
+            await addLibraryItem(payload);
+          }
           setCreatingMonsterStep('list');
-          setMonsterForm({ name: '', img: '', stars: 1, difficultyQ: false, hpCurrent: 10, hpMax: 10, mpCurrent: 10, mpMax: 10, xp: 0, drops: '', tips: '', description: '', visibleBars: false });
+          resetMonsterForm();
       } catch (e) { alert("Erro: " + e.message); }
   };
 
@@ -1018,11 +1057,11 @@ export default function MestreVTTPage() {
                 <div className="modal-header-c">
                     <h3>BIBLIOTECA VTT</h3>
                     <div className="media-tabs">
-                        <button type="button" className={libraryTab === VTT_TYPES.MAP ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.MAP); setCreatingMonsterStep('list'); resetUploadForm(); }}>MAPAS</button>
-                        <button type="button" className={libraryTab === VTT_TYPES.SCENERY ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.SCENERY); setCreatingMonsterStep('list'); resetUploadForm(); }}>CENÁRIOS</button>
-                        <button type="button" className={libraryTab === VTT_TYPES.NPC ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.NPC); setCreatingMonsterStep('list'); resetUploadForm(); }}>NPCS</button>
-                        <button type="button" className={libraryTab === VTT_TYPES.MONSTER ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.MONSTER); setCreatingMonsterStep('list'); resetUploadForm(); }}>MONSTROS</button>
-                        <button type="button" className={libraryTab === VTT_TYPES.OBJECT ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.OBJECT); setCreatingMonsterStep('list'); resetUploadForm(); }}>OBJETOS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.MAP ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.MAP); setCreatingMonsterStep('list'); resetUploadForm(); resetMonsterForm(); }}>MAPAS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.SCENERY ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.SCENERY); setCreatingMonsterStep('list'); resetUploadForm(); resetMonsterForm(); }}>CENÁRIOS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.NPC ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.NPC); setCreatingMonsterStep('list'); resetUploadForm(); resetMonsterForm(); }}>NPCS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.MONSTER ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.MONSTER); setCreatingMonsterStep('list'); resetUploadForm(); resetMonsterForm(); }}>MONSTROS</button>
+                        <button type="button" className={libraryTab === VTT_TYPES.OBJECT ? 'active' : ''} onClick={() => { setLibraryTab(VTT_TYPES.OBJECT); setCreatingMonsterStep('list'); resetUploadForm(); resetMonsterForm(); }}>OBJETOS</button>
                     </div>
                     <button className="close-c" onClick={closeLibrary}>✕</button>
                 </div>
@@ -1071,7 +1110,7 @@ export default function MestreVTTPage() {
                   </>
                 ) : creatingMonsterStep === 'list' ? (
                       <div className="monster-list-view">
-                          <button className="btn-create-monster" onClick={() => setCreatingMonsterStep('create')}>+ CRIAR NOVO {libraryTab === VTT_TYPES.MONSTER ? 'MONSTRO' : 'OBJETO'}</button>
+                          <button className="btn-create-monster" onClick={() => { resetMonsterForm(); setCreatingMonsterStep('create'); }}>+ CRIAR NOVO {libraryTab === VTT_TYPES.MONSTER ? 'MONSTRO' : 'OBJETO'}</button>
                           <div className="bestiary-grid">
                               {filteredCreatures.map((mon) => (
                                   <div key={mon.id} className="monster-card-db">
@@ -1082,6 +1121,7 @@ export default function MestreVTTPage() {
                                       </div>
                                       <div className="m-actions">
                                           <button className="btn-deploy" onClick={() => handleDeployMonster(mon)}>INSERIR</button>
+                                          <button className="btn-edit" onClick={() => handleEditMonster(mon)} title="Editar">✏️</button>
                                           <button className="btn-delete" onClick={() => handleDeleteLibraryItem(mon)}>EXCLUIR</button>
                                       </div>
                                   </div>
@@ -1118,7 +1158,7 @@ export default function MestreVTTPage() {
                                   </>
                               )}
                           </div>
-                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>SALVAR NA BIBLIOTECA</button><button className="btn-cancel-m" onClick={() => setCreatingMonsterStep('list')}>VOLTAR</button></div>
+                          <div className="actions-row-bottom"><button className="btn-save-m" onClick={handleSaveMonster}>{editingLibraryId ? 'SALVAR ALTERAÇÕES' : 'SALVAR NA BIBLIOTECA'}</button><button className="btn-cancel-m" onClick={() => { setCreatingMonsterStep('list'); resetMonsterForm(); }}>VOLTAR</button></div>
                       </div>
                   )}
             </div>
@@ -1334,6 +1374,8 @@ export default function MestreVTTPage() {
         .m-info small { color: #888; }
         .m-actions { display: flex; flex-direction: column; gap: 4px; }
         .btn-deploy { background: #00f2ff; color: #000; border: none; font-size: 10px; font-weight: bold; padding: 4px 8px; cursor: pointer; border-radius: 2px; }
+        .btn-edit { background: #ffcc00; color: #000; border: none; font-size: 12px; font-weight: bold; padding: 4px 8px; cursor: pointer; border-radius: 2px; line-height: 1; }
+        .btn-edit:hover { background: #fff; }
         .btn-delete { background: #f44; color: #fff; border: none; font-size: 10px; font-weight: bold; padding: 4px 8px; cursor: pointer; border-radius: 2px; }
         
         .player-select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
