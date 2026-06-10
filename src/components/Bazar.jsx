@@ -385,7 +385,6 @@ export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOp
               })}
               {filteredItems.length === 0 && <p className="empty-msg">Mercado vazio.</p>}
             </div>
-          </div>
 
           {/* --- MODAL CUSTOMIZADO (ALERT/CONFIRM/PROMPT) --- */}
           {dialog.show && (
