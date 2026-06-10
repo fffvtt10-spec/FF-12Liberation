@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { getCharacterClass, buildCharacterSheetSavePayload } from '../utils/characterHelpers';
-import { RARIDADES, DEFAULT_RARIDADE, getRaridadeById, getSlotAuraStyle } from '../utils/itemRarity';
+import { RARIDADES, DEFAULT_RARIDADE, getRaridadeById, getSlotAuraStyle, getSlotAuraClass } from '../utils/itemRarity';
 
 // --- LISTA DE ÍCONES DE HABILIDADE ---
 const SKILL_ICONS = [
@@ -532,7 +532,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
                                     <div
-                                        className={`slot-square${hasItem ? ' rarity-equipped' : ''}`}
+                                        className={`slot-square${hasItem ? ` rarity-equipped ${getSlotAuraClass(equippedSlot?.raridade)}` : ''}`}
                                         style={hasItem ? auraStyle : undefined}
                                     >
                                         {!hasItem && isMaster && <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>}
@@ -838,10 +838,51 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; transition: border-color 0.3s; }
-        .slot-square.rarity-equipped { animation: rarityPulse 2.5s ease-in-out infinite; border-color: var(--rarity-color); box-shadow: var(--rarity-shadow-min); }
+        .slot-square.rarity-equipped {
+            border-color: var(--rarity-color);
+            box-shadow: var(--rarity-shadow-min);
+            animation: rarityPulse 2.8s ease-in-out infinite;
+        }
+        .slot-square.rarity-aura-super_raro,
+        .slot-square.rarity-aura-epico,
+        .slot-square.rarity-aura-lendario { animation-duration: 2.4s; }
+        .slot-square.rarity-aura-unico {
+            border-width: 2px;
+            animation: unicoPulse 2s ease-in-out infinite;
+        }
+        .slot-square.rarity-aura-amaldicoada {
+            border-width: 2px;
+            border-color: #000 !important;
+            animation: cursedPulse 4.5s ease-in-out infinite;
+            filter: saturate(0.35) brightness(0.75);
+        }
+        .slot-square.rarity-aura-amaldicoada::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 4;
+            background: radial-gradient(circle at center, transparent 25%, rgba(0, 0, 0, 0.75) 70%, rgba(20, 0, 15, 0.9) 100%);
+            animation: cursedVeil 4.5s ease-in-out infinite;
+        }
+        .slot-square.rarity-aura-amaldicoada .item-bg { opacity: 0.55; }
         @keyframes rarityPulse {
             0%, 100% { box-shadow: var(--rarity-shadow-min); }
             50% { box-shadow: var(--rarity-shadow-max); }
+        }
+        @keyframes unicoPulse {
+            0%, 100% { box-shadow: var(--rarity-shadow-min); transform: scale(1); }
+            50% { box-shadow: var(--rarity-shadow-max); transform: scale(1.03); }
+        }
+        @keyframes cursedPulse {
+            0%, 100% { box-shadow: var(--rarity-shadow-min); }
+            35% { box-shadow: var(--rarity-shadow-max); }
+            65% { box-shadow: var(--rarity-shadow-min); }
+        }
+        @keyframes cursedVeil {
+            0%, 100% { opacity: 0.65; }
+            50% { opacity: 0.95; }
         }
         .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; position: absolute; top: 0; left: 0; }
         .empty-text { font-size: 9px; color: #666; text-align: center; line-height: 1; padding: 2px; }
