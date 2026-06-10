@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
 
-export default function SceneryViewer({ sessaoData, isMaster, showManager, onCloseManager, sceneryLibrary = [] }) {
+export default function SceneryViewer({ sessaoData, isMaster, showManager, onCloseManager, sceneryLibrary = [], embeddedManager = false }) {
   const [activeScenery, setActiveScenery] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   
@@ -113,6 +113,36 @@ export default function SceneryViewer({ sessaoData, isMaster, showManager, onClo
 
       {/* --- GERENCIADOR (SÓ MESTRE) --- */}
       {isMaster && showManager && (
+        embeddedManager ? (
+            <div className="scenery-manager-box embedded-manager-panel">
+                <h3 className="manager-title">PROJETOR DE AMBIENTES</h3>
+                <div className="scenery-grid">
+                    {sceneryList.length === 0 && <p className="empty-txt">Nenhuma imagem de cenário na biblioteca global.</p>}
+                    {sceneryList.map((item, i) => {
+                        const url = item.url || item;
+                        return (
+                        <div 
+                            key={item.id || i} 
+                            className={`scenery-thumb ${selectedUrl === url ? 'selected' : ''}`}
+                            onClick={() => setSelectedUrl(url)}
+                        >
+                            <img src={url} alt={item.name || `Opção ${i}`} />
+                        </div>
+                    );})}
+                </div>
+                <div className="scenery-input-row">
+                    <input 
+                        type="text" 
+                        placeholder="Nome do Local (Ex: Ruínas Antigas)" 
+                        value={editingName} 
+                        onChange={e => setEditingName(e.target.value)} 
+                    />
+                    <button className="btn-project" onClick={handleActivate} disabled={!selectedUrl}>
+                        PROJETAR
+                    </button>
+                </div>
+            </div>
+        ) : (
         <div className="scenery-manager-overlay" onClick={onCloseManager}>
             <div className="scenery-manager-box" onClick={e => e.stopPropagation()}>
                 <h3 className="manager-title">PROJETOR DE AMBIENTES</h3>
@@ -146,6 +176,7 @@ export default function SceneryViewer({ sessaoData, isMaster, showManager, onClo
                 <button className="btn-close-manager" onClick={onCloseManager}>CANCELAR</button>
             </div>
         </div>
+        )
       )}
 
       <style>{`
@@ -332,8 +363,16 @@ export default function SceneryViewer({ sessaoData, isMaster, showManager, onClo
             text-shadow: 0 0 10px rgba(255,204,0,0.5);
         }
 
-        /* --- GERENCIADOR (MODAL) --- */
-        .scenery-manager-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 200002; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .scenery-manager-box.embedded-manager-panel {
+            position: relative;
+            width: 100%;
+            max-width: none;
+            box-shadow: none;
+            padding: 0;
+            background: transparent;
+            border: none;
+        }
+        .scenery-manager-box.embedded-manager-panel .scenery-grid { max-height: 40vh; }
         .scenery-manager-box { width: 700px; background: #080808; border: 2px solid #ffcc00; padding: 30px; border-radius: 8px; box-shadow: 0 0 80px rgba(255, 204, 0, 0.15); }
         .manager-title { color: #ffcc00; font-family: 'Cinzel', serif; margin: 0 0 25px 0; text-align: center; border-bottom: 1px solid #333; padding-bottom: 15px; letter-spacing: 3px; font-size: 24px; }
         

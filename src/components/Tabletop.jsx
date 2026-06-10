@@ -169,7 +169,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
     );
 };
 
-export default function Tabletop({ sessaoData, isMaster, showManager, onCloseManager, currentUserUid, personagensData, highlightTokenId, libraryMaps = [], onUpdateMapItem }) {
+export default function Tabletop({ sessaoData, isMaster, showManager, onCloseManager, currentUserUid, personagensData, highlightTokenId, libraryMaps = [], onUpdateMapItem, embeddedManager = false, managerOnly = false }) {
   const [activeMap, setActiveMap] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [tokens, setTokens] = useState([]);
@@ -556,11 +556,12 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
       return true;
   });
 
-  if (!activeMap && !isMaster && !showManager) return null;
+  if (managerOnly && (!isMaster || !showManager)) return null;
+  if (!managerOnly && !activeMap && !isMaster && !showManager) return null;
 
   return (
     <>
-        {activeMap && (
+        {!managerOnly && activeMap && (
             <>
                 <div className="rotate-device-overlay">
                     <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="spin-phone-icon">
@@ -729,6 +730,23 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
         )}
 
         {isMaster && showManager && ( 
+            embeddedManager ? (
+                <div className="manager-box embedded-manager-panel">
+                    <h3 className="manager-title">SALA DE CARTOGRAFIA</h3>
+                    <div className="manager-list">
+                        {mapList.map((map, idx) => (
+                            <div key={idx} className="manager-item">
+                                <img src={map.url} className="thumb-preview" alt="thumb" />
+                                {editingId === map.id ? (
+                                    <input className="manager-name-input" value={editingName} onChange={e => setEditingName(e.target.value)} placeholder="Nome" autoFocus />
+                                ) : (<span className="map-name-span">{map.name}</span>)}
+                                {editingId === map.id ? (<button className="btn-action-sm btn-save-name" onClick={() => handleSaveMapInfo(map)}>SALVAR</button>) : (<button className="btn-action-sm" onClick={() => { setEditingId(map.id); setEditingName(map.name); }}>RENOMEAR</button>)}
+                                <button className="btn-action-sm btn-activate" onClick={() => handleActivateMap(map)}>ABRIR</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
             <div className="manager-overlay" onClick={onCloseManager}>
                 <div className="manager-box" onClick={e => e.stopPropagation()}>
                     <h3 className="manager-title">SALA DE CARTOGRAFIA</h3>
@@ -747,6 +765,7 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
                     <button className="btn-cancelar-main" onClick={onCloseManager}>FECHAR</button>
                 </div>
             </div>
+            )
         )}
 
         <style>{`

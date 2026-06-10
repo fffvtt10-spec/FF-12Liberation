@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from "firebase/firestore";
 
-export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseManager, npcLibrary = [] }) {
+export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseManager, npcLibrary = [], embeddedManager = false }) {
   const [activeNPC, setActiveNPC] = useState(null);
   
   // Estados do Gerenciador (Mestre)
@@ -100,6 +100,53 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
 
       {/* 2. GERENCIADOR (Só Mestre - Canto Superior Direito) */}
       {isMaster && showManager && (
+        embeddedManager ? (
+            <div className="npc-manager-box embedded-manager-panel">
+                <div className="npc-manager-header">
+                    <h3>CONVOCAÇÃO DE NPCS</h3>
+                </div>
+                <div className="npc-grid-list">
+                    {npcList.length === 0 && <p className="empty-msg">Nenhum NPC na biblioteca global.</p>}
+                    {npcList.map((item, i) => {
+                        const url = item.url || item;
+                        return (
+                        <div 
+                            key={item.id || i} 
+                            className={`npc-thumb ${selectedUrl === url ? 'selected' : ''}`}
+                            onClick={() => { setSelectedUrl(url); setEditingName(item.name || ""); }}
+                        >
+                            <img src={url} alt={item.name || "NPC Thumb"} />
+                        </div>
+                    );})}
+                </div>
+                <div className="npc-controls-row">
+                    <input 
+                        type="text" 
+                        placeholder="Nome (Ex: Lorde das Sombras)" 
+                        value={editingName} 
+                        onChange={e => setEditingName(e.target.value)} 
+                    />
+                    <div className="btn-group">
+                        <button className="btn-npc-action visible" onClick={() => handleProject(true)}>ENTRAR</button>
+                        <button className="btn-npc-action hidden" onClick={() => handleProject(false)}>PREPARAR</button>
+                    </div>
+                </div>
+                {activeNPC && !selectedUrl && (
+                    <div className="current-npc-controls">
+                        <h4>EM CENA: <span style={{color:'#fff'}}>{activeNPC.name}</span></h4>
+                        <div className="active-actions">
+                            <button 
+                                className={`toggle-btn ${activeNPC.visible ? 'is-on' : 'is-off'}`}
+                                onClick={() => handleProject(!activeNPC.visible)}
+                            >
+                                {activeNPC.visible ? 'OCULTAR (SAIR)' : 'REVELAR (ENTRAR)'}
+                            </button>
+                            <button className="remove-btn" onClick={handleRemoveNPC}>REMOVER</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        ) : (
         <div className="npc-manager-overlay" onClick={onCloseManager}>
             <div className="npc-manager-box" onClick={e => e.stopPropagation()}>
                 <div className="npc-manager-header">
@@ -135,7 +182,6 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
                     </div>
                 </div>
 
-                {/* CONTROLES DO NPC ATIVO ATUALMENTE */}
                 {activeNPC && !selectedUrl && (
                     <div className="current-npc-controls">
                         <h4>EM CENA: <span style={{color:'#fff'}}>{activeNPC.name}</span></h4>
@@ -152,6 +198,7 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
                 )}
             </div>
         </div>
+        )
       )}
 
       <style>{`
@@ -273,6 +320,17 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
                 1px 1px 0 #000,
                 0 0 20px rgba(0,0,0,0.8);
         }
+
+        .npc-manager-box.embedded-manager-panel {
+            position: relative;
+            width: 100%;
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            pointer-events: auto;
+        }
+        .npc-manager-box.embedded-manager-panel .npc-grid-list { max-height: 40vh; }
 
         /* --- GERENCIADOR (CANTO SUPERIOR DIREITO) --- */
         .npc-manager-overlay { 

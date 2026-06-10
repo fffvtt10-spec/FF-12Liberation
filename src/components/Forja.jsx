@@ -3,8 +3,13 @@ import { db } from '../firebase';
 import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
 import forjaIcon from '../assets/forja.png';
 
-export default function Forja({ vttDock }) { // RECEBE vttDock
-  const [isOpen, setIsOpen] = useState(false);
+export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, onOpenChange }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = (val) => {
+    if (onOpenChange) onOpenChange(val);
+    else setInternalOpen(val);
+  };
   const [items, setItems] = useState([]); 
   const [characters, setCharacters] = useState([]); // NOVO ESTADO: Armazena os personagens do banco
   const [searchTerm, setSearchTerm] = useState("");
@@ -111,20 +116,22 @@ export default function Forja({ vttDock }) { // RECEBE vttDock
 
   return (
     <>
+      {!hideTrigger && (
       <button 
         className={`forja-trigger-btn ${vttDock ? 'vtt-dock-style' : ''}`} 
-        onClick={() => setIsOpen(true)} 
+        onClick={() => setOpen(true)} 
         title="Abrir Forja"
       >
         <img src={forjaIcon} alt="Forja" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='FORJA'}} />
       </button>
+      )}
 
       {isOpen && (
-        <div className="forja-overlay" onClick={() => setIsOpen(false)}>
+        <div className="forja-overlay" onClick={() => setOpen(false)}>
           <div className="forja-modal" onClick={e => e.stopPropagation()}>
             <div className="forja-header">
               <h2>A FORJA ANTIGA</h2>
-              <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
+              <button className="close-btn" onClick={() => setOpen(false)}>×</button>
             </div>
             <div className="mestre-panel-forja">
                 <h4 style={{color:'#f44', margin:'0 0 10px 0'}}>FORJAR NOVO ARTEFATO</h4>

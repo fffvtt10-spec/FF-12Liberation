@@ -3,8 +3,13 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, deleteDoc, updateDoc, setDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore"; 
 import bazarIcon from '../assets/bazar.png'; 
 
-export default function Bazar({ isMestre, playerData, vttDock }) { 
-  const [isOpen, setIsOpen] = useState(false);
+export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOpen: controlledOpen, onOpenChange }) { 
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = (val) => {
+    if (onOpenChange) onOpenChange(val);
+    else setInternalOpen(val);
+  };
   const [items, setItems] = useState([]); 
   const [vaultItems, setVaultItems] = useState([]); 
   const [searchTerm, setSearchTerm] = useState("");
@@ -268,20 +273,22 @@ export default function Bazar({ isMestre, playerData, vttDock }) {
 
   return (
     <>
+      {!hideTrigger && (
       <button 
         className={`bazar-trigger-btn ${vttDock ? 'vtt-dock-style' : ''}`} 
-        onClick={() => setIsOpen(true)} 
+        onClick={() => setOpen(true)} 
         title="Abrir Bazar"
       >
         <img src={bazarIcon} alt="Bazar" onError={(e) => {e.target.style.display='none'; e.target.parentNode.innerText='BAZAR'}} />
       </button>
+      )}
 
       {isOpen && (
-        <div className="bazar-overlay-flex" onClick={() => setIsOpen(false)}>
+        <div className="bazar-overlay-flex" onClick={() => setOpen(false)}>
           <div className="bazar-modal-centered" onClick={e => e.stopPropagation()}>
             <div className="bazar-header">
               <h2>Bazar</h2>
-              <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
+              <button className="close-btn" onClick={() => setOpen(false)}>×</button>
             </div>
 
             {isMestre && (
@@ -424,6 +431,7 @@ export default function Bazar({ isMestre, playerData, vttDock }) {
             </div>
           )}
 
+          </div>
         </div>
       )}
 

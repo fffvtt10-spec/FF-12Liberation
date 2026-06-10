@@ -26,6 +26,7 @@ import Forja from '../components/Forja';
 import Tabletop from '../components/Tabletop'; 
 import SceneryViewer from '../components/SceneryViewer'; 
 import NPCViewer from '../components/NPCViewer'; 
+import DmOrbitalMenu from '../components/DmOrbitalMenu';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
 // --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
@@ -55,35 +56,6 @@ const IconDice = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" />
     <path d="M12 22V12" />
-  </svg>
-);
-const IconScenery = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <polyline points="21 15 16 10 5 21" />
-  </svg>
-);
-const IconMonsters = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2c-4 0-8 3-8 8 0 4 3 7 5 7.5V21h6v-3.5c2-.5 5-3.5 5-7.5 0-5-4-8-8-8z" />
-    <path d="M9 10h.01" />
-    <path d="M15 10h.01" />
-    <path d="M10 14h4" />
-  </svg>
-);
-const IconNPC = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-const IconPlayers = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2a3 3 0 0 1 3 3c0 2-3 3-3 3s-3-1-3-3a3 3 0 0 1 3-3z" />
-    <path d="M15 9c1 1 2.5 2 2.5 4 0 2-2.5 4-2.5 4H9s-2.5-2-2.5-4c0-2 1.5-3 2.5-4" />
-    <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
-    <line x1="7" y1="22" x2="17" y2="22" />
   </svg>
 );
 const IconCombat = () => (
@@ -126,14 +98,15 @@ export default function MestreVTTPage() {
   const [connectedPlayers, setConnectedPlayers] = useState([]);
   const [selectedFicha, setSelectedFicha] = useState(null);
   
-  // Modais
-  const [showMapManager, setShowMapManager] = useState(false);
-  const [showSceneryManager, setShowSceneryManager] = useState(false); 
-  const [showNPCManager, setShowNPCManager] = useState(false); 
-  const [showPlayerManager, setShowPlayerManager] = useState(false);   
+  // Modais & hubs agrupados
+  const [orbitalOpen, setOrbitalOpen] = useState(false);
+  const [showMesaHub, setShowMesaHub] = useState(false);
+  const [mesaTab, setMesaTab] = useState('tabletop');
+  const [showEconomiaHub, setShowEconomiaHub] = useState(false);
+  const [economiaTab, setEconomiaTab] = useState('mercado');
+  const [bazarOpen, setBazarOpen] = useState(false);
+  const [forjaOpen, setForjaOpen] = useState(false);
   const [showCombatTracker, setShowCombatTracker] = useState(false);
-
-  const [showMercadoManager, setShowMercadoManager] = useState(false);
   const [trocasPendentes, setTrocasPendentes] = useState([]);
   const [showBencaoManager, setShowBencaoManager] = useState(false);
   const [bencaoFlash, setBencaoFlash] = useState(false);
@@ -273,6 +246,16 @@ export default function MestreVTTPage() {
     });
     return () => unsubAll();
   }, [sessaoAtiva?.participantes]); 
+
+  useEffect(() => {
+    if (!showEconomiaHub) {
+      setBazarOpen(false);
+      setForjaOpen(false);
+      return;
+    }
+    setBazarOpen(economiaTab === 'bazar');
+    setForjaOpen(economiaTab === 'forja');
+  }, [showEconomiaHub, economiaTab]);
 
   const resetUploadForm = () => {
     setUploadMapUrl("");
@@ -492,10 +475,7 @@ export default function MestreVTTPage() {
           statuses: [] // Array novo para status negativos
       };
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: [...(sessaoAtiva.tokens||[]), newToken] });
-      setShowPlayerManager(false); 
   };
-
-  // Combat Tracker Handlers
   const handleRemoveToken = async (tokenId) => {
       const updatedTokens = sessaoAtiva.tokens.filter(t => t.id !== tokenId);
       await updateDoc(doc(db, "sessoes", sessaoAtiva.id), { tokens: updatedTokens });
@@ -607,6 +587,16 @@ export default function MestreVTTPage() {
   const libraryNpcs = vttLibrary.filter((item) => item.type === VTT_TYPES.NPC);
   const isCreatureTab = libraryTab === VTT_TYPES.MONSTER || libraryTab === VTT_TYPES.OBJECT;
 
+  const orbitalItems = [
+    { id: 'mesa', label: 'Mesa de Jogo', shortLabel: 'MESA', icon: <IconTabletop />, onClick: () => { setMesaTab('tabletop'); setShowMesaHub(true); } },
+    { id: 'biblioteca', label: 'Biblioteca VTT', shortLabel: 'BIBLIOTECA', icon: '📁', onClick: () => openLibrary(VTT_TYPES.MAP) },
+    { id: 'economia', label: 'Economia & Trocas', shortLabel: 'ECONOMIA', icon: '🏮', badge: trocasPendentes.length, onClick: () => { setEconomiaTab('mercado'); setShowEconomiaHub(true); } },
+    { id: 'combate', label: 'Rastreador de Combate', shortLabel: 'COMBATE', icon: <IconCombat />, onClick: () => setShowCombatTracker((v) => !v) },
+    { id: 'dados', label: 'Rolagem de Dados', shortLabel: 'DADOS', icon: <IconDice />, onClick: () => setShowDiceSelector(true) },
+    { id: 'bencao', label: 'Bênção dos Deuses (D100)', shortLabel: 'BÊNÇÃO', icon: '✨', onClick: () => setShowBencaoManager(true) },
+    { id: 'livro', label: 'Livro / Referência', shortLabel: 'LIVRO', icon: <IconBook />, onClick: () => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank') },
+  ];
+
   const buffAtivo = sessaoAtiva?.bencao_deuses?.buff_ativo || sessaoAtiva?.bencao_deuses?.vencedores || [];
 
   // --- LOADING SCREEN ---
@@ -679,16 +669,16 @@ export default function MestreVTTPage() {
 
       {/* --- COMPONENTS --- */}
       <Tabletop 
-        sessaoData={sessaoAtiva} isMaster={true} showManager={showMapManager}
-        onCloseManager={() => setShowMapManager(false)} personagensData={personagensData}
+        sessaoData={sessaoAtiva} isMaster={true} showManager={false}
+        onCloseManager={() => {}} personagensData={personagensData}
         onEditToken={(token) => setEditingToken(JSON.parse(JSON.stringify(token)))}
         highlightTokenId={highlightTokenId}
         libraryMaps={libraryMaps}
         onUpdateMapItem={handleUpdateMapItem}
       />
       
-      <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showSceneryManager} onCloseManager={() => setShowSceneryManager(false)} sceneryLibrary={libraryScenery} />
-      <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={showNPCManager} onCloseManager={() => setShowNPCManager(false)} npcLibrary={libraryNpcs} />
+      <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={false} onCloseManager={() => {}} sceneryLibrary={libraryScenery} />
+      <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={false} onCloseManager={() => {}} npcLibrary={libraryNpcs} />
       {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
       {showDiceSelector && <DiceSelector sessaoId={sessaoAtiva.id} playerName="MESTRE" onClose={() => setShowDiceSelector(false)} />}
 
@@ -942,74 +932,112 @@ export default function MestreVTTPage() {
           </div>
       )}
 
-      {/* DOCK FERRAMENTAS */}
-      <div className="dm-tools-dock">
-          <div className="tool-group"><Bazar isMestre={true} vttDock={true} /><div className="tool-label">BAZAR</div></div>
-          <div className="tool-group"><Forja vttDock={true} /><div className="tool-label">FORJA</div></div>
-          
-          {/* NOVAS FERRAMENTAS DO VTT (QUEUE 01) */}
-          <div className="tool-group">
-              <button className="tool-btn-placeholder" onClick={() => setShowMercadoManager(true)} style={{ position: 'relative' }}>
-                  🏮
-                  {trocasPendentes.length > 0 && <span className="notification-badge">{trocasPendentes.length}</span>}
-              </button>
-              <div className="tool-label">MERCADO DOS LANTERNAS (TROCAS)</div>
-          </div>
-          
-          <div className="tool-group">
-              <button className="tool-btn-placeholder" onClick={() => setShowBencaoManager(true)}>✨</button>
-              <div className="tool-label">BÊNÇÃO DOS DEUSES (D100)</div>
-          </div>
+      {/* Bazar & Forja (controlados pelo hub Economia ou uso standalone) */}
+      <Bazar isMestre={true} hideTrigger isOpen={bazarOpen} onOpenChange={setBazarOpen} />
+      <Forja hideTrigger isOpen={forjaOpen} onOpenChange={setForjaOpen} />
 
-          <div className="tool-group">
-              <button className="tool-btn-placeholder" onClick={() => openLibrary(VTT_TYPES.MAP)}>📁</button>
-              <div className="tool-label">BIBLIOTECA VTT</div>
-          </div>
-
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowMapManager(true)}><IconTabletop /></button><div className="tool-label">TABLETOP</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Rastreador de Combate"><IconCombat /></button><div className="tool-label">COMBATE</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowDiceSelector(true)}><IconDice /></button><div className="tool-label">DADOS</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank')}><IconBook /></button><div className="tool-label">LIVRO</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowSceneryManager(true)}><IconScenery /></button><div className="tool-label">CENÁRIOS</div></div>
-          
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => openLibrary(VTT_TYPES.MONSTER)}><IconMonsters /></button><div className="tool-label">BESTIÁRIO & OBJETOS</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowNPCManager(true)}><IconNPC /></button><div className="tool-label">NPCS</div></div>
-          <div className="tool-group"><button className="tool-btn-placeholder" onClick={() => setShowPlayerManager(true)}><IconPlayers /></button><div className="tool-label">JOGADORES</div></div>
-      </div>
+      <DmOrbitalMenu open={orbitalOpen} onToggle={setOrbitalOpen} items={orbitalItems} />
 
       {selectedFicha && <Ficha characterData={selectedFicha} isMaster={true} onClose={() => setSelectedFicha(null)} />}
 
-      {/* --- MODAIS DE ATUALIZAÇÃO (QUEUE 01) --- */}
-      
-      {/* 1. MERCADO DOS LANTERNAS (APROVAÇÕES) */}
-      {showMercadoManager && (
-          <div className="modal-overlay-custom" onClick={() => setShowMercadoManager(false)}>
-              <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
+      {/* HUB MESA DE JOGO */}
+      {showMesaHub && (
+          <div className="modal-overlay-custom" onClick={() => setShowMesaHub(false)}>
+              <div className="modal-box-custom wide hub-modal" onClick={e => e.stopPropagation()}>
                   <div className="modal-header-c">
-                      <h3>MERCADO DOS LANTERNAS</h3>
-                      <button className="close-c" onClick={() => setShowMercadoManager(false)}>✕</button>
+                      <h3>MESA DE JOGO</h3>
+                      <div className="media-tabs hub-tabs">
+                          <button type="button" className={mesaTab === 'tabletop' ? 'active' : ''} onClick={() => setMesaTab('tabletop')}>TABLETOP</button>
+                          <button type="button" className={mesaTab === 'cenarios' ? 'active' : ''} onClick={() => setMesaTab('cenarios')}>CENÁRIOS</button>
+                          <button type="button" className={mesaTab === 'npcs' ? 'active' : ''} onClick={() => setMesaTab('npcs')}>NPCS</button>
+                          <button type="button" className={mesaTab === 'jogadores' ? 'active' : ''} onClick={() => setMesaTab('jogadores')}>JOGADORES</button>
+                      </div>
+                      <button className="close-c" onClick={() => setShowMesaHub(false)}>✕</button>
                   </div>
-                  <div className="mercado-list">
-                      {trocasPendentes.length === 0 ? <p style={{color: '#666', textAlign: 'center', margin: '20px 0'}}>Nenhuma troca ou envio pendente de autorização.</p> : null}
-                      {trocasPendentes.map(troca => (
-                          <div key={troca.id} className="troca-card-dm">
-                              <p><strong>De:</strong> {troca.remetente}</p>
-                              <p><strong>Para:</strong> {troca.destinatario}</p>
-                              <p><strong>Itens:</strong> {troca.itens?.map(i => `${i.quantidade}x ${i.name}`).join(', ') || 'Nenhum'}</p>
-                              <p><strong>Gil:</strong> {troca.gil || 0}</p>
-                              {troca.mensagem && <p style={{color: '#00f2ff', fontStyle: 'italic'}}><strong>Msg:</strong> "{troca.mensagem}"</p>}
-                              <div className="troca-actions">
-                                  <button className="btn-approve" onClick={() => handleAprovarTroca(troca)}>AUTORIZAR</button>
-                                  <button className="btn-deny" onClick={() => handleRecusarTroca(troca)}>BARRAR</button>
+                  <div className="hub-panel-body">
+                      {mesaTab === 'tabletop' && (
+                          <Tabletop 
+                            sessaoData={sessaoAtiva} isMaster={true} showManager={true} embeddedManager={true} managerOnly={true}
+                            onCloseManager={() => setShowMesaHub(false)} personagensData={personagensData}
+                            highlightTokenId={highlightTokenId} libraryMaps={libraryMaps} onUpdateMapItem={handleUpdateMapItem}
+                          />
+                      )}
+                      {mesaTab === 'cenarios' && (
+                          <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={true} embeddedManager={true} onCloseManager={() => setShowMesaHub(false)} sceneryLibrary={libraryScenery} />
+                      )}
+                      {mesaTab === 'npcs' && (
+                          <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={true} embeddedManager={true} onCloseManager={() => setShowMesaHub(false)} npcLibrary={libraryNpcs} />
+                      )}
+                      {mesaTab === 'jogadores' && (
+                          <div className="hub-jogadores-panel">
+                              <p className="hub-hint">Selecione um personagem para inserir como token no mapa ativo.</p>
+                              <div className="player-select-grid">
+                                  {allCharacters.map(char => (
+                                      <div key={char.id} className="char-select-card" onClick={() => handleDeployPlayer(char)}>
+                                          <div className="c-avatar" style={{backgroundImage: `url(${char.character_sheet?.imgUrl})`}}></div>
+                                          <span>{char.name}</span>
+                                      </div>
+                                  ))}
                               </div>
                           </div>
-                      ))}
+                      )}
                   </div>
               </div>
           </div>
       )}
 
-      {/* 2. BÊNÇÃO DOS DEUSES (D100) */}
+      {/* HUB ECONOMIA */}
+      {showEconomiaHub && (
+          <div className="modal-overlay-custom" onClick={() => setShowEconomiaHub(false)}>
+              <div className="modal-box-custom wide hub-modal" onClick={e => e.stopPropagation()}>
+                  <div className="modal-header-c">
+                      <h3>ECONOMIA & TROCAS</h3>
+                      <div className="media-tabs hub-tabs">
+                          <button type="button" className={economiaTab === 'mercado' ? 'active' : ''} onClick={() => setEconomiaTab('mercado')}>
+                              MERCADO DOS LANTERNAS {trocasPendentes.length > 0 && `(${trocasPendentes.length})`}
+                          </button>
+                          <button type="button" className={economiaTab === 'bazar' ? 'active' : ''} onClick={() => setEconomiaTab('bazar')}>BAZAR</button>
+                          <button type="button" className={economiaTab === 'forja' ? 'active' : ''} onClick={() => setEconomiaTab('forja')}>FORJA</button>
+                      </div>
+                      <button className="close-c" onClick={() => setShowEconomiaHub(false)}>✕</button>
+                  </div>
+                  <div className="hub-panel-body">
+                      {economiaTab === 'mercado' && (
+                          <div className="mercado-list">
+                              {trocasPendentes.length === 0 ? <p style={{color: '#666', textAlign: 'center', margin: '20px 0'}}>Nenhuma troca ou envio pendente de autorização.</p> : null}
+                              {trocasPendentes.map(troca => (
+                                  <div key={troca.id} className="troca-card-dm">
+                                      <p><strong>De:</strong> {troca.remetente}</p>
+                                      <p><strong>Para:</strong> {troca.destinatario}</p>
+                                      <p><strong>Itens:</strong> {troca.itens?.map(i => `${i.quantidade}x ${i.name}`).join(', ') || 'Nenhum'}</p>
+                                      <p><strong>Gil:</strong> {troca.gil || 0}</p>
+                                      {troca.mensagem && <p style={{color: '#00f2ff', fontStyle: 'italic'}}><strong>Msg:</strong> "{troca.mensagem}"</p>}
+                                      <div className="troca-actions">
+                                          <button className="btn-approve" onClick={() => handleAprovarTroca(troca)}>AUTORIZAR</button>
+                                          <button className="btn-deny" onClick={() => handleRecusarTroca(troca)}>BARRAR</button>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                      {economiaTab === 'bazar' && (
+                          <div className="hub-external-tool">
+                              <p className="hub-hint">A interface completa do Bazar abre sobre a mesa. Feche o Bazar para voltar a este painel.</p>
+                              <button type="button" className="btn-save-m" onClick={() => setBazarOpen(true)}>ABRIR BAZAR</button>
+                          </div>
+                      )}
+                      {economiaTab === 'forja' && (
+                          <div className="hub-external-tool">
+                              <p className="hub-hint">A interface completa da Forja abre sobre a mesa. Feche a Forja para voltar a este painel.</p>
+                              <button type="button" className="btn-save-m" onClick={() => setForjaOpen(true)}>ABRIR FORJA</button>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* BÊNÇÃO DOS DEUSES (D100) */}
       {showBencaoManager && (
          <div className="modal-overlay-custom" onClick={() => setShowBencaoManager(false)}>
             <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
@@ -1165,21 +1193,6 @@ export default function MestreVTTPage() {
         </div>
       )}
 
-      {/* --- MODAL INSERIR JOGADOR --- */}
-      {showPlayerManager && (
-          <div className="modal-overlay-custom" onClick={() => setShowPlayerManager(false)}>
-              <div className="modal-box-custom" onClick={e => e.stopPropagation()}>
-                  <div className="modal-header-c"><h3>INSERIR JOGADOR</h3><button className="close-c" onClick={() => setShowPlayerManager(false)}>✕</button></div>
-                  <div className="player-select-grid">
-                      {allCharacters.map(char => (
-                          <div key={char.id} className="char-select-card" onClick={() => handleDeployPlayer(char)}>
-                              <div className="c-avatar" style={{backgroundImage: `url(${char.character_sheet?.imgUrl})`}}></div><span>{char.name}</span>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          </div>
-      )}
 
       {/* --- MODAL DE EDIÇÃO DE TOKEN (REFINADO) --- */}
       {editingToken && (
@@ -1320,14 +1333,16 @@ export default function MestreVTTPage() {
         .md-close-btn { width: 100%; padding: 15px; background: #111; color: #fff; border: none; border-top: 1px solid #b8860b; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .md-close-btn:hover { background: #b8860b; color: #000; }
 
-        /* DOCK COM Z-INDEX ALTO (2000) */
-        .dm-tools-dock { position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 2000; align-items: flex-end; }
-        .tool-group { display: flex; align-items: center; gap: 10px; flex-direction: row-reverse; }
-        .tool-label { background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #ffcc00; opacity: 0; transition: 0.2s; pointer-events: none; transform: translateX(10px); }
-        .tool-group:hover .tool-label { opacity: 1; transform: translateX(0); }
-        .tool-btn-placeholder { width: 50px; height: 50px; border-radius: 50%; background: #111; border: 2px solid #555; color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; box-shadow: 0 0 10px #000; pointer-events: auto; }
-        .tool-btn-placeholder:hover { border-color: #ffcc00; color: #ffcc00; transform: scale(1.1); }
-        .notification-badge { position: absolute; top: -5px; right: -5px; background: #f44; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border: 1px solid #fff; z-index: 10; }
+        .embedded-manager-panel { width: 100%; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; padding: 15px; }
+        .embedded-manager-panel .manager-list { max-height: 45vh; overflow-y: auto; }
+
+        .hub-modal { max-height: 92vh; }
+        .hub-tabs { flex-wrap: wrap; gap: 8px !important; margin: 0 10px !important; }
+        .hub-tabs button { font-size: 10px !important; white-space: nowrap; }
+        .hub-panel-body { min-height: 200px; max-height: 65vh; overflow-y: auto; padding-top: 5px; }
+        .hub-hint { color: #888; font-size: 12px; margin: 0 0 15px 0; font-style: italic; }
+        .hub-jogadores-panel .player-select-grid { max-height: 50vh; overflow-y: auto; }
+        .hub-external-tool { text-align: center; padding: 40px 20px; }
 
         /* MODAIS GERAIS E QUEUE 01 */
         .modal-overlay-custom { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
