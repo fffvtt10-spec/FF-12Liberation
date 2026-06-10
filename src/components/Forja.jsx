@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, orderBy, serverTimestamp, getDocs } from "firebase/firestore";
 import forjaIcon from '../assets/forja.png';
+import { RARIDADES, DEFAULT_RARIDADE, getRaridadeById, syncRaridadeToEquippedSlots } from '../utils/itemRarity';
 
 export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, onOpenChange }) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -19,7 +20,7 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
   const [showOnlyUnused, setShowOnlyUnused] = useState(false);
 
   // Adicionado campo quantidade ao formulário
-  const [form, setForm] = useState({ nome: '', descricao: '', imagem: '', quantidade: 1 });
+  const [form, setForm] = useState({ nome: '', descricao: '', imagem: '', quantidade: 1, raridade: DEFAULT_RARIDADE });
 
   // Efeito para baixar os Itens da Forja e também a lista de Personagens para cruzar os dados
   useEffect(() => {
@@ -49,12 +50,14 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
         nome: form.nome,
         descricao: form.descricao,
         imagem: form.imagem,
+        raridade: form.raridade || DEFAULT_RARIDADE,
         updatedAt: serverTimestamp() 
       };
 
       if (isEditing) {
         // Edição altera apenas o item específico selecionado
         await updateDoc(doc(db, "game_items", isEditing), payload);
+        await syncRaridadeToEquippedSlots(db, updateDoc, getDocs, collection, isEditing, payload.raridade);
         setIsEditing(null);
       } else {
         // CRIAÇÃO EM LOTE: Cria N documentos baseados na quantidade informada
@@ -74,7 +77,7 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
         await Promise.all(batchPromises);
         alert(`${qtd} item(ns) forjado(s) com sucesso!`);
       }
-      setForm({ nome: '', descricao: '', imagem: '', quantidade: 1 });
+      setForm({ nome: '', descricao: '', imagem: '', quantidade: 1, raridade: DEFAULT_RARIDADE });
     } catch (err) { alert("Erro ao forjar item."); console.error(err); }
   };
 
@@ -97,7 +100,7 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
   };
 
   const handleEditClick = (item) => { setIsEditing(item.id); setForm({...item, quantidade: 1}); }; // Na edição, qtde é irrelevante visualmente
-  const handleCancelEdit = () => { setIsEditing(null); setForm({ nome: '', descricao: '', imagem: '', quantidade: 1 }); };
+  const handleCancelEdit = () => { setIsEditing(null); setForm({ nome: '', descricao: '', imagem: '', quantidade: 1, raridade: DEFAULT_RARIDADE }); };
   
   // Função Helper para pegar o nome do jogador pelo ID
   const getOwnerName = (ownerId, buyerNameFallback) => {
@@ -157,6 +160,20 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
                      )}
                      <textarea placeholder="Descrição detalhada e lore do item..." value={form.descricao} onChange={e=>setForm({...form, descricao: e.target.value})} className="forja-input area" style={{height: '40px'}} />
                   </div>
+                  <div className="row">
+                    <select
+                      className="forja-input forja-rarity-select"
+                      value={form.raridade || DEFAULT_RARIDADE}
+                      onChange={e => setForm({ ...form, raridade: e.target.value })}
+                    >
+                      {RARIDADES.map((r) => (
+                        <option key={r.id} value={r.id}>{r.nome} — {r.cor}</option>
+                      ))}
+                    </select>
+                    <span className="rarity-preview" style={{ color: getRaridadeById(form.raridade).cor, borderColor: getRaridadeById(form.raridade).cor }}>
+                      {getRaridadeById(form.raridade).nome}
+                    </span>
+                  </div>
                   <div className="form-actions">
                     <button type="submit" className="btn-forjar">{isEditing ? "REFUNDIR (SALVAR)" : "FORJAR ITENS"}</button>
                     {isEditing && <button type="button" onClick={handleCancelEdit} className="btn-cancel">CANCELAR</button>}
@@ -175,7 +192,9 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
                   <div className="item-img" style={{backgroundImage: `url(${item.imagem || 'https://via.placeholder.com/150?text=?'})`}}></div>
                   <div className="item-info">
                     <h4>{item.nome}</h4>
-                    {/* AQUI ESTÁ A CORREÇÃO DA RENDERIZAÇÃO DO NOME DO DONO */}
+                    <span className="rarity-tag" style={{ color: getRaridadeById(item.raridade).cor, borderColor: getRaridadeById(item.raridade).cor }}>
+                      {getRaridadeById(item.raridade).nome}
+                    </span>
                     {item.ownerId && (<div className="owner-tag">POSSE DE: {getOwnerName(item.ownerId, item.buyerName)}</div>)}
                     <p className="desc">{item.descricao}</p>
                     <small style={{color: '#666'}}>Status: {item.ownerId ? "Cofre Pessoal" : "Cofre Global"}</small>
@@ -232,6 +251,10 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
         .forja-input { background: #000; border: 1px solid #522; color: #fff; padding: 10px; flex: 1; outline: none; font-family: serif; }
         .forja-input:focus { border-color: #f44; }
         .forja-input.area { height: 80px; resize: none; }
+        .forja-rarity-select { flex: 1; cursor: pointer; }
+        .rarity-preview, .rarity-tag { font-size: 11px; font-weight: bold; border: 1px solid; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .rarity-preview { flex-shrink: 0; background: rgba(0,0,0,0.5); }
+        .rarity-tag { display: inline-block; margin-bottom: 4px; }
         .btn-forjar { flex: 1; background: #f44; border: none; padding: 12px; font-weight: bold; cursor: pointer; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
         .btn-forjar:hover { background: #d00; box-shadow: 0 0 10px #d00; }
         .btn-cancel { background: #333; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; }

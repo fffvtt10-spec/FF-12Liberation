@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { getCharacterClass, buildCharacterSheetSavePayload } from '../utils/characterHelpers';
+import { RARIDADES, DEFAULT_RARIDADE, getRaridadeById, getSlotAuraStyle } from '../utils/itemRarity';
 
 // --- LISTA DE ÍCONES DE HABILIDADE ---
 const SKILL_ICONS = [
@@ -242,6 +243,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
           item_name: item.nome,
           item_img: item.imagem,
           description: item.descricao,
+          raridade: item.raridade || DEFAULT_RARIDADE,
           effect: "" 
       };
       setSheet(newSheet);
@@ -257,6 +259,32 @@ export default function Ficha({ characterData, isMaster, onClose }) {
           updatedAt: serverTimestamp() 
       });
       setShowForgeSelector(false);
+  };
+
+  const handleRarityChange = async (raridade) => {
+      if (!isMaster || viewItemDetails?.slotIndex == null) return;
+      const slotIndex = viewItemDetails.slotIndex;
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      if (!newSheet.equipment?.slots?.[slotIndex]) return;
+      newSheet.equipment.slots[slotIndex].raridade = raridade;
+      setSheet(newSheet);
+      setViewItemDetails((prev) => ({ ...prev, raridade }));
+
+      try {
+          const charRef = doc(db, 'characters', characterData.uid || characterData.id);
+          await updateDoc(charRef, {
+              [`character_sheet.equipment.slots.${slotIndex}.raridade`]: raridade,
+          });
+          if (viewItemDetails.item_id) {
+              await updateDoc(doc(db, 'game_items', viewItemDetails.item_id), {
+                  raridade,
+                  updatedAt: serverTimestamp(),
+              });
+          }
+      } catch (err) {
+          console.error('Erro ao salvar raridade:', err);
+          alert('Erro ao salvar raridade.');
+      }
   };
 
   const handleUnequipItem = async (slotIndex) => {
@@ -494,22 +522,30 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 {id: 4, label: "ACESS. 1", style: { top: '80px', left: '-15px' }}, 
                                 {id: 5, label: "CORPO", style: { bottom: '-20px', left: '60px' }}, 
                                 {id: 6, label: "PÉS", style: { bottom: '-20px', right: '60px' }} 
-                            ].map((slot, idx) => (
+                            ].map((slot, idx) => {
+                                const equippedSlot = sheet.equipment?.slots?.[idx];
+                                const hasItem = !!equippedSlot?.item_img;
+                                const slotRaridade = getRaridadeById(equippedSlot?.raridade);
+                                const auraStyle = hasItem ? getSlotAuraStyle(equippedSlot?.raridade) : {};
+
+                                return (
                                 <div key={idx} className="equip-slot" style={slot.style}>
                                     <div className="slot-label">{slot.label}</div>
-                                    <div className="slot-square">
-                                        {!sheet.equipment?.slots?.[idx]?.item_img && isMaster && <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>}
-                                        {sheet.equipment?.slots?.[idx]?.item_img ? (
+                                    <div
+                                        className={`slot-square${hasItem ? ' rarity-equipped' : ''}`}
+                                        style={hasItem ? auraStyle : undefined}
+                                    >
+                                        {!hasItem && isMaster && <button className="btn-plus-item" onClick={() => handleOpenForgeSelector(idx)}>+</button>}
+                                        {hasItem ? (
                                             <>
-                                                <div className="item-bg" style={getBgStyle(sheet.equipment.slots[idx].item_img)}></div>
-                                                {/* --- AGORA ENVIAMOS O SLOT INDEX PARA A MODAL DE DETALHES --- */}
-                                                <button className="btn-eye-item" onClick={() => setViewItemDetails({...sheet.equipment.slots[idx], slotIndex: idx})}>👁️</button>
+                                                <div className="item-bg" style={getBgStyle(equippedSlot.item_img)}></div>
+                                                <button className="btn-eye-item" onClick={() => setViewItemDetails({...equippedSlot, slotIndex: idx})}>👁️</button>
                                                 {isMaster && <button className="btn-return-forge" title="Devolver" onClick={() => handleUnequipItem(idx)}>↩️</button>}
                                             </>
                                         ) : (!isMaster && <span className="empty-text">Vazio</span>)}
                                     </div>
                                 </div>
-                            ))}
+                            );})}
                         </div>
                     </div>
 
@@ -578,12 +614,19 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                     <h3>EQUIPAR DO COFRE</h3>
                     <div className="forge-list-scroll">
                         {forgeItems.length === 0 && <p className="empty-text">Nenhum item disponível na Forja.</p>}
-                        {forgeItems.map(item => (
+                        {forgeItems.map(item => {
+                            const itemRaridade = getRaridadeById(item.raridade);
+                            return (
                             <div key={item.id} className="forge-item-row" onClick={() => handleEquipItem(item)}>
                                 <div className="forge-thumb" style={getBgStyle(item.imagem)}></div>
-                                <div><strong>{item.nome}</strong>{item.ownerId && <small style={{color:'#0f0'}}> (Seu Item)</small>}<p>{item.descricao.substring(0, 40)}...</p></div>
+                                <div>
+                                    <strong>{item.nome}</strong>
+                                    <span className="forge-rarity-label" style={{ color: itemRaridade.cor }}>{itemRaridade.nome}</span>
+                                    {item.ownerId && <small style={{color:'#0f0'}}> (Seu Item)</small>}
+                                    <p>{item.descricao?.substring(0, 40) || ''}...</p>
+                                </div>
                             </div>
-                        ))}
+                        );})}
                     </div>
                     <button className="btn-cancel-modal" onClick={() => setShowForgeSelector(false)}>CANCELAR</button>
                 </div>
@@ -596,6 +639,24 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                 <div className="item-details-box" onClick={e => e.stopPropagation()}>
                     <div className="detail-img-large" style={getBgStyle(viewItemDetails.item_img)}></div>
                     <h3>{viewItemDetails.item_name}</h3>
+                    {isMaster ? (
+                        <div style={{ marginBottom: '12px', textAlign: 'left' }}>
+                            <label style={{ color: '#888', fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Raridade:</label>
+                            <select
+                                className="rarity-select-ficha"
+                                value={viewItemDetails.raridade || DEFAULT_RARIDADE}
+                                onChange={e => handleRarityChange(e.target.value)}
+                            >
+                                {RARIDADES.map((r) => (
+                                    <option key={r.id} value={r.id}>{r.nome}</option>
+                                ))}
+                            </select>
+                        </div>
+                    ) : (
+                        <p className="details-rarity" style={{ color: getRaridadeById(viewItemDetails.raridade).cor }}>
+                            {getRaridadeById(viewItemDetails.raridade).nome}
+                        </p>
+                    )}
                     <p className="details-desc">{viewItemDetails.description || "Sem descrição"}</p>
                     
                     {isMaster ? (
@@ -776,7 +837,12 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .equip-slots-overlay { position: absolute; width: 300px; height: 450px; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; margin-top: -10px; }
         .equip-slot { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
         .slot-label { font-size: 9px; color: #00f2ff; text-shadow: 0 0 2px #000; margin-bottom: 2px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-        .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; }
+        .slot-square { width: 60px; height: 60px; background: rgba(0, 10, 30, 0.9); border: 1px solid #ffcc00; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,0,0,0.8); position: relative; overflow: hidden; border-radius: 4px; transition: border-color 0.3s; }
+        .slot-square.rarity-equipped { animation: rarityPulse 2.5s ease-in-out infinite; border-color: var(--rarity-color); box-shadow: var(--rarity-shadow-min); }
+        @keyframes rarityPulse {
+            0%, 100% { box-shadow: var(--rarity-shadow-min); }
+            50% { box-shadow: var(--rarity-shadow-max); }
+        }
         .item-bg { width: 100%; height: 100%; background-size: cover; background-position: center; position: absolute; top: 0; left: 0; }
         .empty-text { font-size: 9px; color: #666; text-align: center; line-height: 1; padding: 2px; }
         .btn-plus-item { background: transparent; color: #ffcc00; font-size: 24px; border: none; cursor: pointer; font-weight: bold; }
@@ -823,6 +889,9 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .item-details-box img { width: 80px; height: 80px; border: 1px solid #fff; margin-bottom: 10px; }
         .detail-img-large { width: 80px; height: 80px; border: 1px solid #fff; margin: 0 auto 10px auto; background-size: cover; background-position: center; }
         .item-details-box h3 { color: #00f2ff; margin: 0 0 10px 0; }
+        .details-rarity { font-size: 13px; font-weight: bold; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .rarity-select-ficha { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .forge-rarity-label { display: block; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
         .details-desc { font-size: 12px; color: #ccc; margin-bottom: 10px; font-style: italic; }
         .details-effect { font-size: 12px; color: #ffcc00; font-weight: bold; margin-bottom: 20px; }
         .extra-abilities-box { margin-top: 20px; border-top: 2px solid #444; padding-top: 15px; }
