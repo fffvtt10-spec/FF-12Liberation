@@ -19,6 +19,16 @@ body, html, #root {
   color: #e2e8f0;
 }
 
+/* Quando uma página precisa de scroll vertical (ex: MestrePage mobile) */
+html.page-scrollable,
+html.page-scrollable body,
+html.page-scrollable #root {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: auto !important;
+  min-height: 100vh !important;
+}
+
 /* --- UTILITÁRIOS DE TEXTO --- */
 .rpg-title {
   font-family: 'Cinzel', serif;

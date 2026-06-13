@@ -196,6 +196,18 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
 export default function MestrePage() {
   const navigate = useNavigate();
   const [mobileTab, setMobileTab] = useState('missoes');
+
+  // Libera scroll do body/html no mobile — removido ao sair da página
+  useEffect(() => {
+    const enableScroll = () => {
+      document.documentElement.classList.add('page-scrollable');
+    };
+    const disableScroll = () => {
+      document.documentElement.classList.remove('page-scrollable');
+    };
+    enableScroll();
+    return () => disableScroll();
+  }, []);
   
   const [currentUser, setCurrentUser] = useState(null);
   const [missoes, setMissoes] = useState([]);
@@ -1426,11 +1438,11 @@ export default function MestrePage() {
           .ff-title { font-size: 1.6rem; letter-spacing: 3px; }
         }
 
-        /* --- TABLET (768-1100px): 3 colunas compactas com scroll horizontal --- */
+        /* --- TABLET (768-1100px): 3 colunas compactas --- */
         @media (max-width: 1100px) {
-          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
-          .mestre-content { height: auto; min-height: 100%; padding: 12px; overflow: visible; box-sizing: border-box; }
-          .mestre-grid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 12px; flex: none; min-height: 0; }
+          .mestre-container { height: auto !important; min-height: 100vh; overflow: visible !important; }
+          .mestre-content { height: auto; min-height: 100%; padding: 12px 12px 100px; overflow: visible; box-sizing: border-box; }
+          .mestre-grid { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 12px; flex: none; min-height: 0; }
           .board-column { height: 520px; }
           .ff-title { font-size: 1.4rem; letter-spacing: 2px; }
           .mestre-identity-box { padding: 8px 12px; gap: 8px; }
@@ -1438,8 +1450,8 @@ export default function MestrePage() {
 
         /* --- MOBILE (< 768px): abas com 1 coluna por vez --- */
         @media (max-width: 768px) {
-          /* Container e página rolam livremente */
-          .mestre-container { height: auto !important; min-height: 100vh; overflow-y: auto !important; overflow-x: hidden !important; -webkit-overflow-scrolling: touch; }
+          /* Container e página rolam livremente (scroll vem do html/body via classe page-scrollable) */
+          .mestre-container { height: auto !important; min-height: 100vh; overflow: visible !important; }
           .mestre-bg-image-full { position: fixed !important; }
           .mestre-content { position: relative; z-index: 10; height: auto !important; min-height: 100%; padding: 0 0 120px 0; display: flex; flex-direction: column; overflow: visible !important; box-sizing: border-box; }
 
