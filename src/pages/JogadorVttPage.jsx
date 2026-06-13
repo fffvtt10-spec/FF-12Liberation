@@ -923,6 +923,12 @@ export default function JogadorVttPage() {
                                 <p>{viewMonsterDetails.drops}</p>
                             </div>
                         )}
+                        {viewMonsterDetails.tips && (
+                            <div className="md-block tips">
+                                <label>DICAS DO SANCHES</label>
+                                <p>{viewMonsterDetails.tips}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <button className="md-close-btn" onClick={() => setViewMonsterDetails(null)}>FECHAR</button>
@@ -1362,6 +1368,9 @@ export default function JogadorVttPage() {
         .md-block { margin-bottom: 15px; }
         .md-block label { display: block; color: #b8860b; font-size: 10px; font-weight: bold; border-bottom: 1px solid #333; margin-bottom: 5px; }
         .md-block p { margin: 0; font-size: 13px; color: #ccc; line-height: 1.4; white-space: pre-wrap; }
+        .md-block.tips { background: rgba(0, 242, 255, 0.05); border: 1px solid rgba(0, 242, 255, 0.2); padding: 8px; border-radius: 4px; }
+        .md-block.tips label { color: #00f2ff; }
+        .md-block.tips p { color: #00f2ff; font-style: italic; }
         .md-close-btn { width: 100%; padding: 15px; background: #111; color: #fff; border: none; border-top: 1px solid #b8860b; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .md-close-btn:hover { background: #b8860b; color: #000; }
 

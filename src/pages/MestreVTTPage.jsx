@@ -1303,7 +1303,7 @@ export default function MestreVTTPage() {
         .tracker-item.stealth-active { border-color: #a855f7; border-style: dashed; box-shadow: inset 0 0 15px rgba(168, 85, 247, 0.2); }
 
         /* COMBAT TRACKER */
-        .combat-tracker-panel { position: absolute; width: 320px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
+        .combat-tracker-panel { position: absolute; width: 360px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
         .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
         .tracker-title { color: #ffcc00; margin: 0; font-family: 'Cinzel', serif; letter-spacing: 3px; font-size: 16px; text-shadow: 0 0 5px #ffcc00; }
         .tracker-divider { background: #1a1a1a; color: #ffcc00; font-size: 11px; font-weight: bold; text-align: center; padding: 4px; margin: 5px 0; border-top: 1px dashed #444; border-bottom: 1px dashed #444; letter-spacing: 1px; }
@@ -1328,13 +1328,13 @@ export default function MestreVTTPage() {
         .status-btn:hover { background: #222; border-color: #666; transform: scale(1.1); }
         .status-btn.active { border-color: currentColor; background: rgba(255,255,255,0.1); }
 
-        .t-stats-row { display: flex; gap: 5px; }
-        .t-stat { display: flex; align-items: center; font-size: 11px; background: #080808; padding: 2px 5px; border-radius: 3px; border: 1px solid #333; }
-        .t-stat label { margin-right: 4px; font-weight: bold; font-size: 9px; }
+        .t-stats-row { display: flex; gap: 4px; flex-wrap: wrap; }
+        .t-stat { display: flex; align-items: center; font-size: 11px; background: #080808; padding: 2px 5px; border-radius: 3px; border: 1px solid #333; min-width: 0; }
+        .t-stat label { margin-right: 4px; font-weight: bold; font-size: 9px; flex-shrink: 0; }
         .t-stat.hp label { color: #f44; } .t-stat.mp label { color: #00f2ff; }
-        .t-stat input { width: 28px; background: transparent; border: none; color: #fff; text-align: center; padding: 0; font-size: 11px; font-weight: bold; }
-        .t-stat span { color: #fff; font-weight: bold; }
-        .t-stat small { color: #555; margin-left: 2px; font-size: 9px; }
+        .t-stat input { width: 46px; min-width: 46px; background: transparent; border: none; color: #fff; text-align: center; padding: 0; font-size: 11px; font-weight: bold; }
+        .t-stat span { color: #fff; font-weight: bold; min-width: 20px; text-align: center; }
+        .t-stat small { color: #555; margin-left: 2px; font-size: 9px; white-space: nowrap; }
         .t-col-actions { display: flex; gap: 6px; align-items: center; }
         .img-adj-grid { display: flex; flex-direction: column; align-items: center; gap: 1px; }
         .img-adj-grid button { width: 14px; height: 12px; font-size: 7px; padding: 0; line-height: 1; background: #222; border: 1px solid #555; color: #aaa; cursor: pointer; }

@@ -1133,7 +1133,7 @@ export default function MestrePage() {
         .mestre-bg-image-full { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.3; z-index: 0; animation: slowPan 60s infinite alternate; }
         @keyframes slowPan { from { transform: scale(1.0); } to { transform: scale(1.1); } }
         
-        .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; }
 
         .export-float-bar {
             position: fixed;
@@ -1214,9 +1214,9 @@ export default function MestrePage() {
             transition: 0.2s;
         }
         .btn-export-clear:hover { border-color: #ef4444; color: #ef4444; }
-        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .top-bar-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
         .ff-title { font-size: 2rem; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); letter-spacing: 4px; margin: 0; }
-        .mestre-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); border: 1px solid #fbbf24; border-radius: 4px; }
+        .mestre-identity-box { padding: 10px 20px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.6); border: 1px solid #fbbf24; border-radius: 4px; flex-wrap: wrap; }
         .mestre-identity-box label { font-size: 0.8rem; color: #fbbf24; font-weight: bold; }
         .mestre-identity-box input[type="text"] { background: transparent; border: none; border-bottom: 1px solid #555; color: #fff; font-family: 'Cinzel', serif; text-align: center; width: 150px; }
         
@@ -1313,6 +1313,7 @@ export default function MestrePage() {
 
         .ff-add-btn { background: transparent; border: 1px dashed #fbbf24; color: #fbbf24; padding: 5px 15px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: 0.2s; }
         .ff-add-btn:hover { background: rgba(251, 191, 36, 0.1); }
+        .ff-add-btn.small-btn { padding: 4px 10px; font-size: 0.75rem; }
         .ff-add-btn-gold-small { background: transparent; border: 1px dashed #00f2ff; color: #00f2ff; padding: 5px 10px; cursor: pointer; font-size: 0.7rem; font-weight: bold; }
         .ff-add-btn-gold-small:hover { background: rgba(0, 242, 255, 0.1); }
 
@@ -1389,6 +1390,54 @@ export default function MestrePage() {
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+        /* --- RESPONSIVIDADE --- */
+        @media (max-width: 1100px) {
+          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; }
+          .mestre-content { height: auto; overflow-y: visible; padding: 15px; }
+          .mestre-grid { grid-template-columns: 1fr 1fr; gap: 15px; min-height: 0; flex: none; }
+          .board-column { height: 500px; }
+          .ff-title { font-size: 1.5rem; letter-spacing: 2px; }
+          .mestre-identity-box { padding: 8px 12px; }
+          .mestre-identity-box label:nth-child(3) { display: none; }
+        }
+
+        @media (max-width: 768px) {
+          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; }
+          .mestre-content { height: auto; overflow-y: visible; padding: 10px; }
+          .mestre-grid { grid-template-columns: 1fr; gap: 12px; flex: none; min-height: 0; }
+          .board-column { height: 420px; }
+          .top-bar-flex { flex-direction: column; align-items: flex-start; gap: 8px; }
+          .ff-title { font-size: 1.2rem; letter-spacing: 1px; }
+          .mestre-identity-box { width: 100%; box-sizing: border-box; padding: 8px 12px; justify-content: space-between; }
+          .mestre-identity-box label { font-size: 0.7rem; }
+          .mestre-identity-box label:nth-child(3) { display: none; }
+          .mestre-identity-box input[type="text"] { width: 110px; font-size: 0.85rem; }
+          .card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+          .card-header > div { flex-wrap: wrap; }
+          .ff-add-btn, .small-btn { font-size: 0.7rem; padding: 4px 10px; }
+          .ff-modal-scrollable { width: 95vw !important; padding: 15px; }
+          .detail-view-main { width: 95vw !important; height: 85vh !important; }
+          .detail-body-grid { grid-template-columns: 1fr !important; padding: 15px !important; gap: 15px !important; }
+          .detail-info-row { flex-direction: column !important; gap: 15px !important; }
+          .detail-title-col h2 { font-size: 1.3rem !important; }
+          .arena-manager-grid { grid-template-columns: 1fr !important; }
+          .mercado-grid { grid-template-columns: 1fr !important; }
+          .row-double-ff { flex-direction: column; gap: 10px; }
+          .ts-body { flex-direction: column; }
+          .export-float-bar { flex-wrap: wrap; justify-content: center; left: 50%; transform: translateX(-50%); width: 90vw; }
+          .dm-floating-container { right: 15px; bottom: 90px; }
+          .dm-float-btn { width: 55px; height: 55px; }
+        }
+
+        @media (max-width: 480px) {
+          .mestre-content { padding: 8px; }
+          .mestre-grid { gap: 8px; }
+          .board-column { height: 380px; }
+          .ff-title { font-size: 1rem; }
+          .poster-actions { flex-wrap: wrap; }
+          .btn-cyan, .btn-red { font-size: 0.65rem; padding: 5px; }
+        }
 
       `}</style>
     </div>
