@@ -847,7 +847,8 @@ export default function MestrePage() {
         </div>
       </div>
 
-      {/* --- BOTÃO FLUTUANTE MERCADO --- */}
+      {/* --- DOCK DOS BOTÕES FLUTUANTES --- */}
+      <div className="mobile-float-dock-bg" aria-hidden="true" />
       <div className="dm-floating-container">
           <button className="dm-float-btn btn-trocas-dm" onClick={() => setShowMercadoModal(true)} title="Mercado dos Lanternas">
               🏮
@@ -1378,6 +1379,7 @@ export default function MestrePage() {
         .close-lightbox { position: absolute; top: -40px; right: -40px; background: transparent; border: none; color: #fff; font-size: 40px; cursor: pointer; }
         
         /* BOTÕES FLUTUANTES NO MESTREPAGE (EM COLUNA E MAIS ACIMA) */
+        .mobile-float-dock-bg { display: none; } /* só aparece no mobile via media query */
         .dm-floating-container { position: fixed; right: 30px; bottom: 110px; display: flex; flex-direction: column; gap: 20px; z-index: 9999; }
         .dm-float-btn { width: 70px; height: 70px; border-radius: 50%; border: 2px solid; background: #000; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; position: relative; }
         .dm-float-btn:hover { transform: scale(1.1); }
@@ -1436,22 +1438,25 @@ export default function MestrePage() {
 
         /* --- MOBILE (< 768px): abas com 1 coluna por vez --- */
         @media (max-width: 768px) {
-          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
-          .mestre-content { height: auto; min-height: 100%; padding: 0 0 80px 0; display: flex; flex-direction: column; overflow: visible; }
+          /* Container e página rolam livremente */
+          .mestre-container { height: auto !important; min-height: 100vh; overflow-y: auto !important; overflow-x: hidden !important; -webkit-overflow-scrolling: touch; }
+          .mestre-bg-image-full { position: fixed !important; }
+          .mestre-content { position: relative; z-index: 10; height: auto !important; min-height: 100%; padding: 0 0 120px 0; display: flex; flex-direction: column; overflow: visible !important; box-sizing: border-box; }
 
-          /* Tab nav */
+          /* Tab nav sticky */
           .mobile-tab-nav {
             display: flex;
             position: sticky;
             top: 0;
-            z-index: 200;
-            background: rgba(2, 6, 23, 0.97);
+            z-index: 500;
+            background: rgba(2, 6, 23, 0.98);
             border-bottom: 2px solid #fbbf24;
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
           }
           .mob-tab {
             flex: 1;
-            padding: 14px 4px;
+            padding: 15px 4px;
             font-family: 'Cinzel', serif;
             font-size: 0.65rem;
             font-weight: bold;
@@ -1460,42 +1465,56 @@ export default function MestrePage() {
             border: none;
             color: #64748b;
             cursor: pointer;
-            transition: 0.2s;
+            transition: color 0.2s, background 0.2s;
             border-bottom: 3px solid transparent;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
             white-space: nowrap;
           }
-          .mob-tab.active { color: #fbbf24; border-bottom-color: #fbbf24; background: rgba(251,191,36,0.06); }
+          .mob-tab.active { color: #fbbf24; border-bottom-color: #fbbf24; background: rgba(251,191,36,0.07); }
 
           /* Top bar */
-          .top-bar-flex { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 12px 0; margin-bottom: 10px; }
+          .top-bar-flex { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 12px 0; margin-bottom: 0; }
           .ff-title { font-size: 1.3rem; letter-spacing: 2px; text-align: center; }
           .mestre-identity-box { padding: 8px 12px; gap: 8px; justify-content: center; flex-wrap: wrap; }
           .label-cor-narrador { margin-left: 0 !important; }
 
-          /* Grid: uma coluna, scroll normal */
-          .mestre-grid { display: flex; flex-direction: column; padding: 12px; gap: 0; flex: none; overflow: visible; }
-
-          /* Hide/show via tab */
+          /* Grid: sem altura fixa, sem scroll interno — a página toda rola */
+          .mestre-grid { display: block; padding: 10px 12px 0; overflow: visible; }
           .mob-hidden { display: none !important; }
-          .board-column { height: auto; min-height: calc(100vh - 180px); width: 100%; }
+          .board-column { height: auto !important; min-height: 0 !important; width: 100%; border-radius: 0 0 8px 8px; }
 
-          /* Card actions touch-friendly */
-          .btn-cyan, .btn-red { padding: 10px 6px; font-size: 0.75rem; min-height: 40px; }
-          .btn-play-vtt { min-height: 44px; font-size: 0.9rem; }
-          .ff-add-btn { padding: 10px 14px; font-size: 0.8rem; min-height: 40px; }
+          /* Coluna e scrolls não cortam conteúdo no mobile — a página toda rola */
+          .board-column { overflow: visible !important; }
+          .mission-scroll { overflow-y: visible !important; max-height: none !important; flex: none !important; padding-bottom: 16px !important; }
+          .rank-scroll-panel { overflow: visible !important; max-height: none !important; flex: none !important; }
+
+          /* Card actions touch-friendly (área mínima de toque 44px) */
+          .btn-cyan, .btn-red { padding: 12px 8px; font-size: 0.75rem; min-height: 44px; touch-action: manipulation; }
+          .btn-play-vtt { min-height: 48px; font-size: 0.9rem; touch-action: manipulation; }
+          .ff-add-btn { padding: 12px 14px; font-size: 0.8rem; min-height: 44px; touch-action: manipulation; }
+          .btn-kick-x { min-height: 36px; min-width: 36px; }
           .poster-actions { gap: 8px; }
 
           /* Card header */
-          .card-header { flex-wrap: wrap; gap: 8px; padding: 12px; }
-          .card-header h3 { font-size: 0.9rem; }
+          .card-header { flex-wrap: wrap; gap: 8px; padding: 14px 12px; }
+          .card-header h3 { font-size: 0.95rem; }
           .card-header > div { display: flex; gap: 6px; flex-wrap: wrap; }
 
-          /* Modais full-screen no mobile */
-          .ff-modal-overlay-fixed { align-items: flex-end; padding: 0; }
-          .ff-modal-scrollable { width: 100vw !important; max-width: 100vw !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; padding: 20px 16px !important; }
-          .detail-view-main { width: 100vw !important; height: 92vh !important; border-radius: 16px 16px 0 0 !important; }
-          .detail-body-grid { grid-template-columns: 1fr !important; padding: 16px !important; gap: 16px !important; }
+          /* Modais: bottom sheet no mobile */
+          .ff-modal-overlay-fixed { align-items: flex-end !important; padding: 0 !important; }
+          .ff-modal-scrollable {
+            width: 100vw !important; max-width: 100vw !important;
+            max-height: 93vh !important;
+            border-radius: 18px 18px 0 0 !important;
+            padding: 20px 16px 30px !important;
+            border-left: none !important; border-right: none !important; border-bottom: none !important;
+          }
+          .detail-view-main {
+            width: 100vw !important; height: 93vh !important;
+            border-radius: 18px 18px 0 0 !important;
+          }
+          .detail-body-grid { grid-template-columns: 1fr !important; padding: 16px !important; gap: 14px !important; }
           .detail-info-row { flex-direction: column !important; gap: 12px !important; }
           .detail-title-col h2 { font-size: 1.3rem !important; }
           .arena-manager-grid { grid-template-columns: 1fr !important; }
@@ -1503,20 +1522,70 @@ export default function MestrePage() {
           .row-double-ff { flex-direction: column; gap: 10px; }
           .ts-body { flex-direction: column; }
 
-          /* Float bar export */
-          .export-float-bar { flex-wrap: wrap; justify-content: center; width: 92vw; padding: 8px 12px; gap: 8px; }
+          /* Export float bar */
+          .export-float-bar { flex-wrap: wrap; justify-content: center; width: 94vw; padding: 8px 12px; gap: 8px; }
           .btn-export-md, .btn-export-json { padding: 8px 14px; font-size: 0.75rem; }
 
-          /* Botão flutuante */
-          .dm-floating-container { right: 16px; bottom: 20px; }
-          .dm-float-btn { width: 56px; height: 56px; font-size: 24px; }
+          /* ===== DOCK DOS BOTÕES FLUTUANTES NO MOBILE ===== */
+          .mobile-float-dock-bg {
+            display: block;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: rgba(2, 6, 23, 0.97);
+            border-top: 1px solid #334155;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 9988;
+          }
+          .dm-float-btn { width: 52px !important; height: 52px !important; font-size: 22px !important; }
+
+          /* Bazar e Forja: encaixam na dock ao lado do Mercado
+             Dock layout: [🏮 Mercado] [🛒 Bazar] [⚒ Forja]
+             Mercado fica no dm-floating-container (left ~16%)
+             Bazar fica no centro (~50%)
+             Forja fica na direita (~84%)
+          */
+          .bazar-trigger-btn {
+            position: fixed !important;
+            bottom: 8px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            right: auto !important;
+            width: 52px !important; height: 52px !important;
+            z-index: 9991 !important;
+          }
+          .forja-trigger-btn {
+            position: fixed !important;
+            bottom: 8px !important;
+            right: 16px !important;
+            left: auto !important;
+            transform: none !important;
+            width: 52px !important; height: 52px !important;
+            z-index: 9991 !important;
+          }
+          /* Dock do Mercado: só o botão 🏮, alinhado à esquerda da dock */
+          .dm-floating-container {
+            width: auto !important;
+            left: 16px !important;
+            right: auto !important;
+            bottom: 8px !important;
+            background: transparent !important;
+            border-top: none !important;
+            padding: 0 !important;
+          }
         }
 
         /* --- CELULAR PEQUENO (< 420px) --- */
         @media (max-width: 420px) {
           .ff-title { font-size: 1.1rem; letter-spacing: 1px; }
-          .mob-tab { font-size: 0.6rem; padding: 12px 2px; }
-          .mestre-identity-box input[type="text"] { width: 100px; }
+          .mob-tab { font-size: 0.58rem; padding: 13px 2px; }
+          .mestre-identity-box input[type="text"] { width: 90px; }
+          .dm-float-btn { width: 48px !important; height: 48px !important; font-size: 20px !important; }
+          .bazar-trigger-btn { width: 48px !important; height: 48px !important; }
+          .forja-trigger-btn { width: 48px !important; height: 48px !important; }
         }
 
       `}</style>
