@@ -195,6 +195,7 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
 
 export default function MestrePage() {
   const navigate = useNavigate();
+  const [mobileTab, setMobileTab] = useState('missoes');
   
   const [currentUser, setCurrentUser] = useState(null);
   const [missoes, setMissoes] = useState([]);
@@ -705,16 +706,38 @@ export default function MestrePage() {
             <h1 className="ff-title">HUB DO NARRADOR</h1>
             
             <div className="mestre-identity-box ff-card fade-in">
-                <label>ASSINATURA DO MESTRE:</label>
+                <label>ASSINATURA:</label>
                 <input type="text" value={mestreIdentidade} onChange={(e) => setMestreIdentidade(e.target.value)} />
-                <label style={{marginLeft: '15px'}}>COR DO NARRADOR:</label>
+                <label className="label-cor-narrador">COR:</label>
                 <input type="color" value={mestreCor} onChange={(e) => setMestreCor(e.target.value)} style={{width: '30px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer'}} />
             </div>
+        </div>
+
+        {/* --- NAVEGAÇÃO MOBILE POR ABAS --- */}
+        <div className="mobile-tab-nav">
+            <button
+                className={`mob-tab ${mobileTab === 'missoes' ? 'active' : ''}`}
+                onClick={() => setMobileTab('missoes')}
+            >
+                📜 MISSÕES
+            </button>
+            <button
+                className={`mob-tab ${mobileTab === 'rank' ? 'active' : ''}`}
+                onClick={() => setMobileTab('rank')}
+            >
+                🏆 RANK
+            </button>
+            <button
+                className={`mob-tab ${mobileTab === 'sessoes' ? 'active' : ''}`}
+                onClick={() => setMobileTab('sessoes')}
+            >
+                🎮 SESSÕES
+            </button>
         </div>
         
         <div className="mestre-grid">
           {/* COLUNA 1: MISSÕES */}
-          <div className="ff-card board-column">
+          <div className={`ff-card board-column ${mobileTab !== 'missoes' ? 'mob-hidden' : ''}`}>
             <div className="card-header no-border">
               <h3>QUADRO DE MISSÕES</h3>
               <button className="ff-add-btn" onClick={() => setShowModal(true)}><span>+</span> ADICIONAR CARTAZ</button>
@@ -769,7 +792,7 @@ export default function MestrePage() {
           </div>
 
           {/* COLUNA 2: RANK DA TEMPORADA + GESTÃO DE PERSONAGENS */}
-          <div className="ff-card rank-card board-column">
+          <div className={`ff-card rank-card board-column ${mobileTab !== 'rank' ? 'mob-hidden' : ''}`}>
             <div className="card-header no-border">
               <h3>RANK DA TEMPORADA</h3>
             </div>
@@ -785,7 +808,7 @@ export default function MestrePage() {
           </div>
 
           {/* COLUNA 3: SESSÕES */}
-          <div className="ff-card board-column">
+          <div className={`ff-card board-column ${mobileTab !== 'sessoes' ? 'mob-hidden' : ''}`}>
             <div className="card-header no-border" style={{display:'flex', gap:'5px', flexWrap: 'wrap'}}>
               <h3>SESSÕES DE JOGO</h3>
               <div style={{display:'flex', gap:'5px'}}>
@@ -1133,7 +1156,7 @@ export default function MestrePage() {
         .mestre-bg-image-full { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.3; z-index: 0; animation: slowPan 60s infinite alternate; }
         @keyframes slowPan { from { transform: scale(1.0); } to { transform: scale(1.1); } }
         
-        .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+        .mestre-content { position: relative; z-index: 10; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
 
         .export-float-bar {
             position: fixed;
@@ -1391,52 +1414,109 @@ export default function MestrePage() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
 
-        /* --- RESPONSIVIDADE --- */
-        @media (max-width: 1100px) {
-          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; }
-          .mestre-content { height: auto; overflow-y: visible; padding: 15px; }
-          .mestre-grid { grid-template-columns: 1fr 1fr; gap: 15px; min-height: 0; flex: none; }
-          .board-column { height: 500px; }
-          .ff-title { font-size: 1.5rem; letter-spacing: 2px; }
-          .mestre-identity-box { padding: 8px 12px; }
-          .mestre-identity-box label:nth-child(3) { display: none; }
+        /* --- NAVEGAÇÃO MOBILE POR ABAS (oculta no desktop) --- */
+        .mobile-tab-nav { display: none; }
+        .mob-hidden { display: flex !important; } /* no desktop, todas colunas aparecem */
+
+        /* --- NOTEBOOK / TABLET LARGO (1024-1280px) --- */
+        @media (max-width: 1280px) {
+          .mestre-grid { gap: 14px; }
+          .ff-title { font-size: 1.6rem; letter-spacing: 3px; }
         }
 
+        /* --- TABLET (768-1100px): 3 colunas compactas com scroll horizontal --- */
+        @media (max-width: 1100px) {
+          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
+          .mestre-content { height: auto; min-height: 100%; padding: 12px; overflow: visible; box-sizing: border-box; }
+          .mestre-grid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 12px; flex: none; min-height: 0; }
+          .board-column { height: 520px; }
+          .ff-title { font-size: 1.4rem; letter-spacing: 2px; }
+          .mestre-identity-box { padding: 8px 12px; gap: 8px; }
+        }
+
+        /* --- MOBILE (< 768px): abas com 1 coluna por vez --- */
         @media (max-width: 768px) {
-          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; }
-          .mestre-content { height: auto; overflow-y: visible; padding: 10px; }
-          .mestre-grid { grid-template-columns: 1fr; gap: 12px; flex: none; min-height: 0; }
-          .board-column { height: 420px; }
-          .top-bar-flex { flex-direction: column; align-items: flex-start; gap: 8px; }
-          .ff-title { font-size: 1.2rem; letter-spacing: 1px; }
-          .mestre-identity-box { width: 100%; box-sizing: border-box; padding: 8px 12px; justify-content: space-between; }
-          .mestre-identity-box label { font-size: 0.7rem; }
-          .mestre-identity-box label:nth-child(3) { display: none; }
-          .mestre-identity-box input[type="text"] { width: 110px; font-size: 0.85rem; }
-          .card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-          .card-header > div { flex-wrap: wrap; }
-          .ff-add-btn, .small-btn { font-size: 0.7rem; padding: 4px 10px; }
-          .ff-modal-scrollable { width: 95vw !important; padding: 15px; }
-          .detail-view-main { width: 95vw !important; height: 85vh !important; }
-          .detail-body-grid { grid-template-columns: 1fr !important; padding: 15px !important; gap: 15px !important; }
-          .detail-info-row { flex-direction: column !important; gap: 15px !important; }
+          .mestre-container { height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
+          .mestre-content { height: auto; min-height: 100%; padding: 0 0 80px 0; display: flex; flex-direction: column; overflow: visible; }
+
+          /* Tab nav */
+          .mobile-tab-nav {
+            display: flex;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            background: rgba(2, 6, 23, 0.97);
+            border-bottom: 2px solid #fbbf24;
+            backdrop-filter: blur(8px);
+          }
+          .mob-tab {
+            flex: 1;
+            padding: 14px 4px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.65rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            background: transparent;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            transition: 0.2s;
+            border-bottom: 3px solid transparent;
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+          }
+          .mob-tab.active { color: #fbbf24; border-bottom-color: #fbbf24; background: rgba(251,191,36,0.06); }
+
+          /* Top bar */
+          .top-bar-flex { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 12px 0; margin-bottom: 10px; }
+          .ff-title { font-size: 1.3rem; letter-spacing: 2px; text-align: center; }
+          .mestre-identity-box { padding: 8px 12px; gap: 8px; justify-content: center; flex-wrap: wrap; }
+          .label-cor-narrador { margin-left: 0 !important; }
+
+          /* Grid: uma coluna, scroll normal */
+          .mestre-grid { display: flex; flex-direction: column; padding: 12px; gap: 0; flex: none; overflow: visible; }
+
+          /* Hide/show via tab */
+          .mob-hidden { display: none !important; }
+          .board-column { height: auto; min-height: calc(100vh - 180px); width: 100%; }
+
+          /* Card actions touch-friendly */
+          .btn-cyan, .btn-red { padding: 10px 6px; font-size: 0.75rem; min-height: 40px; }
+          .btn-play-vtt { min-height: 44px; font-size: 0.9rem; }
+          .ff-add-btn { padding: 10px 14px; font-size: 0.8rem; min-height: 40px; }
+          .poster-actions { gap: 8px; }
+
+          /* Card header */
+          .card-header { flex-wrap: wrap; gap: 8px; padding: 12px; }
+          .card-header h3 { font-size: 0.9rem; }
+          .card-header > div { display: flex; gap: 6px; flex-wrap: wrap; }
+
+          /* Modais full-screen no mobile */
+          .ff-modal-overlay-fixed { align-items: flex-end; padding: 0; }
+          .ff-modal-scrollable { width: 100vw !important; max-width: 100vw !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; padding: 20px 16px !important; }
+          .detail-view-main { width: 100vw !important; height: 92vh !important; border-radius: 16px 16px 0 0 !important; }
+          .detail-body-grid { grid-template-columns: 1fr !important; padding: 16px !important; gap: 16px !important; }
+          .detail-info-row { flex-direction: column !important; gap: 12px !important; }
           .detail-title-col h2 { font-size: 1.3rem !important; }
           .arena-manager-grid { grid-template-columns: 1fr !important; }
           .mercado-grid { grid-template-columns: 1fr !important; }
           .row-double-ff { flex-direction: column; gap: 10px; }
           .ts-body { flex-direction: column; }
-          .export-float-bar { flex-wrap: wrap; justify-content: center; left: 50%; transform: translateX(-50%); width: 90vw; }
-          .dm-floating-container { right: 15px; bottom: 90px; }
-          .dm-float-btn { width: 55px; height: 55px; }
+
+          /* Float bar export */
+          .export-float-bar { flex-wrap: wrap; justify-content: center; width: 92vw; padding: 8px 12px; gap: 8px; }
+          .btn-export-md, .btn-export-json { padding: 8px 14px; font-size: 0.75rem; }
+
+          /* Botão flutuante */
+          .dm-floating-container { right: 16px; bottom: 20px; }
+          .dm-float-btn { width: 56px; height: 56px; font-size: 24px; }
         }
 
-        @media (max-width: 480px) {
-          .mestre-content { padding: 8px; }
-          .mestre-grid { gap: 8px; }
-          .board-column { height: 380px; }
-          .ff-title { font-size: 1rem; }
-          .poster-actions { flex-wrap: wrap; }
-          .btn-cyan, .btn-red { font-size: 0.65rem; padding: 5px; }
+        /* --- CELULAR PEQUENO (< 420px) --- */
+        @media (max-width: 420px) {
+          .ff-title { font-size: 1.1rem; letter-spacing: 1px; }
+          .mob-tab { font-size: 0.6rem; padding: 12px 2px; }
+          .mestre-identity-box input[type="text"] { width: 100px; }
         }
 
       `}</style>
