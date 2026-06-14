@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { doc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
 
 // --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME) ---
-import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask } from 'react-icons/fa';
+import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask, FaTint, FaFeather } from 'react-icons/fa';
 
 // --- HELPER DE ÍCONES DE STATUS ---
 const getStatusIcon = (id) => {
@@ -17,6 +17,7 @@ const getStatusIcon = (id) => {
         case 'Desabilitado': return <FaBan color="#ff8800" />;
         case 'Condenado': return <FaSkull color="#ff0000" />;
         case 'Envenenado': return <FaFlask color="#00ff00" />;
+        case 'Sangramento': return <FaTint color="#dc2626" />;
         default: return null;
     }
 };
@@ -117,6 +118,7 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
     let tokenClasses = `vtt-token ${token.type} ${flash}`;
     if (!isBaseVisible) tokenClasses += ' ghost-token';
     if (isMyStealth) tokenClasses += ' stealth-token';
+    if (token.flying) tokenClasses += ' flying-token';
     if (isHighlighted) tokenClasses += ' blinking-highlight';
 
     const customStyle = {
@@ -140,22 +142,32 @@ const Token = ({ token, gridSize, isMaster, onUpdate, onStart, charData, isHighl
             onMouseDown={(e) => onStart(e, token)}
             onTouchStart={(e) => onStart(e, token)}
         >
-            <div 
-                className="token-inner" 
-                style={{
-                    backgroundImage: `url(${imgUrl})`,
-                    backgroundPosition: `${bgPosX}% ${bgPosY}%` 
-                }}
-            ></div>
-            
-            {/* --- OVERLAY DE STATUS NEGATIVOS --- */}
-            {token.statuses && token.statuses.length > 0 && (
-                <div className="token-status-overlay">
-                    {token.statuses.map(s => (
-                        <div key={s} className="status-icon-badge" title={s}>{getStatusIcon(s)}</div>
-                    ))}
-                </div>
-            )}
+            {token.flying && <div className="token-flight-shadow" aria-hidden="true" />}
+
+            <div className={`token-float-body ${token.flying ? 'is-flying' : ''}`}>
+                {token.flying && (
+                    <>
+                        <FaFeather className="flight-wing wing-left" aria-hidden="true" />
+                        <FaFeather className="flight-wing wing-right" aria-hidden="true" />
+                    </>
+                )}
+                <div 
+                    className="token-inner" 
+                    style={{
+                        backgroundImage: `url(${imgUrl})`,
+                        backgroundPosition: `${bgPosX}% ${bgPosY}%` 
+                    }}
+                ></div>
+
+                {/* --- OVERLAY DE STATUS NEGATIVOS --- */}
+                {token.statuses && token.statuses.length > 0 && (
+                    <div className="token-status-overlay">
+                        {token.statuses.map(s => (
+                            <div key={s} className="status-icon-badge" title={s}>{getStatusIcon(s)}</div>
+                        ))}
+                    </div>
+                )}
+            </div>
             
             {isMaster && (
                 <div className="token-sizer">
@@ -906,6 +918,51 @@ export default function Tabletop({ sessaoData, isMaster, showManager, onCloseMan
             
             .vtt-token.stealth-token { opacity: 0.6; border: 2px dotted #8a2be2 !important; box-shadow: 0 0 15px rgba(138, 43, 226, 0.6) !important; }
             .vtt-token.stealth-token .token-inner { filter: grayscale(50%) hue-rotate(250deg); }
+
+            .token-float-body { position: relative; width: 100%; height: 100%; border-radius: inherit; }
+            .token-float-body.is-flying { animation: tokenFloat 3.5s ease-in-out infinite; }
+
+            .vtt-token.flying-token { box-shadow: 0 4px 12px rgba(56, 189, 248, 0.35); }
+            .token-flight-shadow {
+                position: absolute;
+                bottom: 2px;
+                left: 50%;
+                width: 72%;
+                height: 10px;
+                transform: translateX(-50%);
+                background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.15) 55%, transparent 75%);
+                border-radius: 50%;
+                pointer-events: none;
+                z-index: 1;
+                animation: flightShadowPulse 3.5s ease-in-out infinite;
+            }
+            .flight-wing {
+                position: absolute;
+                top: 42%;
+                font-size: clamp(10px, 38%, 18px);
+                color: #e0f2fe;
+                filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.8));
+                pointer-events: none;
+                z-index: 6;
+                opacity: 0.92;
+            }
+            .flight-wing.wing-left {
+                left: -18%;
+                transform: translateY(-50%) rotate(-28deg) scaleX(-1);
+            }
+            .flight-wing.wing-right {
+                right: -18%;
+                transform: translateY(-50%) rotate(28deg);
+            }
+
+            @keyframes tokenFloat {
+                0%, 100% { transform: translateY(-3px); }
+                50% { transform: translateY(-7px); }
+            }
+            @keyframes flightShadowPulse {
+                0%, 100% { transform: translateX(-50%) scale(0.8); opacity: 0.45; }
+                50% { transform: translateX(-50%) scale(1); opacity: 0.7; }
+            }
 
             .blinking-highlight {
                 animation: superBlink 0.5s infinite alternate !important;

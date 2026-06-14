@@ -23,6 +23,7 @@ import { backgroundMusic } from './LandingPage';
 import GuildBoard from '../components/GuildBoard'; 
 import treeData from '../data/tree.json';
 import { getCharacterClass, getCharacterRace, hasClassMismatch } from '../utils/characterHelpers'; 
+import { FaFeather } from 'react-icons/fa';
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -831,7 +832,7 @@ export default function JogadorVttPage() {
                         return (
                             <div 
                                 key={token.id} 
-                                className={`tracker-item readonly ${isMyStealth ? 'tracker-stealth-self' : ''} ${hasBencaoBuff ? 'bencao-highlight' : ''}`}
+                                className={`tracker-item readonly ${isMyStealth ? 'tracker-stealth-self' : ''} ${token.flying ? 'tracker-flying' : ''} ${hasBencaoBuff ? 'bencao-highlight' : ''}`}
                                 style={customBorder}
                             >
                                 <div className="t-col-img">
@@ -841,6 +842,7 @@ export default function JogadorVttPage() {
                                 <div className="t-col-info">
                                     <div className="t-name" style={teamColor ? {color: teamColor} : {}}>
                                         {token.name}
+                                        {token.flying && <span className="t-flying-icon" title="Em voo"><FaFeather size={11} /></span>}
                                         {hasBencaoBuff && <span className="t-bencao-icon" title="Bênção dos Deuses ativa">✨</span>}
                                     </div>
                                     <div className="t-stats-row">
@@ -1335,6 +1337,8 @@ export default function JogadorVttPage() {
         .tracker-item.object-item { border-style: dashed; }
         .tracker-item:hover { border-color: #ffcc00; }
         .tracker-item.tracker-stealth-self { border-color: #a855f7; border-style: dashed; opacity: 0.8; box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.3); }
+        .tracker-item.tracker-flying { border-color: #38bdf8; box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.25); }
+        .t-flying-icon { margin-left: 6px; color: #38bdf8; display: inline-flex; vertical-align: middle; filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.6)); }
 
         .t-col-img { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; }
         .t-index { color: #666; font-size: 10px; font-weight: bold; margin-bottom: 2px; }

@@ -30,7 +30,7 @@ import DmOrbitalMenu from '../components/DmOrbitalMenu';
 import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
 
 // --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
-import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask } from 'react-icons/fa';
+import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask, FaTint, FaFeather } from 'react-icons/fa';
 
 const STATUS_EFFECTS = [
     { id: 'Paralisado', icon: <FaBolt />, color: '#ffdd00' },
@@ -41,7 +41,8 @@ const STATUS_EFFECTS = [
     { id: 'Imobilizado', icon: <FaLock />, color: '#888888' },
     { id: 'Desabilitado', icon: <FaBan />, color: '#ff8800' },
     { id: 'Condenado', icon: <FaSkull />, color: '#ff0000' },
-    { id: 'Envenenado', icon: <FaFlask />, color: '#00ff00' }
+    { id: 'Envenenado', icon: <FaFlask />, color: '#00ff00' },
+    { id: 'Sangramento', icon: <FaTint />, color: '#dc2626' }
 ];
 
 // --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
@@ -732,7 +733,7 @@ export default function MestreVTTPage() {
                       return (
                           <div key={token.id} className={`tracker-item-wrapper ${hasBencaoBuff ? 'bencao-highlight' : ''}`}>
                               <div 
-                                className={`tracker-item ${token.type} ${!isVisible ? 'hidden' : ''} ${token.stealth ? 'stealth-active' : ''}`}
+                                className={`tracker-item ${token.type} ${!isVisible ? 'hidden' : ''} ${token.stealth ? 'stealth-active' : ''} ${token.flying ? 'flying-active' : ''}`}
                                 draggable
                                 onDragStart={(e) => onDragStart(e, token.originalIndex)}
                                 onDragOver={(e) => e.preventDefault()}
@@ -747,6 +748,7 @@ export default function MestreVTTPage() {
                                   <div className="t-col-info">
                                       <div className="t-name" style={teamColor ? {color: teamColor} : {}}>
                                           {token.name}
+                                          {token.flying && <span className="t-flying-icon" title="Em voo"><FaFeather size={11} /></span>}
                                           {hasBencaoBuff && <span className="t-bencao-icon" title="Bênção dos Deuses ativa">✨</span>}
                                           <span className="t-active-statuses">
                                               {token.statuses?.map(s => {
@@ -798,6 +800,14 @@ export default function MestreVTTPage() {
                                               style={{color: token.stealth ? '#a855f7' : '#666'}}
                                           >
                                               🥷
+                                          </button>
+                                          <button 
+                                              className="btn-icon-sm" 
+                                              title={token.flying ? "Remover Voo" : "Ativar Voo (token flutuando no grid)"} 
+                                              onClick={() => handleUpdateTokenInTracker(token, { flying: !token.flying })} 
+                                              style={{color: token.flying ? '#38bdf8' : '#666'}}
+                                          >
+                                              <FaFeather size={12} />
                                           </button>
                                           <button className="btn-icon-sm" title={isVisible ? "Ocultar" : "Mostrar"} onClick={() => handleUpdateTokenInTracker(token, { visible: !isVisible })} style={{color: isVisible ? '#ffcc00' : '#666'}}>
                                               {isVisible ? '👁️' : '🙈'}
@@ -1283,6 +1293,7 @@ export default function MestreVTTPage() {
         .bencao-highlight { animation: flashGold 1.5s infinite alternate; border: 2px solid #ffcc00 !important; box-shadow: 0 0 15px #ffcc00; }
         @keyframes flashGold { 0% { filter: brightness(1); box-shadow: 0 0 5px #ffcc00; } 100% { filter: brightness(1.5); box-shadow: 0 0 25px #ffcc00; } }
         .t-bencao-icon { margin-left: 6px; font-size: 14px; filter: drop-shadow(0 0 4px #ffcc00); }
+        .t-flying-icon { margin-left: 6px; color: #38bdf8; display: inline-flex; vertical-align: middle; filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.6)); }
 
         .bencao-roll-flash { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; pointer-events: none; background: rgba(0,0,0,0.75); animation: bencaoFlashBg 4s ease-out forwards; }
         .bencao-roll-flash-inner { display: flex; flex-direction: column; align-items: center; text-align: center; animation: bencaoFlashPop 4s ease-out forwards; }
@@ -1301,6 +1312,8 @@ export default function MestreVTTPage() {
         .btn-pvp-toggle { background: #111; color: #666; border: 1px solid #555; padding: 6px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-left: 20px; font-family: 'Cinzel', serif; font-size: 12px; }
         .btn-pvp-toggle.active { background: #3b0764; color: #c4b5fd; border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5); }
         .tracker-item.stealth-active { border-color: #a855f7; border-style: dashed; box-shadow: inset 0 0 15px rgba(168, 85, 247, 0.2); }
+        .tracker-item.flying-active { border-color: #38bdf8; box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.25); }
+        .tracker-item-wrapper:has(.flying-active) { border-color: #38bdf8; }
 
         /* COMBAT TRACKER */
         .combat-tracker-panel { position: absolute; width: 360px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
