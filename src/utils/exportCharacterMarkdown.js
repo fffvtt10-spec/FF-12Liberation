@@ -110,6 +110,96 @@ export function characterToMarkdown(character) {
   return md;
 }
 
+const COMBAT_SYSTEM_APPENDIX = `---
+
+## Sistema de Combate
+
+O combate é narrativo e fluido: o Mestre define os requisitos de cada rolagem com base na situação. O acerto é resolvido com **D20**; o número necessário depende de posição, condições e contexto da cena.
+
+### Rolagem de Ataque
+
+1. Jogador declara a ação e o alvo.
+2. Mestre define o valor mínimo no D20 para sucesso (ex.: posição favorável = >5; alvo protegido com linha de visão difícil = >10).
+3. Jogador rola D20. Resultado **maior** que o valor definido = acerto.
+
+### Cálculo de Dano
+
+**Ataque físico** (armas corpo a corpo, arcos, bestas, pistolas):
+
+\`\`\`
+Dano Bruto = FOR + Bônus de Classe + Bônus da Arma
+Dano Final = Dano Bruto - DEF do alvo
+\`\`\`
+
+**Ataque mágico** (habilidades, feitiços):
+
+\`\`\`
+Dano Bruto = INT + Bônus de Classe + Bônus do Equipamento
+Dano Final = Dano Bruto - RES do alvo
+\`\`\`
+
+- **Arqueiros, Pistoleiros e Exilados** usam armas de longo alcance e calculam dano com **FOR**.
+- Habilidades podem alterar o tipo elemental do dano (fogo, gelo, raio, veneno etc.) ou aplicar buffs/debuffs.
+- Nos personagens jogadores, defesa física aparece como **ARM** e resistência mágica como **MR**. Em criaturas, use **DEF** e **RES** com a mesma função.
+
+### Regras Especiais
+
+| Resultado D20 | Efeito |
+|---------------|--------|
+| 20 | Sucesso crítico — o dano bruto é **dobrado** |
+| 1 | Falha crítica — consequência narrativa negativa (tropeço, arma danificada, exposição ao inimigo etc.) |
+
+### Referência Rápida
+
+| Tipo | Atributo de Dano | Mitigação do Alvo |
+|------|------------------|-------------------|
+| Físico | FOR | DEF |
+| Mágico | INT | RES |
+
+---
+
+## Instruções para IA — Geração de Encontros
+
+Você recebeu acima as fichas completas do grupo (atributos, ARM, MR, MOV, equipamentos, habilidades e bônus de classe). Use **exclusivamente** esses dados para calibrar encontros de combate.
+
+### O que gerar
+
+Para cada proposta de encontro, entregue **três variantes de dificuldade** (Fácil, Balanceado, Difícil) no mesmo mapa ou cenário. Em cada variante, inclua:
+
+1. **Composição do encontro** — quantidade e tipos de criaturas por mapa; justifique se há diversidade de espécies ou horda homogênea.
+2. **Ficha de cada criatura** — nome, HP, DEF, RES, atributos relevantes (FOR/INT conforme o tipo de ataque), bônus de ataque/dano, MOV e valor sugerido de D20 para acertar o grupo (considere posição e condições típicas do mapa).
+3. **Dificuldade de acerto contra o grupo** — para cada criatura, indique faixas de D20 que o Mestre pode usar conforme a situação tática.
+4. **Mini lore** — 2–4 frases de ambientação inspiradas em *Final Fantasy Tactics*, Ivalice e criaturas clássicas de RPG (goblins, flan, chocobos corrompidos, soldados de guilda, elementais, undead etc.). Tom de fantasia medieval política, não cópia literal de nomes protegidos.
+5. **Dicas táticas** — 1–2 observações por encontro, em tom **sarcástico ou irônico**, sem entregar a solução de bandeja. Sugira caminhos possíveis (flanquear, focar alvo frágil, explorar fraqueza elemental, usar terreno) de forma velada.
+
+### Como balancear
+
+- **Fácil:** o grupo deve vencer gastando poucos recursos; erros de rolagem não devem ser fatais.
+- **Balanceado:** vitória provável com tática e uso de habilidades; 1–2 momentos de tensão real.
+- **Difícil:** exige coordenação, posicionamento e priorização de alvos; derrota é possível se o grupo jogar mal.
+
+Compare o dano médio estimado do grupo (FOR/INT + bônus de classe + equipamento) contra o HP e DEF/RES das criaturas. Considere quantos personagens estão no export e o MOV do mapa.
+
+### Formato de saída sugerido
+
+\`\`\`
+### [Nome do Mapa / Cenário]
+
+#### Variante Fácil
+- Criaturas: ...
+- Lore: ...
+- Dicas: ...
+
+#### Variante Balanceada
+...
+
+#### Variante Difícil
+...
+\`\`\`
+
+Priorize encontros jogáveis, variados e coerentes com o poder médio do grupo exportado acima.
+`;
+
 export function charactersToMarkdown(characters) {
   const dateStr = new Date().toLocaleString('pt-BR');
   let md = `# Exportação de Personagens\n\n`;
@@ -120,6 +210,8 @@ export function charactersToMarkdown(characters) {
     md += characterToMarkdown(char);
     if (i < characters.length - 1) md += `---\n\n`;
   });
+
+  md += `\n${COMBAT_SYSTEM_APPENDIX}`;
 
   return md;
 }
