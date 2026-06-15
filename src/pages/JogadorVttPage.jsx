@@ -22,7 +22,13 @@ import { DiceSelector, DiceResult } from '../components/DiceSystem';
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
 import treeData from '../data/tree.json';
-import { getCharacterClass, getCharacterRace, hasClassMismatch } from '../utils/characterHelpers'; 
+import { getCharacterClass, getCharacterRace, hasClassMismatch } from '../utils/characterHelpers';
+import {
+  getItensInventarioDisponiveis,
+  getGilDisponivelParaTroca,
+  getQuantidadeDisponivelSlot,
+  validarPropostaTroca
+} from '../utils/mercadoLanternas'; 
 import { FaFeather } from 'react-icons/fa';
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
@@ -502,15 +508,32 @@ export default function JogadorVttPage() {
   };
 
   // --- HANDLERS TROCAS GLOBAIS (JOGADOR) ---
-  const toggleItemTroca = (itemIndex, itemName) => {
+  const toggleItemTroca = (item) => {
       setTrocaForm(prev => {
-          const isSelected = prev.itensSelecionados.find(i => i.index === itemIndex);
+          const isSelected = prev.itensSelecionados.find(i => i.index === item.index);
           if (isSelected) {
-              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.index !== itemIndex) };
-          } else {
-              return { ...prev, itensSelecionados: [...prev.itensSelecionados, { index: itemIndex, name: itemName }] };
+              return { ...prev, itensSelecionados: prev.itensSelecionados.filter(i => i.index !== item.index) };
           }
+          return {
+              ...prev,
+              itensSelecionados: [
+                  ...prev.itensSelecionados,
+                  { index: item.index, name: item.name, quantidade: 1, maxQuantity: item.disponivel }
+              ]
+          };
       });
+  };
+
+  const updateItemQuantidadeTroca = (itemIndex, rawValue) => {
+      setTrocaForm(prev => ({
+          ...prev,
+          itensSelecionados: prev.itensSelecionados.map(i => {
+              if (i.index !== itemIndex) return i;
+              const parsed = parseInt(rawValue, 10);
+              const quantidade = Number.isNaN(parsed) ? 1 : Math.min(Math.max(1, parsed), i.maxQuantity);
+              return { ...i, quantidade };
+          })
+      }));
   };
 
   const handleEnviarProposta = async (e) => {
@@ -520,13 +543,20 @@ export default function JogadorVttPage() {
       
       const target = allPersonagens.find(p => p.uid === trocaForm.destinatarioUid);
       if (!target) return alert("Destinatário não encontrado.");
+      if (target.uid === personagem.uid) return alert("Você não pode enviar uma troca para si mesmo.");
       if (isPlayerActive(target.name)) return alert("O destinatário está em uma sessão ativa agora.");
-      
-      const itensFormatados = trocaForm.itensSelecionados.map(i => ({ 
-          name: i.name, 
-          quantidade: 1, 
-          index: i.index
-      }));
+
+      const inventory = personagem.character_sheet?.inventory;
+      const trocasPendentes = minhasTrocas.filter(t => t.status === 'pendente_mestre');
+      const validacao = validarPropostaTroca({
+          inventory,
+          itensSelecionados: trocaForm.itensSelecionados,
+          gil: trocaForm.gil,
+          trocasPendentes,
+          remetenteUid: personagem.uid
+      });
+
+      if (!validacao.valid) return alert(validacao.error);
 
       try {
           await addDoc(collection(db, "mercado_lanternas"), {
@@ -534,7 +564,7 @@ export default function JogadorVttPage() {
               remetente: personagem.name,
               destinatarioUid: target.uid,
               destinatario: target.name,
-              itens: itensFormatados, 
+              itens: validacao.itensNormalizados,
               gil: Number(trocaForm.gil) || 0,
               mensagem: trocaForm.mensagem,
               status: 'pendente_mestre',
@@ -726,8 +756,24 @@ export default function JogadorVttPage() {
   const isBencaoWinner = buffAtivo.includes(personagem?.name);
   const meuNumeroDestino = currentVttSession?.bencao_deuses?.numeros_escolhidos?.[personagem?.name];
   const bencaoJaRolado = (currentVttSession?.bencao_deuses?.resultado_d100 || 0) > 0;
-  const meuInventario = personagem?.character_sheet?.inventory?.items?.filter(i => i && i.name && i.name.trim() !== '') || [];
-  const meuGil = personagem?.character_sheet?.inventory?.gil || 0;
+  const meuInventarioItems = personagem?.character_sheet?.inventory?.items || [];
+  const trocasPendentesEnviadas = minhasTrocas.filter(
+      t => t.remetenteUid === personagem?.uid && t.status === 'pendente_mestre'
+  );
+  const meuInventario = getItensInventarioDisponiveis(meuInventarioItems).map(item => ({
+      ...item,
+      disponivel: getQuantidadeDisponivelSlot(
+          meuInventarioItems,
+          item.index,
+          trocasPendentesEnviadas,
+          personagem.uid
+      )
+  })).filter(item => item.disponivel > 0);
+  const meuGil = getGilDisponivelParaTroca(
+      personagem?.character_sheet?.inventory,
+      trocasPendentesEnviadas,
+      personagem?.uid
+  );
 
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
@@ -1142,18 +1188,50 @@ export default function JogadorVttPage() {
                                         <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>SEUS ITENS DISPONÍVEIS</label>
                                         <div className="itens-troca-lista custom-scrollbar">
                                             {meuInventario.length === 0 && <p style={{color:'#666', fontSize:'12px', fontStyle:'italic'}}>Seu inventário está vazio.</p>}
-                                            {meuInventario.map((item, idx) => (
-                                                <label key={idx} className="item-checkbox-label">
-                                                    <input type="checkbox" checked={!!trocaForm.itensSelecionados.find(i => i.index === idx)} onChange={() => toggleItemTroca(idx, item.name)} />
-                                                    {item.name} (Qtd: {item.quantity})
-                                                </label>
-                                            ))}
+                                            {meuInventario.map((item) => {
+                                                const selecionado = trocaForm.itensSelecionados.find(i => i.index === item.index);
+                                                return (
+                                                    <div key={item.index} className="item-checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, cursor: 'pointer' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!selecionado}
+                                                                onChange={() => toggleItemTroca(item)}
+                                                            />
+                                                            <span>{item.name} (Possui: {item.quantity}{item.disponivel < item.quantity ? ` | Disponível: ${item.disponivel}` : ''})</span>
+                                                        </label>
+                                                        {selecionado && (
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max={selecionado.maxQuantity}
+                                                                className="file-input-dark"
+                                                                style={{ width: '70px', padding: '4px 6px', textAlign: 'center' }}
+                                                                value={selecionado.quantidade}
+                                                                onChange={e => updateItemQuantidadeTroca(item.index, e.target.value)}
+                                                                title={`Quantidade a enviar (máx: ${selecionado.maxQuantity})`}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
                                     <div style={{marginBottom:'10px'}}>
                                         <label style={{display:'block', fontSize:'10px', color:'#aaa', marginBottom:'5px'}}>GIL ENVIADO (Máx: {meuGil})</label>
-                                        <input type="number" min="0" max={meuGil} className="file-input-dark" value={trocaForm.gil} onChange={e => setTrocaForm({...trocaForm, gil: Number(e.target.value)})} />
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max={meuGil}
+                                            className="file-input-dark"
+                                            value={trocaForm.gil}
+                                            onChange={e => {
+                                                const parsed = parseInt(e.target.value, 10);
+                                                const gil = Number.isNaN(parsed) ? 0 : Math.min(Math.max(0, parsed), meuGil);
+                                                setTrocaForm({ ...trocaForm, gil });
+                                            }}
+                                        />
                                     </div>
 
                                     <div style={{marginBottom:'15px'}}>
@@ -1183,7 +1261,7 @@ export default function JogadorVttPage() {
                                                 <strong style={{color: statusColor}}>{statusText}</strong>
                                             </div>
                                             <p style={{margin:'2px 0', fontSize:'10px', color:'#555'}}>{dataHora}</p>
-                                            <p style={{margin:'5px 0', fontSize:'12px', color:'#ccc'}}>Itens: {t.itens?.map(i => i.name).join(', ') || 'Nenhum'}</p>
+                                            <p style={{margin:'5px 0', fontSize:'12px', color:'#ccc'}}>Itens: {t.itens?.map(i => `${i.quantidade || 1}x ${i.name}`).join(', ') || 'Nenhum'}</p>
                                             <p style={{margin:'5px 0', fontSize:'12px', color:'#fcd34d'}}>Gil: {t.gil}</p>
                                             {t.mensagem && <p style={{margin:'5px 0', fontSize:'11px', color:'#aaa', fontStyle:'italic'}}>"{t.mensagem}"</p>}
                                         </div>

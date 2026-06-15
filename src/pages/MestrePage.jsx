@@ -12,7 +12,8 @@ import Ficha from '../components/Ficha';
 import GuildBoard from '../components/GuildBoard';
 import { getCharacterClass, getCharacterRace } from '../utils/characterHelpers';
 import { exportCharactersAsMarkdown } from '../utils/exportCharacterMarkdown';
-import { exportCharactersAsJson } from '../utils/exportCharacterJson'; 
+import { exportCharactersAsJson } from '../utils/exportCharacterJson';
+import { executarTransferenciaTroca } from '../utils/mercadoLanternas'; 
 
 // --- COMPONENTE DE CALENDÁRIO INTERNO ---
 const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlot, onUpdateSession, onDeleteSlot }) => {
@@ -348,53 +349,19 @@ export default function MestrePage() {
       
       if(!remetente || !destinatario) return alert("Erro: Um dos personagens não foi encontrado na base de dados.");
 
-      // Clonar para manipulação segura
-      let remetenteInv = JSON.parse(JSON.stringify(remetente.character_sheet.inventory));
-      let destInv = JSON.parse(JSON.stringify(destinatario.character_sheet.inventory));
-      
-      // Transferência de GIL
-      if(troca.gil > 0) {
-          if((remetenteInv.gil || 0) < troca.gil) return alert(`Erro: O remetente ${remetente.name} não possui Gil suficiente na ficha.`);
-          remetenteInv.gil -= troca.gil;
-          destInv.gil = (destInv.gil || 0) + troca.gil;
-      }
+      const resultado = executarTransferenciaTroca(
+          remetente.character_sheet.inventory,
+          destinatario.character_sheet.inventory,
+          troca
+      );
 
-      // Transferência de ITENS
-      if(troca.itens && troca.itens.length > 0) {
-          for (let itemTroca of troca.itens) {
-              // Checa e remove do remetente
-              let itemIndexRem = remetenteInv.items.findIndex(i => i.name === itemTroca.name);
-              if(itemIndexRem === -1 || remetenteInv.items[itemIndexRem].quantity < itemTroca.quantidade) {
-                  return alert(`Erro: O remetente ${remetente.name} não possui a quantidade exata do item "${itemTroca.name}" na ficha.`);
-              }
-              
-              remetenteInv.items[itemIndexRem].quantity -= itemTroca.quantidade;
-              if(remetenteInv.items[itemIndexRem].quantity <= 0) {
-                  // Limpa o slot caso a quantidade zere
-                  remetenteInv.items[itemIndexRem] = { name: "", quantity: 0, description: "" };
-              }
-
-              // Adiciona ao destinatário
-              let itemIndexDest = destInv.items.findIndex(i => i.name === itemTroca.name);
-              if(itemIndexDest !== -1) {
-                  destInv.items[itemIndexDest].quantity += itemTroca.quantidade;
-              } else {
-                  // Procura slot vazio para alocar o item novo
-                  let emptySlot = destInv.items.findIndex(i => !i.name || i.name.trim() === '');
-                  if(emptySlot !== -1) {
-                      destInv.items[emptySlot] = { name: itemTroca.name, quantity: itemTroca.quantidade, description: "Recebido via Mercado" };
-                  } else {
-                      // Cria novo slot dinâmico no final
-                      destInv.items.push({ name: itemTroca.name, quantity: itemTroca.quantidade, description: "Recebido via Mercado" });
-                  }
-              }
-          }
+      if (!resultado.success) {
+          return alert(`Erro: ${resultado.error} (${remetente.name})`);
       }
 
       try {
-          // Commit das alterações
-          await updateDoc(doc(db, "characters", remetente.uid), { "character_sheet.inventory": remetenteInv });
-          await updateDoc(doc(db, "characters", destinatario.uid), { "character_sheet.inventory": destInv });
+          await updateDoc(doc(db, "characters", remetente.uid), { "character_sheet.inventory": resultado.remetenteInv });
+          await updateDoc(doc(db, "characters", destinatario.uid), { "character_sheet.inventory": resultado.destInv });
           await updateDoc(doc(db, "mercado_lanternas", troca.id), { status: 'aprovado', resolvedAt: new Date().toISOString(), resolvedBy: mestreIdentidade });
           
           alert("Troca APROVADA! Recursos movidos automaticamente entre as fichas.");
