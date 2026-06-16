@@ -535,11 +535,7 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                         </div>
                         <div className="secondary-stats">
                             <div className="stat-row"><label>HP</label><div className="stat-bars-inputs">{isMaster ? <input value={sheet.status.hp.current} onChange={e => updateField('status.hp.current', Number(e.target.value))} /> : <span>{sheet.status.hp.current}</span>}/{isMaster ? <input value={sheet.status.hp.max} onChange={e => updateField('status.hp.max', Number(e.target.value))} /> : <span>{sheet.status.hp.max}</span>}</div></div>
-                            <div className="stat-row"><label>MP</label><div className="stat-bars-inputs mp">{isMaster ? <input value={sheet.status.mp.current} onChange={e => updateField('status.mp.current', Number(e.target.value))} /> : <span>{sheet.status.mp.current}</span>}/{isMaster ? <input value={sheet.status.mp.max} onChange={e => updateField('status.mp.max', Number(e.target.value))} /> : <span>{sheet.status.mp.max}</span>}</div></div>
-                            <div className="mp-regen-box" title="Regeneração de mana por turno (30% do MP máximo)">
-                                <FaTint color="#00f2ff" className="mp-regen-icon" />
-                                <span className="mp-regen-value">{mpRegen}</span>
-                            </div>
+                            <div className="stat-row"><label>MP</label><div className="stat-row-mp-group"><div className="stat-bars-inputs mp">{isMaster ? <input value={sheet.status.mp.current} onChange={e => updateField('status.mp.current', Number(e.target.value))} /> : <span>{sheet.status.mp.current}</span>}/{isMaster ? <input value={sheet.status.mp.max} onChange={e => updateField('status.mp.max', Number(e.target.value))} /> : <span>{sheet.status.mp.max}</span>}</div><div className="mp-regen-box" title="Regeneração de mana por turno (30% do MP máximo)"><FaTint color="#00f2ff" className="mp-regen-icon" /><span className="mp-regen-value">{mpRegen}</span></div></div></div>
                             <div className="stat-row-simple">
                                 <div className="s-box"><img src="/simbolos/ARM.png" alt="ARM" className="stat-icon-img" />{isMaster ? <input value={sheet.status.arm.value} onChange={e => updateField('status.arm.value', Number(e.target.value))} /> : <span>{sheet.status.arm.value}</span>}</div>
                                 <div className="s-box"><img src="/simbolos/RES.png" alt="RES" className="stat-icon-img" />{isMaster ? <input value={sheet.status.res.value} onChange={e => updateField('status.res.value', Number(e.target.value))} /> : <span>{sheet.status.res.value}</span>}</div>
@@ -863,9 +859,11 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .stat-bars-inputs { flex: 1; background: rgba(255,0,0,0.1); border: 1px solid #522; padding: 5px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #fff; border-radius: 4px; }
         .stat-bars-inputs.mp { background: rgba(0,0,255,0.1); border-color: #225; }
         .stat-bars-inputs input { background: transparent; border: none; color: #fff; width: 40px; text-align: center; font-family: 'serif'; font-weight: bold; }
-        .mp-regen-box { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; padding: 8px 12px; background: rgba(0, 242, 255, 0.08); border: 1px solid #225; border-radius: 4px; user-select: none; pointer-events: none; }
-        .mp-regen-icon { font-size: 22px; filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.5)); }
-        .mp-regen-value { font-size: 18px; font-weight: bold; color: #00f2ff; font-family: 'serif'; }
+        .stat-row-mp-group { flex: 1; display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+        .stat-row-mp-group .stat-bars-inputs.mp { flex: 1; min-width: 0; }
+        .mp-regen-box { flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; min-width: 48px; background: rgba(0, 242, 255, 0.08); border: 1px solid #225; border-radius: 4px; user-select: none; pointer-events: none; }
+        .mp-regen-icon { font-size: 14px; filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.5)); }
+        .mp-regen-value { font-size: 14px; font-weight: bold; color: #00f2ff; font-family: 'serif'; line-height: 1; }
         .stat-row-simple { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
         .s-box { flex: 1; background: #111; border: 1px solid #444; padding: 10px; text-align: center; border-radius: 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .s-box label { display: block; font-size: 10px; color: #888; margin-bottom: 5px; }
