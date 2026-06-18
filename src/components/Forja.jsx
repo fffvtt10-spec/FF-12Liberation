@@ -110,12 +110,23 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
       return buyerNameFallback || "Jogador";
   };
 
+  const groupItems = (itemList) => {
+    return itemList.reduce((acc, item) => {
+      const key = `${item.nome}-${item.raridade || DEFAULT_RARIDADE}-${item.ownerId || 'vault'}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+  };
+
   // --- FILTRO APLICADO ---
   const filteredItems = items.filter(item => {
       const matchesSearch = item.nome.toLowerCase().includes(searchTerm.toLowerCase());
       const isUnused = showOnlyUnused ? !item.ownerId : true; // Se o filtro estiver ativo, mostra apenas itens que não tem dono
       return matchesSearch && isUnused;
   });
+
+  const groupedDisplayItems = groupItems(filteredItems);
 
   return (
     <>
@@ -187,11 +198,18 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
               </button>
             </div>
             <div className="forja-grid">
-              {filteredItems.map(item => (
+              {Object.values(groupedDisplayItems).map(group => {
+                const item = group[0];
+                const estoque = group.length;
+
+                return (
                 <div key={item.id} className="forja-item-card">
                   <div className="item-img" style={{backgroundImage: `url(${item.imagem || 'https://via.placeholder.com/150?text=?'})`}}></div>
                   <div className="item-info">
-                    <h4>{item.nome}</h4>
+                    <div className="item-header-row">
+                      <h4>{item.nome}</h4>
+                      {estoque > 1 && <span className="stock-badge">QTD: {estoque}</span>}
+                    </div>
                     <span className="rarity-tag" style={{ color: getRaridadeById(item.raridade).cor, borderColor: getRaridadeById(item.raridade).cor }}>
                       {getRaridadeById(item.raridade).nome}
                     </span>
@@ -200,7 +218,6 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
                     <small style={{color: '#666'}}>Status: {item.ownerId ? "Cofre Pessoal" : "Cofre Global"}</small>
                   </div>
                   <div className="item-actions">
-                    {/* Botão para devolver ao bazar (Lógica de desafixar) */}
                     {item.ownerId && (
                         <button className="btn-icon" onClick={() => handleReturnToBazar(item.id)} title="Desafixar e Retornar ao Bazar">♻️</button>
                     )}
@@ -208,7 +225,8 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
                     <button className="btn-icon delete" onClick={() => handleDelete(item.id)} title="Destruir">🔥</button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {filteredItems.length === 0 && <p className="empty-msg">A forja está fria. Nenhum item encontrado.</p>}
             </div>
           </div>
@@ -271,7 +289,9 @@ export default function Forja({ vttDock, hideTrigger, isOpen: controlledOpen, on
         .forja-item-card:hover { border-color: #f44; }
         .item-img { width: 70px; height: 70px; background-size: cover; background-position: center; border: 1px solid #633; margin-right: 15px; border-radius: 4px; background-color: #000; }
         .item-info { flex: 1; }
-        .item-info h4 { margin: 0 0 5px 0; color: #fff; font-size: 18px; }
+        .item-header-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .item-info h4 { margin: 0; color: #fff; font-size: 18px; }
+        .stock-badge { font-size: 10px; background: #333; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; border: 1px solid #555; flex-shrink: 0; }
         .item-info .desc { margin: 0; color: #aaa; font-size: 12px; font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .owner-tag { background: #00f2ff; color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
         .item-actions { display: flex; gap: 8px; margin-left: 15px; }
