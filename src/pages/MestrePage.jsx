@@ -35,6 +35,22 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
   const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
+  const getEventPillStyle = (ev) => {
+    if (!ev.mestreCor) return {};
+    return {
+      borderLeft: `4px solid ${ev.mestreCor}`,
+      backgroundColor: `${ev.mestreCor}30`,
+      borderColor: ev.mestreCor,
+      color: '#fff'
+    };
+  };
+
+  const getEventTitle = (ev) => {
+    const mestre = ev.mestreNome || 'Mestre';
+    if (ev.type === 'session') return `${ev.missaoNome} — ${mestre}`;
+    return `${mestre} — Disponível`;
+  };
+
   const events = [
     ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
     ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio), isArena: s.isArena }))
@@ -61,10 +77,13 @@ const CalendarSystem = ({ onClose, isMaster, disponibilidades, sessoes, onAddSlo
                 key={idx} 
                 className={`cal-event-pill ${ev.type} ${ev.isArena ? 'arena' : ''}`} 
                 onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
-                title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
-                style={ev.mestreCor ? { borderLeft: `4px solid ${ev.mestreCor}`, backgroundColor: ev.type === 'session' ? `${ev.mestreCor}30` : '' } : {}}
+                title={getEventTitle(ev)}
+                style={getEventPillStyle(ev)}
               >
-                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? (ev.isArena ? '⚔️' : '🛡️') : '✅'}
+                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')}{' '}
+                {ev.type === 'session'
+                  ? (ev.isArena ? '⚔️' : '🛡️')
+                  : (ev.mestreNome ? ev.mestreNome.split(' ')[0] : '✅')}
               </div>
             ))}
           </div>

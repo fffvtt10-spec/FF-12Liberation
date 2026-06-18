@@ -51,8 +51,24 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
 
   const events = [
     ...disponibilidades.map(d => ({ ...d, type: 'slot', dateObj: new Date(d.start) })),
-    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio) }))
+    ...sessoes.map(s => ({ ...s, type: 'session', dateObj: new Date(s.dataInicio), isArena: s.isArena }))
   ];
+
+  const getEventPillStyle = (ev) => {
+    if (!ev.mestreCor) return {};
+    return {
+      borderLeft: `4px solid ${ev.mestreCor}`,
+      backgroundColor: `${ev.mestreCor}30`,
+      borderColor: ev.mestreCor,
+      color: '#fff'
+    };
+  };
+
+  const getEventTitle = (ev) => {
+    const mestre = ev.mestreNome || 'Mestre';
+    if (ev.type === 'session') return `${ev.missaoNome} — ${mestre}`;
+    return `${mestre} — Disponível`;
+  };
 
   const renderDays = () => {
     const days = [];
@@ -72,11 +88,15 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
             {dayEvents.map((ev, idx) => (
               <div 
                 key={idx} 
-                className={`cal-event-pill ${ev.type}`} 
+                className={`cal-event-pill ${ev.type} ${ev.isArena ? 'arena' : ''}`} 
                 onClick={(e) => { e.stopPropagation(); setViewEvent(ev); }}
-                title={ev.type === 'session' ? ev.missaoNome : 'Disponível'}
+                title={getEventTitle(ev)}
+                style={getEventPillStyle(ev)}
               >
-                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')} {ev.type === 'session' ? '⚔️' : '✅'}
+                {ev.dateObj.getHours()}:{String(ev.dateObj.getMinutes()).padStart(2,'0')}{' '}
+                {ev.type === 'session'
+                  ? (ev.isArena ? '⚔️' : '🛡️')
+                  : (ev.mestreNome ? ev.mestreNome.split(' ')[0] : '✅')}
               </div>
             ))}
           </div>
@@ -107,10 +127,12 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
                 <div className="mini-modal detail">
                     {viewEvent.type === 'session' ? (
                         <>
-                            <h4 style={{color: '#f44'}}>⚔️ SESSÃO AGENDADA</h4>
+                            <h4 style={{color: viewEvent.isArena ? '#a855f7' : (viewEvent.mestreCor || '#f44')}}>
+                              {viewEvent.isArena ? '⚔️ ARENA PVP' : '🛡️ SESSÃO AGENDADA'}
+                            </h4>
                             <h3>{viewEvent.missaoNome}</h3>
                             <p><strong>Horário:</strong> {new Date(viewEvent.dataInicio).toLocaleString()}</p>
-                            <p><strong>Narrador:</strong> {viewEvent.mestreNome}</p>
+                            <p><strong>Narrador:</strong> <span style={{color: viewEvent.mestreCor || '#fff'}}>{viewEvent.mestreNome || 'Desconhecido'}</span></p>
                             <div className="detail-players">
                                 <strong>Jogadores:</strong>
                                 {viewEvent.participantes?.join(', ') || "Nenhum"}
@@ -118,9 +140,10 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
                         </>
                     ) : (
                         <>
-                            <h4 style={{color: '#0f0'}}>✅ HORÁRIO DISPONÍVEL</h4>
+                            <h4 style={{color: viewEvent.mestreCor || '#0f0'}}>✅ HORÁRIO DISPONÍVEL</h4>
                             <p><strong>Data:</strong> {new Date(viewEvent.start).toLocaleString()}</p>
-                            <p>O Mestre está livre neste horário.</p>
+                            <p><strong>Narrador:</strong> <span style={{color: viewEvent.mestreCor || '#fff'}}>{viewEvent.mestreNome || 'Desconhecido'}</span></p>
+                            <p>Este mestre está livre neste horário.</p>
                         </>
                     )}
                     <button className="btn-cancelar-main" style={{marginTop:'10px', width:'100%'}} onClick={() => setViewEvent(null)}>FECHAR</button>
@@ -141,6 +164,7 @@ const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
         .cal-events-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
         .cal-event-pill { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .cal-event-pill.session { background: #7f1d1d; color: #fca5a5; border: 1px solid #f87171; }
+        .cal-event-pill.session.arena { background: #4c1d95; color: #c4b5fd; border-color: #8b5cf6; }
         .cal-event-pill.slot { background: #064e3b; color: #6ee7b7; border: 1px solid #34d399; }
         .mini-modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 20; }
         .mini-modal { background: #020617; border: 1px solid #fbbf24; padding: 20px; width: 300px; border-radius: 8px; box-shadow: 0 0 20px #000; }
