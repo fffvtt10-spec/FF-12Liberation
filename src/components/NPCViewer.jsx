@@ -77,6 +77,16 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
                   
                   {/* Container da Imagem (PNG Limpo com Fade) */}
                   <div className="npc-image-box">
+                      {isMaster && isVisible && (
+                        <button
+                          type="button"
+                          className="npc-close-btn"
+                          onClick={(e) => { e.stopPropagation(); handleRemoveNPC(); }}
+                          title="Remover NPC"
+                        >
+                          ✕
+                        </button>
+                      )}
                       <img src={activeNPC.url} alt="NPC" className="npc-img" />
                       {/* Fade inferior para misturar com o nome */}
                       <div className="npc-fade-bottom"></div>
@@ -259,6 +269,36 @@ export default function NPCViewer({ sessaoData, isMaster, showManager, onCloseMa
             /* Máscara suave para as bordas não ficarem duras */
             -webkit-mask-image: radial-gradient(ellipse at center, black 70%, transparent 100%);
             mask-image: radial-gradient(ellipse at center, black 70%, transparent 100%);
+        }
+
+        .npc-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 20;
+            pointer-events: auto;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(0, 0, 0, 0.45);
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.45;
+            transition: opacity 0.2s, background 0.2s, color 0.2s;
+            padding: 0;
+        }
+
+        .npc-close-btn:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.5);
         }
 
         .npc-img {
