@@ -195,8 +195,11 @@ export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOp
         showAlert("SUCESSO", `Solicitação enviada! Saldo restante: ${newGil} Gil.`);
 
     } catch (err) {
-        console.error(err);
-        showAlert("ERRO CRÍTICO", err?.message || "Falha na transação.");
+        console.error("Erro na compra do Bazar:", err);
+        const msg = err?.code === "permission-denied"
+          ? "Permissão negada pelo Firestore. Peça ao admin para publicar as regras atualizadas."
+          : (err?.message || "Falha na transação.");
+        showAlert("ERRO CRÍTICO", msg);
     }
   };
 

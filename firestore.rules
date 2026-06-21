@@ -19,6 +19,7 @@ service cloud.firestore {
       return userExists() && get(userPath()).data.role == 'mestre';
     }
 
+    // Admin do painel (criar/banir contas). Aprovações in-game usam role "mestre" em /users.
     function isAdmin() {
       return isSignedIn()
         && request.auth.token.email_verified == true
@@ -55,6 +56,17 @@ service cloud.firestore {
         && after.job_system == before.job_system;
     }
 
+    // Compra no Bazar (código antigo reenviava character_sheet inteiro só para mudar Gil)
+    function characterSheetOnlyInventoryChanged() {
+      let before = resource.data.character_sheet;
+      let after = request.resource.data.character_sheet;
+      return after.basic_info == before.basic_info
+        && after.attributes == before.attributes
+        && after.status == before.status
+        && after.job_system == before.job_system
+        && after.equipment == before.equipment;
+    }
+
     function playerCanUpdateOwnCharacter() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let allowedPlayerFields = [
@@ -73,31 +85,38 @@ service cloud.firestore {
             changed.hasOnly(['character_sheet'])
             && characterSheetCoreUnchanged()
           )
+          || (
+            changed.hasOnly(['character_sheet'])
+            && characterSheetOnlyInventoryChanged()
+          )
         );
     }
 
-    function playerCanUpdateGameItem() {
-      let changed = request.resource.data.diff(resource.data).affectedKeys();
-
+    function isPlayerBazarPurchase() {
       return isSignedIn()
-        && request.resource.data.ownerId == request.auth.uid
-        && (
-          (
-            resource.data.status == 'bazar'
-            && request.resource.data.status == 'requested'
-            && changed.hasOnly(['status', 'ownerId', 'buyerName', 'updatedAt'])
-          )
-          || (
-            resource.data.status == 'vault'
-            && request.resource.data.status == 'equipped'
-            && changed.hasOnly(['status', 'ownerId', 'buyerName', 'slotIndex', 'updatedAt', 'raridade'])
-          )
-          || (
-            resource.data.status == 'equipped'
-            && request.resource.data.status == 'vault'
-            && changed.hasOnly(['status', 'ownerId', 'buyerName', 'slotIndex', 'updatedAt', 'raridade'])
-          )
-        );
+        && resource.data.status == 'bazar'
+        && request.resource.data.status == 'requested'
+        && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function isPlayerEquipFromVault() {
+      return isSignedIn()
+        && resource.data.status == 'vault'
+        && request.resource.data.status == 'equipped'
+        && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function isPlayerUnequipToVault() {
+      return isSignedIn()
+        && resource.data.status == 'equipped'
+        && request.resource.data.status == 'vault'
+        && resource.data.ownerId == request.auth.uid;
+    }
+
+    function playerCanUpdateGameItem() {
+      return isPlayerBazarPurchase()
+        || isPlayerEquipFromVault()
+        || isPlayerUnequipToVault();
     }
 
     match /users/{userId} {
