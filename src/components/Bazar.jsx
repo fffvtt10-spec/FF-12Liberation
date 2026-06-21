@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, deleteDoc, updateDoc, setDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from "firebase/firestore"; 
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp, writeBatch } from "firebase/firestore"; 
 import bazarIcon from '../assets/bazar.png'; 
 
 export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOpen: controlledOpen, onOpenChange }) { 
@@ -167,32 +167,36 @@ export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOp
   // PASSO 3: Executa a compra no banco de dados
   const executePurchase = async (data) => {
     const { group, quantity, totalPrice, currentGil } = data;
-    
+
+    if (!auth.currentUser?.uid) {
+      return showAlert("ACESSO NEGADO", "Você precisa estar logado.");
+    }
+
     try {
-        // 1. Atualiza Gil
         const newGil = currentGil - totalPrice;
         const charRef = doc(db, "characters", auth.currentUser.uid);
-        const updatedSheet = JSON.parse(JSON.stringify(playerData.character_sheet));
-        updatedSheet.inventory.gil = newGil;
-        await setDoc(charRef, { character_sheet: updatedSheet }, { merge: true });
-
-        // 2. Atualiza Itens
         const itemsToBuy = group.slice(0, quantity);
-        const batchPromises = itemsToBuy.map(item => 
-            updateDoc(doc(db, "game_items", item.id), { 
-                status: 'requested', 
-                ownerId: auth.currentUser.uid, 
-                buyerName: playerData.name, 
-                updatedAt: serverTimestamp() 
-            })
-        );
-        await Promise.all(batchPromises);
+        const batch = writeBatch(db);
+
+        // Atualiza só o Gil (evita reenviar a ficha inteira — compatível com security rules)
+        batch.update(charRef, { "character_sheet.inventory.gil": newGil });
+
+        itemsToBuy.forEach((item) => {
+          batch.update(doc(db, "game_items", item.id), {
+            status: "requested",
+            ownerId: auth.currentUser.uid,
+            buyerName: playerData.name,
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+        await batch.commit();
 
         showAlert("SUCESSO", `Solicitação enviada! Saldo restante: ${newGil} Gil.`);
 
     } catch (err) {
         console.error(err);
-        showAlert("ERRO CRÍTICO", "Falha na transação.");
+        showAlert("ERRO CRÍTICO", err?.message || "Falha na transação.");
     }
   };
 
