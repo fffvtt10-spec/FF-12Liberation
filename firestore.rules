@@ -31,33 +31,55 @@ service cloud.firestore {
     }
 
     function playerSessionFieldsOnly() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly([
-          'connected_players',
-          'equipes',
-          'participantes',
-          'bencao_deuses',
-          'pings',
-          'tokens',
-          'painted_groups',
-          'latest_roll'
-        ]);
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      // Campos permitidos no total
+      let allowedFields = ['connected_players', 'equipes', 'participantes',
+                           'bencao_deuses', 'pings', 'tokens', 'painted_groups', 'latest_roll'];
+      // Campos de interação in-game que exigem que o jogador já esteja conectado
+      let gameFields = ['bencao_deuses', 'pings', 'tokens', 'painted_groups', 'latest_roll'];
+      return isSignedIn()
+        && changed.hasOnly(allowedFields)
+        && (
+          // Conexão/desconexão e registro em arenas: qualquer jogador logado pode fazer
+          !changed.hasAny(gameFields)
+          ||
+          // Interações in-game: exige que o UID do jogador esteja em connected_players
+          request.auth.uid in resource.data.connected_players
+        );
     }
 
-    // Bazar: verifica que APENAS character_sheet.inventory.gil mudou usando diff aninhado.
-    // Mais robusto do que comparar Maps inteiros com ==.
-    function isPlayerGilUpdate() {
-      let topChanged = request.resource.data.diff(resource.data).affectedKeys();
+    // Jogador pode atualizar sua própria ficha, desde que não altere progressão controlada pelo Mestre.
+    // charId é recebido como parâmetro explícito para evitar o bug de escopo em funções do nível raiz.
+    // Usa diff aninhado para evitar comparação Map==Map que falha em estruturas complexas (arrays, etc.)
+    function playerCanUpdateOwnCharacter(charId) {
+      let docChanged = request.resource.data.diff(resource.data).affectedKeys();
+      let sheetChanged = request.resource.data.character_sheet
+                           .diff(resource.data.character_sheet).affectedKeys();
       return isOwner(charId)
-        && topChanged.hasOnly(['character_sheet'])
-        && request.resource.data.character_sheet
-              .diff(resource.data.character_sheet).affectedKeys().hasOnly(['inventory'])
-        && request.resource.data.character_sheet.inventory
-              .diff(resource.data.character_sheet.inventory).affectedKeys().hasOnly(['gil']);
+        // Só 'character_sheet' (e opcionalmente 'class') mudam no documento
+        && docChanged.hasOnly(['character_sheet', 'class'])
+        // Campos de identidade no nível do documento não mudam
+        && !docChanged.hasAny(['uid', 'email', 'createdAt', 'name', 'race', 'gender'])
+        // Atributos e sistema de jobs são controlados pelo Mestre, não pelo jogador
+        && !sheetChanged.hasAny(['attributes', 'job_system'])
+        // Nível é controlado pelo Mestre (comparação escalar simples, sem Map==)
+        && request.resource.data.character_sheet.basic_info.level
+            == resource.data.character_sheet.basic_info.level;
+    }
+
+    // Compra no Bazar: bazar → requested. Restringe exatamente os campos que Bazar.jsx atualiza.
+    function isPlayerBazarPurchase() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return isSignedIn()
+        && resource.data.status == 'bazar'
+        && request.resource.data.status == 'requested'
+        && request.resource.data.ownerId == request.auth.uid
+        && changed.hasOnly(['status', 'ownerId', 'buyerName', 'updatedAt']);
     }
 
     // Sincronização de classe: atualiza campo 'class' (top-level) + character_sheet.basic_info.class
-    function isPlayerClassSync() {
+    // charId recebido como parâmetro explícito pelo mesmo motivo de escopo acima.
+    function isPlayerClassSync(charId) {
       let topChanged = request.resource.data.diff(resource.data).affectedKeys();
       return isOwner(charId)
         && topChanged.hasOnly(['class', 'character_sheet'])
@@ -69,59 +91,25 @@ service cloud.firestore {
         && request.resource.data.class == request.resource.data.character_sheet.basic_info.class;
     }
 
-    function characterSheetCoreUnchanged() {
-      let before = resource.data.character_sheet;
-      let after = request.resource.data.character_sheet;
-      return after.basic_info.level == before.basic_info.level
-        && after.basic_info.experience == before.basic_info.experience
-        && after.basic_info.race == before.basic_info.race
-        && after.basic_info.character_name == before.basic_info.character_name
-        && after.attributes == before.attributes
-        && after.status == before.status
-        && after.job_system == before.job_system;
-    }
-
-    function characterSheetOnlyInventoryChanged() {
-      let before = resource.data.character_sheet;
-      let after = request.resource.data.character_sheet;
-      return after.basic_info == before.basic_info
-        && after.attributes == before.attributes
-        && after.status == before.status
-        && after.job_system == before.job_system
-        && after.equipment == before.equipment;
-    }
-
-    function playerCanUpdateOwnCharacter() {
-      let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return isOwner(charId)
-        && !changed.hasAny(['uid', 'email', 'createdAt', 'name', 'race', 'gender'])
-        && changed.hasOnly(['character_sheet'])
-        && (characterSheetCoreUnchanged() || characterSheetOnlyInventoryChanged());
-    }
-
-    // Compra no Bazar: bazar → requested. Exige que o item ainda não tenha dono (ownerId == null).
-    function isPlayerBazarPurchase() {
-      return isSignedIn()
-        && resource.data.status == 'bazar'
-        && resource.data.ownerId == null
-        && request.resource.data.status == 'requested'
-        && request.resource.data.ownerId == request.auth.uid;
-    }
-
-    // Equipar do vault: o jogador só pode equipar itens que já são dele (ownerId == auth.uid).
+    // Equipar do vault: restrito aos campos que Ficha.jsx atualiza no equip.
     function isPlayerEquipFromVault() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
       return isSignedIn()
         && resource.data.status == 'vault'
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'equipped'
-        && request.resource.data.ownerId == request.auth.uid;
+        && request.resource.data.ownerId == request.auth.uid
+        && changed.hasOnly(['status', 'ownerId', 'buyerName', 'slotIndex', 'updatedAt']);
     }
 
+    // Desequipar para vault: restrito aos campos que Ficha.jsx atualiza no unequip.
     function isPlayerUnequipToVault() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
       return isSignedIn()
         && resource.data.status == 'equipped'
         && request.resource.data.status == 'vault'
-        && resource.data.ownerId == request.auth.uid;
+        && resource.data.ownerId == request.auth.uid
+        && changed.hasOnly(['status', 'slotIndex', 'updatedAt']);
     }
 
     function playerCanUpdateGameItem() {
@@ -149,9 +137,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['uid', 'name', 'character_sheet']);
       allow update: if isMestre()
         || isAdmin()
-        || isPlayerGilUpdate()
-        || isPlayerClassSync()
-        || playerCanUpdateOwnCharacter();
+        || isPlayerClassSync(charId)
+        || playerCanUpdateOwnCharacter(charId);
       allow delete: if isAdmin();
     }
 
