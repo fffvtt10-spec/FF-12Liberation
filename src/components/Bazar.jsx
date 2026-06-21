@@ -109,15 +109,17 @@ export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOp
         await updateDoc(doc(db, "game_items", isEditing), payload);
         setIsEditing(null);
       } else if (selectedVaultId) {
+        // ownerId: null é obrigatório para que isPlayerBazarPurchase() deixe jogadores comprarem
+        const bazarPayload = { ...payload, status: 'bazar', ownerId: null, buyerName: null };
         if (applyToAll) {
             const sameItems = vaultItems.filter(v => v.nome === form.nome);
             const batchPromises = sameItems.map(item => 
-                updateDoc(doc(db, "game_items", item.id), { ...payload, status: 'bazar' })
+                updateDoc(doc(db, "game_items", item.id), bazarPayload)
             );
             await Promise.all(batchPromises);
             showAlert("SUCESSO", `${batchPromises.length} itens colocados à venda!`);
         } else {
-            await updateDoc(doc(db, "game_items", selectedVaultId), { ...payload, status: 'bazar' });
+            await updateDoc(doc(db, "game_items", selectedVaultId), bazarPayload);
         }
         setSelectedVaultId("");
       } else {
@@ -132,7 +134,12 @@ export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOp
 
   const handleRemoveFromBazar = async (id) => {
     if (window.confirm("Remover do mercado? O item voltará para a Forja.")) {
-      await updateDoc(doc(db, "game_items", id), { status: 'vault', updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "game_items", id), {
+        status: 'vault',
+        ownerId: null,
+        buyerName: null,
+        updatedAt: serverTimestamp()
+      });
     }
   };
 
@@ -140,7 +147,12 @@ export default function Bazar({ isMestre, playerData, vttDock, hideTrigger, isOp
       if(!window.confirm(`Aprovar a entrega de ${group.length} itens para ${group[0].buyerName}?`)) return;
       try {
           const batchPromises = group.map(item => 
-             updateDoc(doc(db, "game_items", item.id), { status: 'vault', updatedAt: serverTimestamp() })
+             updateDoc(doc(db, "game_items", item.id), {
+               status: 'vault',
+               ownerId: item.ownerId,   // mantém o dono (comprador aprovado)
+               buyerName: null,         // limpa fila de compra
+               updatedAt: serverTimestamp()
+             })
           );
           await Promise.all(batchPromises);
           showAlert("APROVADO", "Venda aprovada! Itens enviados.");

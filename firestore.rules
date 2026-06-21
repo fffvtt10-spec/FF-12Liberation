@@ -44,6 +44,31 @@ service cloud.firestore {
         ]);
     }
 
+    // Bazar: verifica que APENAS character_sheet.inventory.gil mudou usando diff aninhado.
+    // Mais robusto do que comparar Maps inteiros com ==.
+    function isPlayerGilUpdate() {
+      let topChanged = request.resource.data.diff(resource.data).affectedKeys();
+      return isOwner(charId)
+        && topChanged.hasOnly(['character_sheet'])
+        && request.resource.data.character_sheet
+              .diff(resource.data.character_sheet).affectedKeys().hasOnly(['inventory'])
+        && request.resource.data.character_sheet.inventory
+              .diff(resource.data.character_sheet.inventory).affectedKeys().hasOnly(['gil']);
+    }
+
+    // Sincronização de classe: atualiza campo 'class' (top-level) + character_sheet.basic_info.class
+    function isPlayerClassSync() {
+      let topChanged = request.resource.data.diff(resource.data).affectedKeys();
+      return isOwner(charId)
+        && topChanged.hasOnly(['class', 'character_sheet'])
+        && request.resource.data.character_sheet
+              .diff(resource.data.character_sheet).affectedKeys().hasOnly(['basic_info'])
+        && request.resource.data.character_sheet.basic_info
+              .diff(resource.data.character_sheet.basic_info).affectedKeys().hasOnly(['class'])
+        && request.resource.data.class is string
+        && request.resource.data.class == request.resource.data.character_sheet.basic_info.class;
+    }
+
     function characterSheetCoreUnchanged() {
       let before = resource.data.character_sheet;
       let after = request.resource.data.character_sheet;
@@ -56,7 +81,6 @@ service cloud.firestore {
         && after.job_system == before.job_system;
     }
 
-    // Compra no Bazar (código antigo reenviava character_sheet inteiro só para mudar Gil)
     function characterSheetOnlyInventoryChanged() {
       let before = resource.data.character_sheet;
       let after = request.resource.data.character_sheet;
@@ -69,39 +93,26 @@ service cloud.firestore {
 
     function playerCanUpdateOwnCharacter() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      let allowedPlayerFields = [
-        'class',
-        'character_sheet.basic_info.class',
-        'character_sheet.inventory.gil',
-        'character_sheet.inventory',
-        'character_sheet.equipment.slots',
-      ];
-
       return isOwner(charId)
         && !changed.hasAny(['uid', 'email', 'createdAt', 'name', 'race', 'gender'])
-        && (
-          changed.hasOnly(allowedPlayerFields)
-          || (
-            changed.hasOnly(['character_sheet'])
-            && characterSheetCoreUnchanged()
-          )
-          || (
-            changed.hasOnly(['character_sheet'])
-            && characterSheetOnlyInventoryChanged()
-          )
-        );
+        && changed.hasOnly(['character_sheet'])
+        && (characterSheetCoreUnchanged() || characterSheetOnlyInventoryChanged());
     }
 
+    // Compra no Bazar: bazar → requested. Exige que o item ainda não tenha dono (ownerId == null).
     function isPlayerBazarPurchase() {
       return isSignedIn()
         && resource.data.status == 'bazar'
+        && resource.data.ownerId == null
         && request.resource.data.status == 'requested'
         && request.resource.data.ownerId == request.auth.uid;
     }
 
+    // Equipar do vault: o jogador só pode equipar itens que já são dele (ownerId == auth.uid).
     function isPlayerEquipFromVault() {
       return isSignedIn()
         && resource.data.status == 'vault'
+        && resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'equipped'
         && request.resource.data.ownerId == request.auth.uid;
     }
@@ -125,7 +136,9 @@ service cloud.firestore {
         && request.resource.data.uid == userId
         && request.resource.data.role in ['jogador', 'mestre']
         && request.resource.data.keys().hasAll(['email', 'role', 'uid', 'active']);
-      allow update: if false;
+      allow update: if isAdmin()
+        && request.resource.data.role in ['jogador', 'mestre']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'active']);
       allow delete: if isAdmin();
     }
 
@@ -134,7 +147,11 @@ service cloud.firestore {
       allow create: if isOwner(charId)
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasAll(['uid', 'name', 'character_sheet']);
-      allow update: if isMestre() || isAdmin() || playerCanUpdateOwnCharacter();
+      allow update: if isMestre()
+        || isAdmin()
+        || isPlayerGilUpdate()
+        || isPlayerClassSync()
+        || playerCanUpdateOwnCharacter();
       allow delete: if isAdmin();
     }
 
