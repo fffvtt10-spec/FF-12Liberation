@@ -18,7 +18,8 @@ import Tabletop from '../components/Tabletop';
 import SceneryViewer from '../components/SceneryViewer'; 
 import NPCViewer from '../components/NPCViewer'; 
 import chocoboGif from '../assets/chocobo-loading.gif';
-import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
+import { DiceSelector } from '../components/DiceSystem';
+import { Dice3DResult } from '../components/Dice3DResult'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
 import treeData from '../data/tree.json';
@@ -829,7 +830,7 @@ export default function JogadorVttPage() {
 
         <SceneryViewer sessaoData={currentVttSession} isMaster={false} />
         <NPCViewer sessaoData={currentVttSession} isMaster={false} />
-        {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
+        {rollResult && <Dice3DResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
         {/* --- COMBAT TRACKER --- */}

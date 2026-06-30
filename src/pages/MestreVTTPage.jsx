@@ -27,7 +27,8 @@ import Tabletop from '../components/Tabletop';
 import SceneryViewer from '../components/SceneryViewer'; 
 import NPCViewer from '../components/NPCViewer'; 
 import DmOrbitalMenu from '../components/DmOrbitalMenu';
-import { DiceSelector, DiceResult } from '../components/DiceSystem'; 
+import { DiceSelector } from '../components/DiceSystem';
+import { Dice3DResult } from '../components/Dice3DResult'; 
 
 // --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
 import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask, FaTint, FaFeather } from 'react-icons/fa';
@@ -689,7 +690,7 @@ export default function MestreVTTPage() {
       
       <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={false} onCloseManager={() => {}} sceneryLibrary={libraryScenery} />
       <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={false} onCloseManager={() => {}} npcLibrary={libraryNpcs} />
-      {rollResult && <DiceResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
+      {rollResult && <Dice3DResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
       {showDiceSelector && <DiceSelector sessaoId={sessaoAtiva.id} playerName="MESTRE" onClose={() => setShowDiceSelector(false)} />}
 
       {/* --- COMBAT TRACKER --- */}
