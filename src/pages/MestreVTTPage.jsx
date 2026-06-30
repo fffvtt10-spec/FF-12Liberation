@@ -172,7 +172,11 @@ export default function MestreVTTPage() {
                      const roll = ativa.latest_roll;
                      const rollId = roll.id || roll.timestamp;
                      if (rollId !== dismissedRollTimestamp.current) {
-                        setRollResult(prev => { if (!prev || (prev.id || prev.timestamp) !== rollId) return roll; return prev; });
+                        const uid = auth.currentUser?.uid;
+                        const waitForRoller = roll.status === 'pending' && roll.rolledBy !== uid;
+                        if (!waitForRoller) {
+                          setRollResult(roll);
+                        }
                      }
                 }
 
@@ -667,7 +671,18 @@ export default function MestreVTTPage() {
       
       <SceneryViewer sessaoData={sessaoAtiva} isMaster={true} showManager={false} onCloseManager={() => {}} sceneryLibrary={libraryScenery} />
       <NPCViewer sessaoData={sessaoAtiva} isMaster={true} showManager={false} onCloseManager={() => {}} npcLibrary={libraryNpcs} />
-      {rollResult && <Dice3DResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
+      {rollResult && (
+        <Dice3DResult
+          key={rollResult.id || rollResult.timestamp}
+          rollData={rollResult}
+          sessaoId={sessaoAtiva?.id}
+          isRoller={rollResult.rolledBy === auth.currentUser?.uid}
+          onClose={() => {
+            dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp;
+            setRollResult(null);
+          }}
+        />
+      )}
       {showDiceSelector && <DiceSelector sessaoId={sessaoAtiva.id} playerName="MESTRE" onClose={() => setShowDiceSelector(false)} />}
 
       {/* --- COMBAT TRACKER --- */}

@@ -1,29 +1,60 @@
-import React, { useEffect, useRef, useState } from 'react';
-import '@3d-dice/dice-box/dist/style.css';
-
-const DICE_CANVAS_ID = 'dice-3d-canvas';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const DICE_BOX_CONFIG = {
-  assetPath: '/assets/dice-box/',
-  scale: 9,
-  throwForce: 9,
-  spinForce: 6,
-  startingHeight: 12,
-  theme: 'default',
-  themeColor: '#ffcc00',
-  enableShadows: false,
-  offscreen: false,
+  assetPath: '/assets/dice-box-threejs/',
+  sounds: false,
+  shadows: false,
+  theme_surface: 'green-felt',
+  theme_colorset: 'white',
+  theme_material: 'plastic',
+  strength: 1.2,
+  onRollComplete: () => {},
 };
 
-let diceBoxInstance = null;
-let diceBoxInitPromise = null;
+/** Lista de dados a partir de counts ({ d20: 1 }) ou rolls existentes. */
+export function buildRollList(rolls, diceCounts) {
+  if (rolls?.length) {
+    return rolls.map((r) => ({ die: r.die }));
+  }
+  if (!diceCounts) return [];
+
+  const list = [];
+  Object.keys(diceCounts).forEach((key) => {
+    const count = diceCounts[key] || 0;
+    for (let i = 0; i < count; i += 1) {
+      list.push({ die: key });
+    }
+  });
+  return list;
+}
+
+/** Notação simples: "1d20+2d6" */
+export function buildPlainNotation(rollList) {
+  if (!rollList?.length) return '';
+
+  const segments = [];
+  let i = 0;
+
+  while (i < rollList.length) {
+    const die = rollList[i].die;
+    let count = 0;
+    while (i < rollList.length && rollList[i].die === die) {
+      count += 1;
+      i += 1;
+    }
+    segments.push(`${count}${die}`);
+  }
+
+  return segments.join('+');
+}
 
 /**
- * Monta notação determinística para o dice-box.
- * Valores após @ são aplicados na ordem em que os dados são processados (esquerda → direita).
- * Ex.: [{d20,17}] → "1d20@17" — todos os clientes veem o mesmo resultado visual.
+ * Notação determinística para replay sincronizado (threejs).
+ * Ex.: [{d20,17}] → "1d20@17"
  */
-export function buildNotation(rolls) {
+export function buildDeterministicNotation(rolls) {
   if (!rolls?.length) return '';
 
   const segments = [];
@@ -44,19 +75,41 @@ export function buildNotation(rolls) {
   return `${segments.join('+')}@${values.join(',')}`;
 }
 
-async function getDiceBox() {
-  if (diceBoxInstance) return diceBoxInstance;
+function sidesToDieType(sides) {
+  const n = typeof sides === 'number' ? sides : parseInt(String(sides).replace(/\D/g, ''), 10);
+  if (n === 100) return 'd100';
+  return `d${n}`;
+}
 
-  if (!diceBoxInitPromise) {
-    diceBoxInitPromise = (async () => {
-      const DiceBox = (await import('@3d-dice/dice-box')).default;
-      diceBoxInstance = new DiceBox(`#${DICE_CANVAS_ID}`, DICE_BOX_CONFIG);
-      await diceBoxInstance.init();
-    })();
+/** Converte retorno do dice-box-threejs para o formato do card. */
+export function mapThreeJsResultsToRollData(results, rollData) {
+  const rolls = [];
+
+  if (results?.sets) {
+    results.sets.forEach((set) => {
+      const die = set.type || sidesToDieType(set.sides);
+      (set.rolls || []).forEach((r) => {
+        rolls.push({ die, value: r.value });
+      });
+    });
+  } else if (Array.isArray(results)) {
+    results.forEach((r) => {
+      rolls.push({
+        die: r.type || sidesToDieType(r.sides),
+        value: r.value,
+      });
+    });
   }
 
-  await diceBoxInitPromise;
-  return diceBoxInstance;
+  const modifier = rollData.modifier || 0;
+  const sum = rolls.reduce((acc, r) => acc + r.value, 0);
+
+  return {
+    ...rollData,
+    rolls,
+    total: sum + modifier,
+    status: 'complete',
+  };
 }
 
 function DiceResultCard({ rollData, onClose, compact = false }) {
@@ -96,19 +149,24 @@ function DiceResultCard({ rollData, onClose, compact = false }) {
   );
 }
 
-export const Dice3DResult = ({ rollData, onClose }) => {
-  const [phase, setPhase] = useState('rolling');
-  const rollIdRef = useRef(null);
-  const rollingRef = useRef(false);
+export const Dice3DResult = ({ rollData, onClose, sessaoId, isRoller = false }) => {
+  const reactId = useId().replace(/:/g, '');
+  const containerId = `dice-3d-${reactId}`;
+  const boxRef = useRef(null);
+  const closingRef = useRef(false);
+  const rollId = rollData?.id || rollData?.timestamp;
 
-  const handleClose = async () => {
-    if (diceBoxInstance) {
-      try {
-        await diceBoxInstance.clear();
-      } catch (error) {
-        console.warn('Erro ao limpar dados 3D:', error);
-      }
-    }
+  const hasResolvedValues = rollData.rolls?.length > 0 && rollData.rolls.every((r) => r.value != null);
+  const shouldReplay = hasResolvedValues && !isRoller;
+
+  const [phase, setPhase] = useState('rolling');
+  const [displayData, setDisplayData] = useState(
+    shouldReplay ? rollData : null
+  );
+
+  const handleClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     onClose();
   };
 
@@ -116,34 +174,68 @@ export const Dice3DResult = ({ rollData, onClose }) => {
     if (!rollData) return undefined;
 
     const rollId = rollData.id || rollData.timestamp;
-    if (rollIdRef.current === rollId || rollingRef.current) return undefined;
-    rollIdRef.current = rollId;
-
     let cancelled = false;
+    closingRef.current = false;
 
     const runRoll = async () => {
-      rollingRef.current = true;
       setPhase('rolling');
 
-      const notation = buildNotation(rollData.rolls || []);
+      const rollList = buildRollList(rollData.rolls, rollData.diceCounts);
+      const notation = shouldReplay
+        ? buildDeterministicNotation(rollData.rolls)
+        : buildPlainNotation(rollList);
+
       if (!notation) {
-        if (!cancelled) setPhase('result');
-        rollingRef.current = false;
+        if (!cancelled) {
+          setDisplayData(rollData);
+          setPhase('result');
+        }
         return;
       }
 
       try {
-        const box = await getDiceBox();
+        const container = document.getElementById(containerId);
+        if (!container || cancelled) return;
+
+        const DiceBox = (await import('@3d-dice/dice-box-threejs')).default;
+        const box = new DiceBox(`#${containerId}`, DICE_BOX_CONFIG);
+        boxRef.current = box;
+
+        await box.initialize();
         if (cancelled) return;
 
-        await box.clear();
-        await box.roll(notation);
-        if (!cancelled) setPhase('result');
+        const results = await box.roll(notation);
+        if (cancelled) return;
+
+        let resolved;
+        if (shouldReplay) {
+          resolved = rollData;
+        } else {
+          resolved = mapThreeJsResultsToRollData(results, rollData);
+          setDisplayData(resolved);
+
+          if (sessaoId && isRoller) {
+            try {
+              await updateDoc(doc(db, 'sessoes', sessaoId), {
+                latest_roll: resolved,
+              });
+            } catch (error) {
+              console.error('Erro ao sincronizar rolagem:', error);
+            }
+          }
+        }
+
+        if (!shouldReplay) {
+          setDisplayData(resolved);
+        }
+
+        setPhase('result');
       } catch (error) {
         console.error('Erro na animação 3D de dados:', error);
-        if (!cancelled) setPhase('fallback');
-      } finally {
-        rollingRef.current = false;
+        if (!cancelled) {
+          setDisplayData(rollData.rolls?.length ? rollData : null);
+          setPhase('fallback');
+        }
       }
     };
 
@@ -151,24 +243,14 @@ export const Dice3DResult = ({ rollData, onClose }) => {
 
     return () => {
       cancelled = true;
+      boxRef.current = null;
     };
-  }, [rollData]);
-
-  useEffect(() => {
-    return () => {
-      rollingRef.current = false;
-      rollIdRef.current = null;
-      if (diceBoxInstance) {
-        diceBoxInstance.clear().catch(() => {});
-        diceBoxInstance = null;
-        diceBoxInitPromise = null;
-      }
-    };
-  }, []);
+  }, [rollId, shouldReplay, isRoller, sessaoId, containerId]);
 
   if (!rollData) return null;
 
-  const showResultCard = phase === 'result' || phase === 'fallback';
+  const cardData = displayData || (phase === 'fallback' ? rollData : null);
+  const showResultCard = (phase === 'result' || phase === 'fallback') && cardData?.rolls?.length;
   const showStage = phase !== 'fallback';
 
   return (
@@ -176,7 +258,7 @@ export const Dice3DResult = ({ rollData, onClose }) => {
       <div className="dice-3d-panel">
         {showStage && (
           <div className={`dice-3d-stage ${showResultCard ? 'is-settled' : ''}`}>
-            <div id={DICE_CANVAS_ID} className="dice-3d-canvas-host" />
+            <div id={containerId} className="dice-3d-canvas-host" />
             {phase === 'rolling' && (
               <div className="dice-3d-rolling-label">
                 <span className="dr-player-name">{rollData.playerName}</span>
@@ -189,7 +271,7 @@ export const Dice3DResult = ({ rollData, onClose }) => {
         {showResultCard && (
           <div className="dice-result-layer">
             <DiceResultCard
-              rollData={rollData}
+              rollData={cardData}
               onClose={handleClose}
               compact={showStage}
             />
@@ -245,6 +327,7 @@ export const Dice3DResult = ({ rollData, onClose }) => {
         .dice-3d-canvas-host canvas {
           width: 100% !important;
           height: 100% !important;
+          display: block;
         }
 
         .dice-3d-rolling-label {

@@ -390,7 +390,11 @@ export default function JogadorVttPage() {
                       const roll = sessionUpdated.latest_roll;
                       const rollId = roll.id || roll.timestamp;
                       if (rollId !== dismissedRollTimestamp.current) {
-                        setRollResult(prev => { if (!prev || (prev.id || prev.timestamp) !== rollId) return roll; return prev; });
+                        const uid = auth.currentUser?.uid;
+                        const waitForRoller = roll.status === 'pending' && roll.rolledBy !== uid;
+                        if (!waitForRoller) {
+                          setRollResult(roll);
+                        }
                       }
                 }
                 const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
@@ -857,7 +861,18 @@ export default function JogadorVttPage() {
 
         <SceneryViewer sessaoData={currentVttSession} isMaster={false} />
         <NPCViewer sessaoData={currentVttSession} isMaster={false} />
-        {rollResult && <Dice3DResult rollData={rollResult} onClose={() => { dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp; setRollResult(null); }} />}
+        {rollResult && (
+          <Dice3DResult
+            key={rollResult.id || rollResult.timestamp}
+            rollData={rollResult}
+            sessaoId={currentVttSession?.id}
+            isRoller={rollResult.rolledBy === auth.currentUser?.uid}
+            onClose={() => {
+              dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp;
+              setRollResult(null);
+            }}
+          />
+        )}
         {showDiceSelector && currentVttSession && <DiceSelector sessaoId={currentVttSession.id} playerName={personagem.name} onClose={() => setShowDiceSelector(false)} />}
         
         {/* --- COMBAT TRACKER --- */}

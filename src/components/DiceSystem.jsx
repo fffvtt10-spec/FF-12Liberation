@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, updateDoc } from "firebase/firestore";
 
 // Configuração dos tipos de dados
@@ -32,44 +32,26 @@ export const DiceSelector = ({ sessaoId, playerName, onClose }) => {
 
     setRolling(true);
 
-    // 1. FECHAR IMEDIATAMENTE (Correção Visual)
-    onClose(); 
+    // Fecha o seletor — a animação 3D define o resultado real
+    onClose();
 
-    // 2. Calcular Resultados Locais
-    let sumDice = 0;
-    let details = [];
-
-    Object.keys(counts).forEach(key => {
-        const count = counts[key];
-        const sides = parseInt(key.substring(1));
-        for(let i=0; i<count; i++) {
-            const val = Math.floor(Math.random() * sides) + 1;
-            sumDice += val;
-            details.push({ die: key, value: val });
-        }
-    });
-
-    // 3. Processar Modificador (+5, -2, 5)
     let modValue = 0;
     if (modifier) {
         const cleanMod = modifier.replace(/\s/g, '');
-        modValue = parseInt(cleanMod);
+        modValue = parseInt(cleanMod, 10);
         if (isNaN(modValue)) modValue = 0;
     }
 
-    const finalTotal = sumDice + modValue;
-
-    // 4. Objeto da Rolagem
     const rollPayload = {
         id: `roll_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-        playerName: playerName,
-        rolls: details,
+        playerName,
+        rolledBy: auth.currentUser?.uid || null,
+        diceCounts: { ...counts },
         modifier: modValue,
-        total: finalTotal,
-        timestamp: Date.now() 
+        status: 'pending',
+        timestamp: Date.now(),
     };
 
-    // 5. Enviar para Firebase em segundo plano
     try {
         const sessionRef = doc(db, "sessoes", sessaoId);
         await updateDoc(sessionRef, {
@@ -77,6 +59,8 @@ export const DiceSelector = ({ sessaoId, playerName, onClose }) => {
         });
     } catch (error) {
         console.error("Erro ao rolar dados:", error);
+    } finally {
+        setRolling(false);
     }
   };
 
