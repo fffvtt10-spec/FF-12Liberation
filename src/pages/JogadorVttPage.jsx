@@ -23,6 +23,7 @@ import { Dice3DResult } from '../components/Dice3DResult';
 import AnnouncementTicker from '../components/AnnouncementTicker'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
+import DmOrbitalMenu from '../components/DmOrbitalMenu';
 import treeData from '../data/tree.json';
 import { getCharacterClass, getCharacterRace, hasClassMismatch } from '../utils/characterHelpers';
 import {
@@ -32,6 +33,10 @@ import {
   validarPropostaTroca
 } from '../utils/mercadoLanternas'; 
 import { FaFeather } from 'react-icons/fa';
+import {
+  IconDice, IconCombat, IconBook, IconTree, IconScroll,
+  IconCalendar, IconShield, IconLantern, IconSparkle, IconChat,
+} from '../components/VttIcons';
 
 // --- COMPONENTE DE CALENDÁRIO (READ ONLY PARA JOGADOR) ---
 const CalendarSystemPlayer = ({ onClose, disponibilidades, sessoes }) => {
@@ -200,22 +205,6 @@ const CountdownTimer = ({ targetDate }) => {
   return <span className="countdown-text">{timeLeft}</span>;
 };
 
-const CombatIcon = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
-      <path d="M13 19l6-6" />
-      <path d="M16 16l4 4" />
-      <path d="M19 21l2-2" />
-    </svg>
-);
-
-const BookIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-  </svg>
-);
-
 const formatSanchesText = (text) => {
     if (!text) return { __html: "" };
     let formatted = text
@@ -256,7 +245,6 @@ export default function JogadorVttPage() {
   const [hasJoinedSession, setHasJoinedSession] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const [showMissionModal, setShowMissionModal] = useState(false);
   const [showMissionDetails, setShowMissionDetails] = useState(null); 
   const [viewImage, setViewImage] = useState(null); 
   const [resenhas, setResenhas] = useState([]);
@@ -304,7 +292,6 @@ export default function JogadorVttPage() {
   const [bencaoFlash, setBencaoFlash] = useState(false);
   const lastBencaoTsRef = useRef(null);
 
-  const [showTrocas, setShowTrocas] = useState(false);
   const [minhasTrocas, setMinhasTrocas] = useState([]);
   const [trocaForm, setTrocaForm] = useState({ destinatarioUid: '', itensSelecionados: [], gil: 0, mensagem: '' });
 
@@ -313,6 +300,14 @@ export default function JogadorVttPage() {
   const [treePos, setTreePos] = useState({ x: 50, y: 50 });
   const [isDraggingTree, setIsDraggingTree] = useState(false);
   const [dragOffsetTree, setDragOffsetTree] = useState({ x: 0, y: 0 });
+
+  // --- MENU ORBITAL UNIFICADO & HUBS COM ABAS ---
+  const [orbitalOpen, setOrbitalOpen] = useState(false);
+  const [showComunidadeHub, setShowComunidadeHub] = useState(false);
+  const [comunidadeTab, setComunidadeTab] = useState('missoes');
+  const [showEconomiaHub, setShowEconomiaHub] = useState(false);
+  const [economiaTab, setEconomiaTab] = useState('trocas');
+  const [bazarOpen, setBazarOpen] = useState(false);
 
   const handleChatMouseDown = (e) => {
       setIsDraggingChat(true);
@@ -472,6 +467,11 @@ export default function JogadorVttPage() {
       const saved = currentVttSession.bencao_deuses?.numeros_escolhidos?.[personagem.name];
       setNumeroDestino(saved ? String(saved) : "");
   }, [showBencao, currentVttSession?.bencao_deuses?.numeros_escolhidos, personagem?.name, currentVttSession, personagem]);
+
+  useEffect(() => {
+    if (!showEconomiaHub) { setBazarOpen(false); return; }
+    setBazarOpen(economiaTab === 'bazar');
+  }, [showEconomiaHub, economiaTab]);
 
   // Função helper para verificar se um jogador X está com sessão ativa rolando
   const isPlayerActive = (playerName) => {
@@ -801,6 +801,31 @@ export default function JogadorVttPage() {
       personagem?.uid
   );
 
+  const trocasPendentesBadge = minhasTrocas.filter(t => t.status === 'pendente_mestre' && t.remetenteUid === personagem?.uid).length;
+
+  const orbitalItems = [
+    { id: 'classes', label: 'Árvore de Classes', shortLabel: 'CLASSES', icon: <IconTree />, onClick: () => setShowClassTree(true) },
+    { id: 'comunidade', label: 'Missões & Guilda', shortLabel: 'COMUNIDADE', icon: <IconScroll />, onClick: () => { setComunidadeTab('missoes'); setShowComunidadeHub(true); } },
+    { id: 'economia', label: 'Mercado & Trocas', shortLabel: 'MERCADO', icon: <IconLantern />, badge: trocasPendentesBadge, onClick: () => { setEconomiaTab('trocas'); setShowEconomiaHub(true); } },
+    { id: 'arena', label: 'Arenas PVP', shortLabel: 'ARENAS', icon: <IconShield />, onClick: () => setShowArenaModal(true) },
+    { id: 'agenda', label: 'Agenda', shortLabel: 'AGENDA', icon: <IconCalendar />, onClick: () => setShowCalendar(true) },
+    { id: 'livro', label: 'Livro do Jogo', shortLabel: 'LIVRO', icon: <IconBook />, onClick: handleOpenBook },
+    ...(resenhas.length > 0 ? [{
+      id: 'sanches', label: 'Resenhas do Sanches', shortLabel: 'RESENHAS',
+      icon: <div className="orbital-face-icon" style={{ backgroundImage: `url(${sanchezImg})` }} />,
+      badge: unreadResenhas, onClick: handleOpenSanches,
+    }] : []),
+    ...(currentVttSession ? [
+      { id: 'bencao', label: 'Bênção dos Deuses', shortLabel: 'BÊNÇÃO', icon: <IconSparkle />, onClick: () => setShowBencao(true) },
+      { id: 'combate', label: 'Rastreador de Combate', shortLabel: 'COMBATE', icon: <IconCombat />, onClick: () => setShowCombatTracker(v => !v) },
+      { id: 'dados', label: 'Rolar Dados', shortLabel: 'DADOS', icon: <IconDice />, onClick: () => setShowDiceSelector(true) },
+    ] : []),
+    ...(showTeamChat ? [{
+      id: 'chat', label: 'Chat de Equipe', shortLabel: 'CHAT', icon: <IconChat />, badge: unreadChatMessages,
+      onClick: () => { setChatOpen(!chatOpen); if (!chatOpen) { setLastOpenedChat(Date.now()); setUnreadChatMessages(0); } },
+    }] : []),
+  ];
+
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
@@ -1023,53 +1048,46 @@ export default function JogadorVttPage() {
         {sessoesAtivas.length > 0 && !hasJoinedSession && <div className="active-sessions-banner fade-in"><h3>SESSÃO EM ANDAMENTO!</h3>{sessoesAtivas.map(s => <div key={s.id} className="session-entry-row"><span className="sessao-nome-active">{s.missaoNome}</span><button className="btn-enter-session" onClick={() => enterVTT(s)}>ENTRAR AGORA</button></div>)}</div>}
         {vttStatus && currentVttSession && <div className={`vtt-status-widget ${vttStatus}`}><div className="status-indicator"></div><div className="status-text">{vttStatus === 'waiting' ? <><h4>AGUARDANDO</h4><small>Conectado...</small></> : <><h4>ONLINE</h4><small>Na Mesa</small></>}</div></div>}
 
-        {/* --- BOTÕES FLUTUANTES ENVOLTOS EM UM FLEX CONTAINER --- */}
-        <div className="hud-columns-container">
-            {/* Coluna 1: Principal (Sempre visível ou global) */}
-            <div className="hud-col">
-                <button className="hud-btn btn-tree" onClick={() => setShowClassTree(true)} title="Árvore de Classes">🌳</button>
-                <button className="hud-btn btn-trocas" onClick={() => setShowTrocas(true)} title="Sistema de Trocas">
-                    🏮
-                    {minhasTrocas.filter(t=>t.status==='pendente_mestre' && t.remetenteUid===personagem?.uid).length > 0 && <span className="notification-badge">!</span>}
-                </button>
-                <button className="hud-btn btn-arena" onClick={() => setShowArenaModal(true)} title="Arenas PVP">⚔️</button>
-                <button className="hud-btn btn-calendar" onClick={() => setShowCalendar(true)} title="Agenda">📅</button>
-                <button className="hud-btn btn-book" onClick={handleOpenBook} title="Livro do Jogo"><BookIcon /></button>
-                {resenhas.length > 0 && <button className="hud-btn btn-sanches" onClick={handleOpenSanches} title="Resenhas">
-                    <div className="sanches-icon-face" style={{backgroundImage: `url(${sanchezImg})`}}></div>
-                    {unreadResenhas > 0 && <span className="notification-badge">{unreadResenhas}</span>}
-                </button>}
-                <button className="hud-btn btn-mission" onClick={() => setShowMissionModal(true)} title="Missões">📜</button>
-            </div>
+        <Bazar isMestre={false} playerData={personagem} hideTrigger isOpen={bazarOpen} onOpenChange={setBazarOpen} />
 
-            {/* Coluna 2: Apenas durante VTT Ativo */}
-            {currentVttSession && (
-                <div className="hud-col">
-                    {showTeamChat && (
-                        <button className="hud-btn" style={{borderColor: myTeam.cor, color: '#fff'}} onClick={() => {
-                            setChatOpen(!chatOpen);
-                            if (!chatOpen) { setLastOpenedChat(Date.now()); setUnreadChatMessages(0); }
-                        }} title="Chat de Equipe">
-                            💬
-                            {unreadChatMessages > 0 && <span className="notification-badge">{unreadChatMessages}</span>}
-                        </button>
-                    )}
-                    <button className={`hud-btn btn-bencao ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowBencao(true)} title="Bênção dos Deuses">✨</button>
-                    <button className="hud-btn btn-combat" onClick={() => setShowCombatTracker(!showCombatTracker)} title="Ver Combate"><CombatIcon /></button>
-                    <button className="hud-btn btn-dice" onClick={() => setShowDiceSelector(true)} title="Rolar Dados">🎲</button>
-                </div>
-            )}
-        </div>
-
-        <Bazar isMestre={false} playerData={personagem} />
-        <GuildBoard isMaster={false} />
+        <DmOrbitalMenu open={orbitalOpen} onToggle={setOrbitalOpen} items={orbitalItems} />
 
         {showCalendar && (
           <CalendarSystemPlayer onClose={() => setShowCalendar(false)} disponibilidades={disponibilidades} sessoes={allSessoes} />
         )}
         
-        {/* MODAL DE LISTA DE MISSÕES */}
-        {showMissionModal && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionModal(false)}><div className="ff-modal-compact ff-card" onClick={e => e.stopPropagation()}><div className="modal-header-compact"><h3 className="modal-title-ff">QUADRO DE CONTRATOS</h3><button className="btn-close-x" onClick={() => setShowMissionModal(false)}>✕</button></div><div className="missions-grid-compact">{missoes.map(m => (<div key={m.id} className={`mission-card-compact rank-${m.rank}`}><div className="mc-left"><span className="mc-rank">{m.rank}</span></div><div className="mc-center"><h4 className="mc-title">{m.nome}</h4><span className="mc-reward">💰 {m.gilRecompensa} Gil</span></div><div className="mc-right"><button className="btn-details-mini" onClick={() => setShowMissionDetails(m)}>Ver Detalhes</button><button className="btn-accept-mini" onClick={() => handleCandidatar(m)}>ACEITAR</button></div></div>))}</div></div></div>)}
+        {/* HUB COMUNIDADE: MISSÕES & GUILDA */}
+        {showComunidadeHub && (
+            <div className="modal-overlay-custom" onClick={() => setShowComunidadeHub(false)}>
+                <div className="modal-box-custom wide hub-modal" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header-c">
+                        <h3>COMUNIDADE</h3>
+                        <div className="media-tabs hub-tabs">
+                            <button type="button" className={comunidadeTab === 'missoes' ? 'active' : ''} onClick={() => setComunidadeTab('missoes')}>MISSÕES</button>
+                            <button type="button" className={comunidadeTab === 'guilda' ? 'active' : ''} onClick={() => setComunidadeTab('guilda')}>GUILDA</button>
+                        </div>
+                        <button className="close-c" onClick={() => setShowComunidadeHub(false)}>✕</button>
+                    </div>
+                    <div className="hub-panel-body">
+                        {comunidadeTab === 'missoes' && (
+                            <div className="missions-grid-compact">
+                                {missoes.map(m => (
+                                    <div key={m.id} className={`mission-card-compact rank-${m.rank}`}>
+                                        <div className="mc-left"><span className="mc-rank">{m.rank}</span></div>
+                                        <div className="mc-center"><h4 className="mc-title">{m.nome}</h4><span className="mc-reward">💰 {m.gilRecompensa} Gil</span></div>
+                                        <div className="mc-right"><button className="btn-details-mini" onClick={() => setShowMissionDetails(m)}>Ver Detalhes</button><button className="btn-accept-mini" onClick={() => handleCandidatar(m)}>ACEITAR</button></div>
+                                    </div>
+                                ))}
+                                {missoes.length === 0 && <p style={{textAlign:'center', color:'#666'}}>Nenhum contrato disponível no momento.</p>}
+                            </div>
+                        )}
+                        {comunidadeTab === 'guilda' && (
+                            <GuildBoard isMaster={false} embedded={true} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
         
         {/* MODAL DE DETALHES DA MISSÃO */}
         {showMissionDetails && (<div className="ff-modal-overlay-flex" onClick={() => setShowMissionDetails(null)} style={{zIndex: 100000}}><div className="ff-modal-details-wide ff-card" onClick={e => e.stopPropagation()}><div className="detail-wide-header"><div className="dw-rank-badge">{showMissionDetails.rank}</div><div className="dw-title-box"><h2>{showMissionDetails.nome}</h2><span className="dw-narrator">Narrador: {showMissionDetails.mestreNome}</span></div><div className="dw-vagas-box"><span className="dw-vagas-label">Grupo: {showMissionDetails.candidatos ? showMissionDetails.candidatos.length : 0} / {showMissionDetails.grupo || '?'}</span><div className="dw-vagas-bar"><div style={{width: `${Math.min(((showMissionDetails.candidatos?.length || 0) / (parseInt(showMissionDetails.grupo) || 1)) * 100, 100)}%`}}></div></div></div></div><div className="detail-wide-body"><div className="dw-col-left"><div className="dw-info-item"><label>🌍 LOCAL</label><span>{showMissionDetails.local || "Desconhecido"}</span></div><div className="dw-info-item"><label>👤 CONTRATANTE</label><span>{showMissionDetails.contratante || "Anônimo"}</span></div><div className="dw-reward-box"><label>RECOMPENSAS</label><div className="dw-gil-row"><span className="gil-icon">💰</span> <span className="gil-val">{showMissionDetails.gilRecompensa} GIL</span></div>{showMissionDetails.recompensa && (<div className="dw-extra-rewards">{showMissionDetails.recompensa.split('\n').map((r,i) => (<div key={i} className="reward-item">• {r}</div>))}</div>)}</div><div className="dw-candidates-box"><label>AVENTUREIROS INSCRITOS</label><div className="dw-cand-list">{showMissionDetails.candidatos && showMissionDetails.candidatos.length > 0 ? (showMissionDetails.candidatos.map((c, i) => (<div key={i} className="dw-cand-item" style={{color: c.isLeader ? '#ffcc00' : '#ccc'}}>{c.isLeader ? '👑' : '•'} {c.nome}</div>))) : <span style={{fontSize:'11px', color:'#666'}}>Seja o primeiro!</span>}</div></div>{showMissionDetails.imagem && (<button className="btn-cartaz-full" onClick={() => setViewImage(showMissionDetails.imagem)}>👁️ VER CARTAZ</button>)}</div><div className="dw-col-right custom-scrollbar"><div className="dw-text-block"><label>📜 DESCRIÇÃO</label><p>{showMissionDetails.descricaoMissao}</p></div><div className="dw-text-block"><label>⚔️ OBJETIVOS</label><p>{showMissionDetails.objetivosMissao}</p></div><div className="dw-text-block"><label>⚡ REQUISITOS</label><p>{showMissionDetails.requisitos}</p></div></div></div><button className="dw-close-btn" onClick={() => setShowMissionDetails(null)}>FECHAR</button></div></div>)}
@@ -1183,11 +1201,20 @@ export default function JogadorVttPage() {
         
         {showFicha && personagem && <Ficha characterData={personagem} isMaster={false} onClose={() => setShowFicha(false)} />}
 
-        {/* MODAL: SISTEMA DE TROCAS GLOBAIS */}
-        {showTrocas && (
-            <div className="modal-overlay-custom" onClick={() => setShowTrocas(false)}>
-                <div className="modal-box-custom wide" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header-c"><h3>🏮 MERCADO DOS LANTERNAS</h3><button className="close-c" onClick={() => setShowTrocas(false)}>✕</button></div>
+        {/* HUB ECONOMIA: TROCAS & BAZAR */}
+        {showEconomiaHub && (
+            <div className="modal-overlay-custom" onClick={() => setShowEconomiaHub(false)}>
+                <div className="modal-box-custom wide hub-modal" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header-c">
+                        <h3>MERCADO & TROCAS</h3>
+                        <div className="media-tabs hub-tabs">
+                            <button type="button" className={economiaTab === 'trocas' ? 'active' : ''} onClick={() => setEconomiaTab('trocas')}>TROCAS</button>
+                            <button type="button" className={economiaTab === 'bazar' ? 'active' : ''} onClick={() => setEconomiaTab('bazar')}>BAZAR</button>
+                        </div>
+                        <button className="close-c" onClick={() => setShowEconomiaHub(false)}>✕</button>
+                    </div>
+                    <div className="hub-panel-body">
+                    {economiaTab === 'trocas' && (
                     <div style={{display:'flex', gap:'20px'}}>
                         
                         {/* Enviar Proposta */}
@@ -1298,6 +1325,14 @@ export default function JogadorVttPage() {
                         </div>
 
                     </div>
+                    )}
+                    {economiaTab === 'bazar' && (
+                        <div className="hub-external-tool">
+                            <p className="hub-hint">A loja completa do Bazar abre em uma janela própria. Feche o Bazar para voltar a este painel.</p>
+                            <button type="button" className="btn-save-m" onClick={() => setBazarOpen(true)}>ABRIR BAZAR</button>
+                        </div>
+                    )}
+                    </div>
                 </div>
             </div>
         )}
@@ -1400,37 +1435,20 @@ export default function JogadorVttPage() {
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
         .char-meta { font-size: 12px; color: #00f2ff; }
         
-        /* CONTAINER DOS BOTÕES FLUTUANTES (SOLUÇÃO DE ALINHAMENTO) */
-        .hud-columns-container { position: fixed; left: 20px; bottom: 30px; display: flex; gap: 15px; align-items: flex-end; z-index: 2000; }
-        .hud-col { display: flex; flex-direction: column; gap: 15px; }
-        .hud-btn { width: 50px; height: 50px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 20px; box-shadow: 0 0 10px #000; position: relative; }
-        .hud-btn:hover { transform: scale(1.1); }
-        
-        .btn-mission { border: 2px solid #ffcc00; color: #fff; }
-        .btn-mission:hover { box-shadow: 0 0 15px #ffcc00; }
-        .btn-sanches { border: 2px solid #00f2ff; }
-        .btn-sanches:hover { box-shadow: 0 0 15px #00f2ff; }
-        .btn-book { border: 2px solid #fff; color: #fff; }
-        .btn-book:hover { border-color: #ffcc00; color: #ffcc00; box-shadow: 0 0 15px #fff; }
-        .btn-calendar { border: 2px solid #22c55e; color: #22c55e; }
-        .btn-calendar:hover { box-shadow: 0 0 15px #22c55e; color: #fff; border-color: #fff; }
-        .btn-arena { border: 2px solid #a855f7; color: #a855f7; }
-        .btn-arena:hover { box-shadow: 0 0 15px #a855f7; color: #fff; border-color: #fff; }
-        .btn-trocas { border: 2px solid #f43f5e; color: #f43f5e; }
-        .btn-trocas:hover { box-shadow: 0 0 15px #f43f5e; color: #fff; border-color: #fff; }
-        .btn-tree { border: 2px solid #3b82f6; color: #3b82f6; }
-        .btn-tree:hover { box-shadow: 0 0 15px #3b82f6; color: #fff; border-color: #fff; }
-        
-        .btn-dice { border: 2px solid #fff; background: #111; color: #fff; }
-        .btn-dice:hover { border-color: #ffcc00; box-shadow: 0 0 15px #ffcc00; }
-        .btn-combat { border: 2px solid #f44; background: #111; color: #f44; }
-        .btn-combat:hover { border-color: #fff; color: #fff; box-shadow: 0 0 15px #f44; }
-        .btn-bencao { border: 2px solid #ffcc00; color: #ffcc00; }
-        .btn-bencao:hover { box-shadow: 0 0 15px #ffcc00; color: #fff; border-color: #fff; }
+        /* ÍCONE CUSTOMIZADO (SANCHES) DENTRO DO MENU ORBITAL */
+        .orbital-face-icon { width: 22px; height: 22px; border-radius: 50%; background-size: cover; background-position: center; }
+        .orbital-satellite:hover .orbital-face-icon { box-shadow: 0 0 8px #ffcc00; }
 
-        .sanches-icon-face { width: 100%; height: 100%; border-radius: 50%; background-size: cover; opacity: 0.8; }
-        .btn-sanches:hover .sanches-icon-face { opacity: 1; }
-        .notification-badge { position: absolute; top: -2px; right: -2px; background: #f00; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid #fff; font-weight: bold; font-size: 10px; z-index: 2000; box-shadow: 0 0 5px #000; }
+        /* HUBS COM ABAS (MESMO PADRÃO DO MESTRE) */
+        .hub-modal { max-height: 92vh; }
+        .media-tabs { display: flex; gap: 15px; margin: 0 20px; }
+        .media-tabs button { background: transparent; border: none; color: #aaa; font-family: 'Cinzel', serif; font-size: 12px; cursor: pointer; padding-bottom: 5px; font-weight: bold; }
+        .media-tabs button.active { color: #ffcc00; border-bottom: 2px solid #ffcc00; }
+        .hub-tabs { flex-wrap: wrap; gap: 8px !important; margin: 0 10px !important; }
+        .hub-tabs button { font-size: 10px !important; white-space: nowrap; }
+        .hub-panel-body { min-height: 200px; max-height: 65vh; overflow-y: auto; padding-top: 5px; }
+        .hub-hint { color: #888; font-size: 12px; margin: 0 0 15px 0; font-style: italic; }
+        .hub-external-tool { text-align: center; padding: 40px 20px; }
         
         .combat-tracker-panel { position: absolute; width: 300px; max-height: 70vh; background: linear-gradient(180deg, #0d0d10 0%, #000 100%); border: 2px solid #b8860b; border-radius: 6px; z-index: 2100; display: flex; flex-direction: column; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
         .tracker-header { background: #15100a; border-bottom: 2px solid #b8860b; padding: 10px; text-align: center; }
@@ -1654,8 +1672,6 @@ export default function JogadorVttPage() {
         .fc-node.special { background: #3b0764; border: 2px solid #a855f7; color: #e9d5ff; }
         .fc-node.legendary { background: #020617; border: 2px solid #00f2ff; color: #00f2ff; box-shadow: 0 0 15px #00f2ff; }
         .fc-arrow { color: #555; font-size: 16px; font-weight: bold; }
-        
-        .guild-btn-float { top: auto !important; left: auto !important; transform: none !important; bottom: 30px !important; right: 110px !important; z-index: 2000 !important; }
       `}</style>
 
       <WallpaperPicker
@@ -1665,7 +1681,7 @@ export default function JogadorVttPage() {
         storageKey="jogador_wallpaper"
         side="right"
         bottom={30}
-        sideOffset={170}
+        sideOffset={90}
       />
     </div>
   );

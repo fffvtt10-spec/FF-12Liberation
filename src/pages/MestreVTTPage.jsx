@@ -31,6 +31,7 @@ import { DiceSelector } from '../components/DiceSystem';
 import { Dice3DResult } from '../components/Dice3DResult'; 
 import AnnouncementTicker from '../components/AnnouncementTicker';
 import AnnouncementManager from '../components/AnnouncementManager';
+import { IconTabletop, IconDice, IconCombat, IconBook, IconFolder, IconLantern, IconSparkle, IconMegaphone } from '../components/VttIcons';
 
 // --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
 import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask, FaTint, FaFeather } from 'react-icons/fa';
@@ -47,35 +48,6 @@ const STATUS_EFFECTS = [
     { id: 'Envenenado', icon: <FaFlask />, color: '#00ff00' },
     { id: 'Sangramento', icon: <FaTint />, color: '#dc2626' }
 ];
-
-// --- NOVOS ÍCONES SVG (ESTILO DARK FANTASY) ---
-const IconTabletop = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-    <line x1="8" y1="2" x2="8" y2="18" />
-    <line x1="16" y1="6" x2="16" y2="22" />
-  </svg>
-);
-const IconDice = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" />
-    <path d="M12 22V12" />
-  </svg>
-);
-const IconCombat = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
-    <path d="M13 19l6-6" />
-    <path d="M16 16l4 4" />
-    <path d="M19 21l2-2" />
-  </svg>
-);
-const IconBook = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-  </svg>
-);
 
 const MESTRE_WALLPAPERS = [
   { label: 'Padrão',      src: fundoMestre   },
@@ -594,12 +566,12 @@ export default function MestreVTTPage() {
 
   const orbitalItems = [
     { id: 'mesa', label: 'Mesa de Jogo', shortLabel: 'MESA', icon: <IconTabletop />, onClick: () => { setMesaTab('tabletop'); setShowMesaHub(true); } },
-    { id: 'biblioteca', label: 'Biblioteca VTT', shortLabel: 'BIBLIOTECA', icon: '📁', onClick: () => openLibrary(VTT_TYPES.MAP) },
-    { id: 'economia', label: 'Economia & Trocas', shortLabel: 'ECONOMIA', icon: '🏮', badge: trocasPendentes.length, onClick: () => { setEconomiaTab('mercado'); setShowEconomiaHub(true); } },
+    { id: 'biblioteca', label: 'Biblioteca VTT', shortLabel: 'BIBLIOTECA', icon: <IconFolder />, onClick: () => openLibrary(VTT_TYPES.MAP) },
+    { id: 'economia', label: 'Economia & Trocas', shortLabel: 'ECONOMIA', icon: <IconLantern />, badge: trocasPendentes.length, onClick: () => { setEconomiaTab('mercado'); setShowEconomiaHub(true); } },
     { id: 'combate', label: 'Rastreador de Combate', shortLabel: 'COMBATE', icon: <IconCombat />, onClick: () => setShowCombatTracker((v) => !v) },
     { id: 'dados', label: 'Rolagem de Dados', shortLabel: 'DADOS', icon: <IconDice />, onClick: () => setShowDiceSelector(true) },
-    { id: 'bencao', label: 'Bênção dos Deuses (D100)', shortLabel: 'BÊNÇÃO', icon: '✨', onClick: () => setShowBencaoManager(true) },
-    { id: 'anuncios', label: 'Anúncios da Mesa', shortLabel: 'ANÚNCIOS', icon: '📢', onClick: () => setShowAnnouncementManager(true) },
+    { id: 'bencao', label: 'Bênção dos Deuses (D100)', shortLabel: 'BÊNÇÃO', icon: <IconSparkle />, onClick: () => setShowBencaoManager(true) },
+    { id: 'anuncios', label: 'Anúncios da Mesa', shortLabel: 'ANÚNCIOS', icon: <IconMegaphone />, onClick: () => setShowAnnouncementManager(true) },
     { id: 'livro', label: 'Livro / Referência', shortLabel: 'LIVRO', icon: <IconBook />, onClick: () => window.open('https://www.canva.com/design/DAGpzszHsc4/NcbQ19hsr4grzm9aotQFtw/edit?utm_content=DAGpzszHsc4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton', '_blank') },
   ];
 
