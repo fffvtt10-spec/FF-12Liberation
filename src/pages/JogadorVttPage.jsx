@@ -19,7 +19,8 @@ import SceneryViewer from '../components/SceneryViewer';
 import NPCViewer from '../components/NPCViewer'; 
 import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector } from '../components/DiceSystem';
-import { Dice3DResult } from '../components/Dice3DResult'; 
+import { Dice3DResult } from '../components/Dice3DResult';
+import AnnouncementTicker from '../components/AnnouncementTicker'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
 import treeData from '../data/tree.json';
@@ -803,6 +804,7 @@ export default function JogadorVttPage() {
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
+      <AnnouncementTicker />
       
       {bencaoFlash && currentVttSession?.bencao_deuses?.vencedores?.length > 0 && createPortal(
           <div className="bencao-roll-flash">
@@ -821,7 +823,7 @@ export default function JogadorVttPage() {
 
         <div className={`char-hud clickable-hud ${isBencaoWinner ? 'bencao-highlight' : ''}`} onClick={() => setShowFicha(true)} title="Abrir Ficha">
           <div className="char-avatar"><div className="avatar-circle"><span className="hud-level">{personagem.character_sheet?.basic_info?.level || 1}</span></div></div>
-          <div className="char-info"><h2 className="char-name">{personagem.name}</h2><span className="char-meta">{getCharacterRace(personagem)} // {getCharacterClass(personagem)}</span></div>
+          <div className="char-info"><h2 className="char-name">{personagem.name}</h2><span className="char-meta">{personagem.character_sheet?.basic_info?.custom_title || `${getCharacterRace(personagem)} // ${getCharacterClass(personagem)}`}</span></div>
         </div>
 
         {currentVttSession && currentVttSession.active_map && (
@@ -1392,7 +1394,7 @@ export default function JogadorVttPage() {
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         
-        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; transition: 0.3s; }
+        .char-hud { position: absolute; top: 56px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; transition: 0.3s; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
         .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; }
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
@@ -1484,7 +1486,7 @@ export default function JogadorVttPage() {
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 999; width: 200px; }
+        .vtt-status-widget { position: fixed; top: 56px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 999; width: 200px; }
         .vtt-status-widget.waiting { border-color: #ffcc00; }
         .vtt-status-widget.connected { border-color: #0f0; }
         .status-indicator { width: 15px; height: 15px; border-radius: 50%; background: #fff; }

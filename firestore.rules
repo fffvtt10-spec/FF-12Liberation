@@ -224,6 +224,11 @@ service cloud.firestore {
       allow write: if isMestre();
     }
 
+    match /anuncios/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isMestre();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

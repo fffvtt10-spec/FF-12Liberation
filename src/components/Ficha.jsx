@@ -241,6 +241,57 @@ export default function Ficha({ characterData, isMaster, onClose }) {
       setHasUnsavedChanges(true);
   };
 
+  const getSkillArray = (s, listType) => {
+      if (listType === 'primary') return s.job_system.primary_class.skills;
+      if (listType === 'secondary') return s.job_system.secondary_class.skills;
+      if (listType === 'passives') return s.job_system.passives;
+      if (listType === 'reactions') return s.job_system.reactions;
+      return [];
+  };
+
+  const updateSkillUsage = (listType, index, updater) => {
+      if (!isMaster) return;
+      const newSheet = JSON.parse(JSON.stringify(sheet));
+      const skill = getSkillArray(newSheet, listType)[index];
+      if (!skill) return;
+      if (!skill.usage) skill.usage = { max: 0, current: 0 };
+
+      updater(skill.usage);
+
+      skill.usage.max = Math.min(5, Math.max(0, skill.usage.max || 0));
+      skill.usage.current = Math.min(skill.usage.max, Math.max(0, skill.usage.current || 0));
+
+      setSheet(newSheet);
+      setHasUnsavedChanges(true);
+  };
+
+  const handleUsageMaxChange = (listType, index, delta) => {
+      updateSkillUsage(listType, index, (usage) => {
+          const wasFull = usage.current === usage.max;
+          usage.max = (usage.max || 0) + delta;
+          if (wasFull || usage.current === undefined) usage.current = usage.max;
+      });
+  };
+
+  const handleUsageDotClick = (listType, index, dotIdx) => {
+      updateSkillUsage(listType, index, (usage) => {
+          const lit = dotIdx < (usage.current ?? usage.max);
+          usage.current = lit ? dotIdx : dotIdx + 1;
+      });
+  };
+
+  const handleUsageDecrement = (listType, index) => {
+      updateSkillUsage(listType, index, (usage) => {
+          usage.current = (usage.current ?? usage.max) - 1;
+      });
+  };
+
+  const handleUsageRestore = (listType, index) => {
+      updateSkillUsage(listType, index, (usage) => {
+          usage.current = usage.max;
+      });
+  };
+
   const handleSkillIconSelect = (iconName) => {
       if (!iconSelectorTarget) return;
       const { listType, skillIndex } = iconSelectorTarget;
@@ -451,6 +502,48 @@ export default function Ficha({ characterData, isMaster, onClose }) {
                                 <button className="btn-masterize" onClick={() => toggleMastery(listType, i)}>MASTERIZAR</button>
                             )}
                         </div>
+
+                        {(isMaster || (skill.usage?.max > 0)) && (
+                            <div className="skill-usage-box">
+                                <div className="usage-header">
+                                    <span>USOS</span>
+                                    {isMaster && (
+                                        <div className="usage-max-control">
+                                            <button type="button" onClick={() => handleUsageMaxChange(listType, i, -1)} disabled={(skill.usage?.max || 0) <= 0}>-</button>
+                                            <span className="usage-max-value">{skill.usage?.max || 0}</span>
+                                            <button type="button" onClick={() => handleUsageMaxChange(listType, i, 1)} disabled={(skill.usage?.max || 0) >= 5}>+</button>
+                                        </div>
+                                    )}
+                                </div>
+                                {skill.usage?.max > 0 && (
+                                    <>
+                                        <div className="usage-dots">
+                                            {Array.from({ length: skill.usage.max }).map((_, dotIdx) => {
+                                                const lit = dotIdx < (skill.usage.current ?? skill.usage.max);
+                                                return (
+                                                    <button
+                                                        key={dotIdx}
+                                                        type="button"
+                                                        className={`usage-dot ${lit ? 'lit' : ''} ${isMaster ? 'clickable' : ''}`}
+                                                        disabled={!isMaster}
+                                                        onClick={() => handleUsageDotClick(listType, i, dotIdx)}
+                                                        title={isMaster ? (lit ? 'Apagar' : 'Acender') : ''}
+                                                    >
+                                                        {lit ? '●' : '○'}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {isMaster && (
+                                            <div className="usage-actions">
+                                                <button type="button" className="btn-usage-action" onClick={() => handleUsageDecrement(listType, i)}>-1 USO</button>
+                                                <button type="button" className="btn-usage-action" onClick={() => handleUsageRestore(listType, i)}>RESTAURAR</button>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -494,6 +587,16 @@ export default function Ficha({ characterData, isMaster, onClose }) {
             
             <div className="header-info">
                 <h1 className="responsive-title">{sheet.basic_info.character_name}</h1>
+                {isMaster ? (
+                    <input
+                        className="player-title-input"
+                        placeholder="Título do personagem (opcional)"
+                        value={sheet.basic_info?.custom_title || ""}
+                        onChange={e => updateField('basic_info.custom_title', e.target.value)}
+                    />
+                ) : (
+                    sheet.basic_info?.custom_title && <span className="player-title-display">{sheet.basic_info.custom_title}</span>
+                )}
                 <span className="sub-header">{sheet.basic_info.race} // {displayClass}</span>
                 <div className="xp-container">
                     <div className="lvl-box"><small>LVL</small>{isMaster ? <input className="lvl-input" type="number" value={sheet.basic_info.level} onChange={e => updateField('basic_info.level', Number(e.target.value))} /> : <span>{sheet.basic_info.level}</span>}</div>
@@ -616,10 +719,6 @@ export default function Ficha({ characterData, isMaster, onClose }) {
 
                         <div className="extra-abilities-box">
                             <div className="bonus-row"><label>BÔNUS DE CLASSE</label>{isMaster ? <textarea value={sheet.job_system?.class_bonus?.value} onChange={e => updateField('job_system.class_bonus.value', e.target.value)} className="bonus-area" /> : <p className="bonus-area-read">{sheet.job_system?.class_bonus?.value || "Nenhum"}</p>}</div>
-                            <div className="bonus-row" style={{marginTop:'15px'}}>
-                                <label>TÍTULO</label>
-                                {isMaster ? <input className="ab-input" style={{background: 'rgba(0,0,0,0.5)', padding: '5px', width: '100%', border: '1px solid #444', borderRadius: '4px'}} value={sheet.basic_info?.custom_title || ""} onChange={e => updateField('basic_info.custom_title', e.target.value)} /> : <p style={{background: 'rgba(0,0,0,0.5)', padding: '8px', borderRadius: '4px', fontSize: '12px', color: '#ffcc00', fontWeight: 'bold', margin: 0}}>{sheet.basic_info?.custom_title || "Sem Título"}</p>}
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -739,6 +838,10 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .header-info { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
         .header-info h1 { margin: 0; color: #ffcc00; font-size: 36px; letter-spacing: 4px; text-shadow: 0 0 10px rgba(255,204,0,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
         .sub-header { color: #00f2ff; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
+        .player-title-display { color: #ffcc00; font-size: 13px; font-weight: bold; font-style: italic; letter-spacing: 1px; text-shadow: 0 0 8px rgba(255,204,0,0.4); margin-bottom: 4px; }
+        .player-title-input { background: rgba(0,0,0,0.4); border: 1px solid #444; color: #ffcc00; font-size: 13px; font-weight: bold; font-style: italic; letter-spacing: 1px; text-align: center; padding: 4px 10px; border-radius: 12px; margin-bottom: 6px; width: 80%; outline: none; font-family: 'Cinzel', serif; }
+        .player-title-input::placeholder { color: #666; font-style: italic; }
+        .player-title-input:focus { border-color: #ffcc00; box-shadow: 0 0 8px rgba(255,204,0,0.3); }
         .xp-container { display: flex; align-items: center; gap: 15px; width: 60%; margin-top: -5px; }
         .lvl-box { display: flex; flex-direction: column; align-items: center; background: #222; border: 1px solid #ffcc00; padding: 5px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2); }
         .lvl-box small { font-size: 8px; color: #ffcc00; }
@@ -818,6 +921,22 @@ export default function Ficha({ characterData, isMaster, onClose }) {
         .skill-track.grayed .skill-fill { background: #888; }
         .skill-fill { height: 100%; background: #00f2ff; transition: width 0.3s; }
         .btn-masterize { width: 100%; margin-top: 4px; background: linear-gradient(to right, #d4af37, #b8860b); border: none; color: #000; font-size: 9px; font-weight: bold; cursor: pointer; padding: 2px; border-radius: 2px; }
+
+        /* USOS (BOLINHAS) */
+        .skill-usage-box { margin-top: 6px; background: rgba(0,0,0,0.3); padding: 5px 6px; border-radius: 3px; border: 1px solid rgba(255,204,0,0.15); }
+        .usage-header { display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #888; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .usage-max-control { display: flex; align-items: center; gap: 4px; }
+        .usage-max-control button { background: #222; border: 1px solid #444; color: #ffcc00; width: 16px; height: 16px; line-height: 1; font-size: 10px; cursor: pointer; border-radius: 2px; padding: 0; display: flex; align-items: center; justify-content: center; }
+        .usage-max-control button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .usage-max-value { width: 12px; text-align: center; font-size: 10px; color: #fff; font-weight: bold; }
+        .usage-dots { display: flex; gap: 4px; justify-content: center; margin-bottom: 4px; }
+        .usage-dot { background: none; border: none; color: #555; font-size: 16px; line-height: 1; padding: 0; cursor: default; transition: 0.15s; }
+        .usage-dot.lit { color: #ffcc00; text-shadow: 0 0 6px #ffcc00; }
+        .usage-dot.clickable { cursor: pointer; }
+        .usage-dot.clickable:hover { transform: scale(1.2); }
+        .usage-actions { display: flex; gap: 4px; }
+        .btn-usage-action { flex: 1; background: #1a1a1a; border: 1px solid #444; color: #aaa; font-size: 8px; font-weight: bold; padding: 3px 2px; cursor: pointer; border-radius: 2px; letter-spacing: 0.5px; }
+        .btn-usage-action:hover { border-color: #ffcc00; color: #ffcc00; }
         .star-icon { color: #ffd700; font-size: 14px; margin-right: 5px; text-shadow: 0 0 5px #ffd700; }
         .pulsing { animation: pulseStar 1.5s infinite; }
         @keyframes pulseStar { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
