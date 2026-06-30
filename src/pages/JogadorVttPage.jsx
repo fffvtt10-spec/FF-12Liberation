@@ -1429,7 +1429,7 @@ export default function JogadorVttPage() {
         .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; z-index: 0; }
         .content-layer { position: relative; z-index: 10; width: 100%; height: 100%; }
         
-        .char-hud { position: absolute; top: 56px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; transition: 0.3s; }
+        .char-hud { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 50px; border: 1px solid #ffcc00; z-index: 999; cursor: pointer; transition: 0.3s; }
         .avatar-circle { width: 60px; height: 60px; background: #222; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; }
         .hud-level { font-size: 28px; font-weight: bold; color: #ffcc00; }
         .char-info h2 { margin: 0; font-size: 20px; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
@@ -1504,7 +1504,7 @@ export default function JogadorVttPage() {
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .vtt-status-widget { position: fixed; top: 56px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 999; width: 200px; }
+        .vtt-status-widget { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 2px solid; padding: 15px; border-radius: 8px; display: flex; align-items: center; gap: 15px; z-index: 999; width: 200px; }
         .vtt-status-widget.waiting { border-color: #ffcc00; }
         .vtt-status-widget.connected { border-color: #0f0; }
         .status-indicator { width: 15px; height: 15px; border-radius: 50%; background: #fff; }
