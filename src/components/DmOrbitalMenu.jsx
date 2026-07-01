@@ -3,12 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 const FAB_SIZE = 56;
 const FAB_INSET = 24;
 const BUTTON_SIZE = 48;
-const MIN_GAP = 10;
-
-/** Ângulos seguros: arco só para cima/esquerda a partir do canto inferior direito (π → 1.47π). */
-const ANGLE_START = Math.PI * 1.03;
-const ANGLE_END = Math.PI * 1.465;
-const MAX_ARC = ANGLE_END - ANGLE_START;
+const MIN_GAP = 12;
 
 function useViewportSize() {
   const [size, setSize] = useState(() => ({
@@ -27,105 +22,69 @@ function useViewportSize() {
 
 function getLayoutMetrics(viewport, comfortable) {
   const compact = viewport.w < 480;
-  const btnSize = compact ? 42 : comfortable ? 46 : BUTTON_SIZE;
-  const spacing = btnSize + MIN_GAP + (comfortable && !compact ? 4 : 0);
+  const btnSize = compact ? 42 : comfortable ? 44 : BUTTON_SIZE;
+  const spacing = btnSize + MIN_GAP;
   const btnHalf = btnSize / 2;
   const inset = compact ? 14 : FAB_INSET;
-  const edgePad = compact ? 8 : 12;
+  const edgePad = compact ? 10 : 14;
 
   const maxRadiusX = viewport.w - inset - FAB_SIZE / 2 - btnHalf - edgePad;
   const maxRadiusY = viewport.h - inset - FAB_SIZE / 2 - btnHalf - edgePad;
-  const maxRadius = Math.max(72, Math.min(comfortable ? 148 : 132, maxRadiusX, maxRadiusY));
 
-  return { compact, btnSize, spacing, btnHalf, inset, edgePad, maxRadiusX, maxRadiusY, maxRadius };
+  return { compact, btnSize, spacing, inset, maxRadiusX, maxRadiusY };
 }
 
 /**
- * Distribui itens em anéis concêntricos dentro do arco seguro e da viewport.
+ * Leque em colunas (2 colunas quando >4 itens): sobe e vai para a esquerda
+ * a partir do FAB, com espaçamento fixo e previsível.
  */
-function computeOrbitalLayout(count, comfortable, viewport) {
-  if (count <= 0) return { positions: [], metrics: getLayoutMetrics(viewport, comfortable) };
-
+function computeFanLayout(count, comfortable, viewport) {
   const metrics = getLayoutMetrics(viewport, comfortable);
-  const { spacing, maxRadius, maxRadiusX, maxRadiusY } = metrics;
+  if (count <= 0) return { positions: [], metrics };
 
-  if (count === 1) {
-    const r = Math.min(88, maxRadius);
-    const angle = Math.PI * 1.22;
-    return {
-      metrics,
-      positions: [clampPosition(Math.cos(angle) * r, Math.sin(angle) * r, maxRadiusX, maxRadiusY, 0)],
-    };
-  }
+  const { spacing, maxRadiusX, maxRadiusY } = metrics;
+  const cols = count <= 4 ? 1 : 2;
+  const rows = Math.ceil(count / cols);
+  const colGap = spacing + (comfortable ? 6 : 2);
+  const rowGap = spacing + (comfortable ? 4 : 0);
 
-  const rings = [];
-  let remaining = count;
-  let ringIdx = 0;
-  const minRadius = metrics.compact ? 64 : comfortable ? 76 : 70;
-  const radiusStep = Math.max(32, (maxRadius - minRadius) / 3);
+  const rawHeight = (rows - 1) * rowGap + spacing;
+  const rawWidth = cols === 1 ? spacing : colGap + spacing;
+  const scaleY = rawHeight > maxRadiusY ? maxRadiusY / rawHeight : 1;
+  const scaleX = rawWidth > maxRadiusX ? maxRadiusX / rawWidth : 1;
+  const scale = Math.min(1, scaleX, scaleY);
 
-  while (remaining > 0 && ringIdx < 4) {
-    const radius = Math.min(minRadius + ringIdx * radiusStep, maxRadius);
-    const capacity = Math.max(
-      1,
-      Math.min(remaining, Math.floor((MAX_ARC * radius) / spacing) + 1)
-    );
-    rings.push({ radius, count: capacity, ringIdx });
-    remaining -= capacity;
-    ringIdx += 1;
-  }
-
+  const startX = -spacing * 0.85;
+  const startY = -spacing * 0.75;
   const positions = [];
-  let delay = 0;
 
-  rings.forEach(({ radius, count: ringCount, ringIdx: ring }) => {
-    const arcNeeded = ringCount <= 1 ? 0 : ((ringCount - 1) * spacing) / radius;
-    const arcSpan = Math.min(MAX_ARC, arcNeeded);
-    const ringOffset = ring * 0.035;
-    const start = ANGLE_START + ringOffset;
+  for (let i = 0; i < count; i += 1) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const rowCurve = row * (comfortable ? 10 : 8);
 
-    for (let i = 0; i < ringCount; i += 1) {
-      const t = ringCount <= 1 ? 0.5 : i / (ringCount - 1);
-      const angle = start + arcSpan * t;
-      const rawX = Math.cos(angle) * radius;
-      const rawY = Math.sin(angle) * radius;
-      positions.push({
-        ...clampPosition(rawX, rawY, maxRadiusX, maxRadiusY, ring),
-        delay: delay * 30,
-      });
-      delay += 1;
-    }
-  });
+    const x = (startX - col * colGap - rowCurve) * scale;
+    const y = (startY - row * rowGap) * scale;
+
+    positions.push({
+      x: Math.max(-maxRadiusX, x),
+      y: Math.max(-maxRadiusY, y),
+      ring: col,
+      flipLabel: x < -maxRadiusX * 0.55,
+      delay: i * 26,
+    });
+  }
 
   return { positions, metrics };
 }
 
-/** Mantém satélites à esquerda/acima do FAB, nunca para fora da tela. */
-function clampPosition(x, y, maxRadiusX, maxRadiusY, ring) {
-  const minX = -maxRadiusX;
-  const minY = -maxRadiusY;
-  const maxX = -10;
-  const maxY = -10;
-
-  const clampedX = Math.max(minX, Math.min(maxX, x));
-  const clampedY = Math.max(minY, Math.min(maxY, y));
-
-  return {
-    x: clampedX,
-    y: clampedY,
-    ring,
-    flipLabel: clampedX < -maxRadiusX * 0.55,
-  };
-}
-
 /**
- * Menu orbital — FAB no canto inferior direito expande os atalhos em arco.
- * @param {boolean} comfortable — mais espaçamento (ideal para jogador em sessão)
+ * Menu orbital — FAB no canto inferior direito expande os atalhos em leque.
  */
 export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable = false }) {
   const viewport = useViewportSize();
   const { positions, metrics } = useMemo(
-    () => computeOrbitalLayout(items.length, comfortable, viewport),
+    () => computeFanLayout(items.length, comfortable, viewport),
     [items.length, comfortable, viewport.w, viewport.h]
   );
 
@@ -158,7 +117,7 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
             style={{
               '--sat-x': `${pos.x}px`,
               '--sat-y': `${pos.y}px`,
-              '--sat-delay': `${pos.delay ?? i * 30}ms`,
+              '--sat-delay': `${pos.delay ?? i * 26}ms`,
               '--sat-z': (pos.ring ?? 0) + 1,
             }}
             onClick={() => {
@@ -238,7 +197,6 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           font-size: 22px;
           line-height: 1;
           font-family: 'Cinzel', serif;
-          transition: transform 0.25s;
         }
 
         .orbital-satellite {
@@ -255,7 +213,6 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           color: #fff;
           cursor: pointer;
           display: flex;
-          flex-direction: column;
           align-items: center;
           justify-content: center;
           transform: translate(0, 0) scale(0);
@@ -316,7 +273,6 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           border-radius: 4px;
           opacity: 0;
           pointer-events: none;
-          transition: opacity 0.15s;
           z-index: 30;
         }
         .orbital-satellite.label-right .orbital-sat-label {
