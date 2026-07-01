@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { isRollComplete } from '../utils/dismissedRolls';
 
 const DICE_BOX_CONFIG = {
   assetPath: '/assets/dice-box-threejs/',
@@ -156,13 +157,11 @@ export const Dice3DResult = ({ rollData, onClose, sessaoId, isRoller = false }) 
   const closingRef = useRef(false);
   const rollId = rollData?.id || rollData?.timestamp;
 
-  const hasResolvedValues = rollData.rolls?.length > 0 && rollData.rolls.every((r) => r.value != null);
-  const shouldReplay = hasResolvedValues && !isRoller;
+  const isStoredComplete = isRollComplete(rollData);
+  const shouldReplay = isStoredComplete;
 
   const [phase, setPhase] = useState('rolling');
-  const [displayData, setDisplayData] = useState(
-    shouldReplay ? rollData : null
-  );
+  const [displayData, setDisplayData] = useState(null);
 
   const handleClose = () => {
     if (closingRef.current) return;
@@ -208,16 +207,15 @@ export const Dice3DResult = ({ rollData, onClose, sessaoId, isRoller = false }) 
         if (cancelled) return;
 
         let resolved;
-        if (shouldReplay) {
+        if (isStoredComplete) {
           resolved = rollData;
         } else {
           resolved = mapThreeJsResultsToRollData(results, rollData);
-          setDisplayData(resolved);
 
           if (sessaoId && isRoller) {
             try {
               await updateDoc(doc(db, 'sessoes', sessaoId), {
-                latest_roll: resolved,
+                latest_roll: { ...resolved, status: 'complete' },
               });
             } catch (error) {
               console.error('Erro ao sincronizar rolagem:', error);
@@ -225,10 +223,7 @@ export const Dice3DResult = ({ rollData, onClose, sessaoId, isRoller = false }) 
           }
         }
 
-        if (!shouldReplay) {
-          setDisplayData(resolved);
-        }
-
+        setDisplayData(resolved);
         setPhase('result');
       } catch (error) {
         console.error('Erro na animação 3D de dados:', error);
@@ -245,7 +240,7 @@ export const Dice3DResult = ({ rollData, onClose, sessaoId, isRoller = false }) 
       cancelled = true;
       boxRef.current = null;
     };
-  }, [rollId, shouldReplay, isRoller, sessaoId, containerId]);
+  }, [rollId, shouldReplay, isRoller, sessaoId, containerId, isStoredComplete]);
 
   if (!rollData) return null;
 

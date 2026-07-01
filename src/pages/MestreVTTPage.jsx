@@ -31,6 +31,8 @@ import { DiceSelector } from '../components/DiceSystem';
 import { Dice3DResult } from '../components/Dice3DResult'; 
 import AnnouncementManager from '../components/AnnouncementManager';
 import { IconTabletop, IconDice, IconCombat, IconBook, IconFolder, IconLantern, IconSparkle, IconMegaphone } from '../components/VttIcons';
+import { dismissRoll, getRollId, shouldOpenRollOverlay } from '../utils/dismissedRolls';
+import { createInitialRollTracker, syncRollTracker, readRollTrackerSnapshot, commitRollTracker } from '../utils/rollTracker';
 
 // --- ÍCONES DE STATUS NEGATIVOS (FONT AWESOME - 100% ESTÁVEL PARA VERCEL) ---
 import { FaBolt, FaIcicles, FaEyeSlash, FaVolumeMute, FaFire, FaLock, FaBan, FaSkull, FaFlask, FaTint, FaFeather } from 'react-icons/fa';
@@ -124,7 +126,7 @@ export default function MestreVTTPage() {
   const [allCharacters, setAllCharacters] = useState([]);
   const [showDiceSelector, setShowDiceSelector] = useState(false);
   const [rollResult, setRollResult] = useState(null); 
-  const dismissedRollTimestamp = useRef(0);
+  const rollTrackerRef = useRef(createInitialRollTracker());
   
   const sessaoRef = useRef(null);
 
@@ -169,14 +171,17 @@ export default function MestreVTTPage() {
                 setConnectedPlayers(ativa.connected_players || []); 
                 if (ativa.latest_roll) {
                      const roll = ativa.latest_roll;
-                     const rollId = roll.id || roll.timestamp;
-                     if (rollId !== dismissedRollTimestamp.current) {
-                        const uid = auth.currentUser?.uid;
-                        const waitForRoller = roll.status === 'pending' && roll.rolledBy !== uid;
-                        if (!waitForRoller) {
-                          setRollResult(roll);
-                        }
+                     syncRollTracker(rollTrackerRef, ativa.id);
+                     const trackerSnap = readRollTrackerSnapshot(rollTrackerRef);
+                     if (shouldOpenRollOverlay({
+                       roll,
+                       sessaoId: ativa.id,
+                       uid: auth.currentUser?.uid,
+                       ...trackerSnap,
+                     })) {
+                       setRollResult(roll);
                      }
+                     commitRollTracker(rollTrackerRef, roll);
                 }
 
                 // Listener do Mercado dos Lanternas (Aprovações do Mestre)
@@ -676,7 +681,10 @@ export default function MestreVTTPage() {
           sessaoId={sessaoAtiva?.id}
           isRoller={rollResult.rolledBy === auth.currentUser?.uid}
           onClose={() => {
-            dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp;
+            const rollId = getRollId(rollResult);
+            if (sessaoAtiva?.id && rollId) {
+              dismissRoll(sessaoAtiva.id, rollId);
+            }
             setRollResult(null);
           }}
         />

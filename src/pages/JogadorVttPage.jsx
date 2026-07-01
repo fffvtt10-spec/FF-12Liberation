@@ -23,6 +23,8 @@ import { Dice3DResult } from '../components/Dice3DResult';
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
 import DmOrbitalMenu from '../components/DmOrbitalMenu';
+import { dismissRoll, getRollId, shouldOpenRollOverlay } from '../utils/dismissedRolls';
+import { createInitialRollTracker, syncRollTracker, readRollTrackerSnapshot, commitRollTracker } from '../utils/rollTracker';
 import treeData from '../data/tree.json';
 import { getCharacterClass, getCharacterRace, hasClassMismatch } from '../utils/characterHelpers';
 import {
@@ -267,7 +269,7 @@ export default function JogadorVttPage() {
 
   const [showDiceSelector, setShowDiceSelector] = useState(false);
   const [rollResult, setRollResult] = useState(null);
-  const dismissedRollTimestamp = useRef(0);
+  const rollTrackerRef = useRef(createInitialRollTracker());
   const [unreadResenhas, setUnreadResenhas] = useState(0);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const prevLevelRef = useRef(null); 
@@ -387,14 +389,18 @@ export default function JogadorVttPage() {
                 setCurrentVttSession(sessionUpdated);
                 if (sessionUpdated.latest_roll) {
                       const roll = sessionUpdated.latest_roll;
-                      const rollId = roll.id || roll.timestamp;
-                      if (rollId !== dismissedRollTimestamp.current) {
-                        const uid = auth.currentUser?.uid;
-                        const waitForRoller = roll.status === 'pending' && roll.rolledBy !== uid;
-                        if (!waitForRoller) {
-                          setRollResult(roll);
-                        }
+                      const uid = auth.currentUser?.uid;
+                      syncRollTracker(rollTrackerRef, sessionUpdated.id);
+                      const trackerSnap = readRollTrackerSnapshot(rollTrackerRef);
+                      if (shouldOpenRollOverlay({
+                        roll,
+                        sessaoId: sessionUpdated.id,
+                        uid,
+                        ...trackerSnap,
+                      })) {
+                        setRollResult(roll);
                       }
+                      commitRollTracker(rollTrackerRef, roll);
                 }
                 const playerInList = sessionUpdated.connected_players?.includes(auth.currentUser?.uid);
                 setVttStatus(playerInList ? 'connected' : 'waiting');
@@ -866,7 +872,10 @@ export default function JogadorVttPage() {
             sessaoId={currentVttSession?.id}
             isRoller={rollResult.rolledBy === auth.currentUser?.uid}
             onClose={() => {
-              dismissedRollTimestamp.current = rollResult.id || rollResult.timestamp;
+              const rollId = getRollId(rollResult);
+              if (currentVttSession?.id && rollId) {
+                dismissRoll(currentVttSession.id, rollId);
+              }
               setRollResult(null);
             }}
           />
