@@ -20,7 +20,6 @@ import NPCViewer from '../components/NPCViewer';
 import chocoboGif from '../assets/chocobo-loading.gif';
 import { DiceSelector } from '../components/DiceSystem';
 import { Dice3DResult } from '../components/Dice3DResult';
-import AnnouncementTicker from '../components/AnnouncementTicker'; 
 import { backgroundMusic } from './LandingPage'; 
 import GuildBoard from '../components/GuildBoard'; 
 import DmOrbitalMenu from '../components/DmOrbitalMenu';
@@ -833,7 +832,6 @@ export default function JogadorVttPage() {
   return (
     <div className="jogador-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="background-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
-      <AnnouncementTicker />
       
       {bencaoFlash && currentVttSession?.bencao_deuses?.vencedores?.length > 0 && createPortal(
           <div className="bencao-roll-flash">

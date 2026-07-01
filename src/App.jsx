@@ -14,6 +14,7 @@ import MestrePage from './pages/MestrePage';
 import CharacterCreation from './pages/CharacterCreation';
 import JogadorVttPage from './pages/JogadorVttPage';
 import MestreVTTPage from './pages/MestreVTTPage';
+import AnnouncementTicker from './components/AnnouncementTicker';
 
 // Componente de Rota Protegida para Admin
 const ProtectedAdminRoute = ({ user, initializing, children }) => {
@@ -56,7 +57,9 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <>
+      <AnnouncementTicker />
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       
@@ -82,5 +85,6 @@ export default function App() {
       {/* Fallback para evitar tela branca */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+    </>
   );
 }

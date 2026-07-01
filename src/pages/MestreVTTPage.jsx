@@ -29,7 +29,6 @@ import NPCViewer from '../components/NPCViewer';
 import DmOrbitalMenu from '../components/DmOrbitalMenu';
 import { DiceSelector } from '../components/DiceSystem';
 import { Dice3DResult } from '../components/Dice3DResult'; 
-import AnnouncementTicker from '../components/AnnouncementTicker';
 import AnnouncementManager from '../components/AnnouncementManager';
 import { IconTabletop, IconDice, IconCombat, IconBook, IconFolder, IconLantern, IconSparkle, IconMegaphone } from '../components/VttIcons';
 
@@ -603,7 +602,6 @@ export default function MestreVTTPage() {
   return (
     <div className="mestre-vtt-container" onMouseMove={handleWindowMouseMove} onMouseUp={handleWindowMouseUp}>
       <div className="mestre-bg-layer" style={{ backgroundImage: `url(${wallpaper})` }} />
-      <AnnouncementTicker />
 
       <button
         type="button"
