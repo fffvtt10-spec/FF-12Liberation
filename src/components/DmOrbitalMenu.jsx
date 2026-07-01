@@ -1,82 +1,121 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
+const FAB_SIZE = 56;
+const FAB_INSET = 24;
 const BUTTON_SIZE = 48;
-const MIN_GAP = 12;
-const MIN_ARC_SPACING = BUTTON_SIZE + MIN_GAP;
+const MIN_GAP = 10;
+
+/** Ângulos seguros: arco só para cima/esquerda a partir do canto inferior direito (π → 1.47π). */
+const ANGLE_START = Math.PI * 1.03;
+const ANGLE_END = Math.PI * 1.465;
+const MAX_ARC = ANGLE_END - ANGLE_START;
+
+function useViewportSize() {
+  const [size, setSize] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    h: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
+
+  useEffect(() => {
+    const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  return size;
+}
+
+function getLayoutMetrics(viewport, comfortable) {
+  const compact = viewport.w < 480;
+  const btnSize = compact ? 42 : comfortable ? 46 : BUTTON_SIZE;
+  const spacing = btnSize + MIN_GAP + (comfortable && !compact ? 4 : 0);
+  const btnHalf = btnSize / 2;
+  const inset = compact ? 14 : FAB_INSET;
+  const edgePad = compact ? 8 : 12;
+
+  const maxRadiusX = viewport.w - inset - FAB_SIZE / 2 - btnHalf - edgePad;
+  const maxRadiusY = viewport.h - inset - FAB_SIZE / 2 - btnHalf - edgePad;
+  const maxRadius = Math.max(72, Math.min(comfortable ? 148 : 132, maxRadiusX, maxRadiusY));
+
+  return { compact, btnSize, spacing, btnHalf, inset, edgePad, maxRadiusX, maxRadiusY, maxRadius };
+}
 
 /**
- * Calcula posições dos satélites com arco e raio adaptativos.
- * Acima de 6 itens usa dois anéis concêntricos para evitar sobreposição.
+ * Distribui itens em anéis concêntricos dentro do arco seguro e da viewport.
  */
-function computeOrbitalLayout(count, comfortable = false) {
-  if (count <= 0) return { positions: [] };
+function computeOrbitalLayout(count, comfortable, viewport) {
+  if (count <= 0) return { positions: [], metrics: getLayoutMetrics(viewport, comfortable) };
 
-  const gapBoost = comfortable ? 6 : 0;
-  const spacing = MIN_ARC_SPACING + gapBoost;
-  const startAngle = Math.PI * 1.04;
+  const metrics = getLayoutMetrics(viewport, comfortable);
+  const { spacing, maxRadius, maxRadiusX, maxRadiusY } = metrics;
 
   if (count === 1) {
+    const r = Math.min(88, maxRadius);
+    const angle = Math.PI * 1.22;
     return {
-      positions: [{ x: -92, y: -16, delay: 0 }],
+      metrics,
+      positions: [clampPosition(Math.cos(angle) * r, Math.sin(angle) * r, maxRadiusX, maxRadiusY, 0)],
     };
   }
 
-  const useDualRing = count > 6;
+  const rings = [];
+  let remaining = count;
+  let ringIdx = 0;
+  const minRadius = metrics.compact ? 64 : comfortable ? 76 : 70;
+  const radiusStep = Math.max(32, (maxRadius - minRadius) / 3);
 
-  if (!useDualRing) {
-    const radius = Math.min(comfortable ? 200 : 180, 86 + count * (comfortable ? 12 : 10));
-    const arcSpan = Math.min(
-      Math.PI * (comfortable ? 0.95 : 0.82),
-      ((count - 1) * spacing) / radius
+  while (remaining > 0 && ringIdx < 4) {
+    const radius = Math.min(minRadius + ringIdx * radiusStep, maxRadius);
+    const capacity = Math.max(
+      1,
+      Math.min(remaining, Math.floor((MAX_ARC * radius) / spacing) + 1)
     );
-
-    return {
-      positions: Array.from({ length: count }, (_, i) => {
-        const t = i / (count - 1);
-        const angle = startAngle + arcSpan * t;
-        return {
-          x: Math.cos(angle) * radius,
-          y: Math.sin(angle) * radius,
-          delay: i * 38,
-        };
-      }),
-    };
+    rings.push({ radius, count: capacity, ringIdx });
+    remaining -= capacity;
+    ringIdx += 1;
   }
-
-  const innerCount = Math.ceil(count / 2);
-  const outerCount = count - innerCount;
-  const innerRadius = comfortable ? 108 : 98;
-  const outerRadius = comfortable ? 182 : 168;
-
-  const innerArc = Math.min(Math.PI * 0.92, ((innerCount - 1) * spacing) / innerRadius);
-  const outerArc = Math.min(Math.PI * 0.78, ((outerCount - 1) * spacing) / outerRadius);
-  const outerStart = startAngle + (innerArc - outerArc) / 2;
 
   const positions = [];
+  let delay = 0;
 
-  for (let i = 0; i < innerCount; i += 1) {
-    const t = innerCount === 1 ? 0.5 : i / (innerCount - 1);
-    const angle = startAngle + innerArc * t;
-    positions.push({
-      x: Math.cos(angle) * innerRadius,
-      y: Math.sin(angle) * innerRadius,
-      delay: i * 32,
-      ring: 0,
-    });
-  }
+  rings.forEach(({ radius, count: ringCount, ringIdx: ring }) => {
+    const arcNeeded = ringCount <= 1 ? 0 : ((ringCount - 1) * spacing) / radius;
+    const arcSpan = Math.min(MAX_ARC, arcNeeded);
+    const ringOffset = ring * 0.035;
+    const start = ANGLE_START + ringOffset;
 
-  for (let i = 0; i < outerCount; i += 1) {
-    const t = outerCount === 1 ? 0.5 : i / (outerCount - 1);
-    const angle = outerStart + outerArc * t;
-    positions.push({
-      x: Math.cos(angle) * outerRadius,
-      y: Math.sin(angle) * outerRadius,
-      delay: (innerCount + i) * 32,
-      ring: 1,
-    });
-  }
+    for (let i = 0; i < ringCount; i += 1) {
+      const t = ringCount <= 1 ? 0.5 : i / (ringCount - 1);
+      const angle = start + arcSpan * t;
+      const rawX = Math.cos(angle) * radius;
+      const rawY = Math.sin(angle) * radius;
+      positions.push({
+        ...clampPosition(rawX, rawY, maxRadiusX, maxRadiusY, ring),
+        delay: delay * 30,
+      });
+      delay += 1;
+    }
+  });
 
-  return { positions };
+  return { positions, metrics };
+}
+
+/** Mantém satélites à esquerda/acima do FAB, nunca para fora da tela. */
+function clampPosition(x, y, maxRadiusX, maxRadiusY, ring) {
+  const minX = -maxRadiusX;
+  const minY = -maxRadiusY;
+  const maxX = -10;
+  const maxY = -10;
+
+  const clampedX = Math.max(minX, Math.min(maxX, x));
+  const clampedY = Math.max(minY, Math.min(maxY, y));
+
+  return {
+    x: clampedX,
+    y: clampedY,
+    ring,
+    flipLabel: clampedX < -maxRadiusX * 0.55,
+  };
 }
 
 /**
@@ -84,13 +123,19 @@ function computeOrbitalLayout(count, comfortable = false) {
  * @param {boolean} comfortable — mais espaçamento (ideal para jogador em sessão)
  */
 export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable = false }) {
-  const { positions } = useMemo(
-    () => computeOrbitalLayout(items.length, comfortable),
-    [items.length, comfortable]
+  const viewport = useViewportSize();
+  const { positions, metrics } = useMemo(
+    () => computeOrbitalLayout(items.length, comfortable, viewport),
+    [items.length, comfortable, viewport.w, viewport.h]
   );
 
+  const { compact, btnSize, inset } = metrics;
+
   return (
-    <div className={`dm-orbital-menu ${open ? 'is-open' : ''} ${comfortable ? 'is-comfortable' : ''}`}>
+    <div
+      className={`dm-orbital-menu ${open ? 'is-open' : ''} ${comfortable ? 'is-comfortable' : ''} ${compact ? 'is-compact' : ''}`}
+      style={{ '--orbital-inset': `${inset}px`, '--sat-size': `${btnSize}px` }}
+    >
       {open && (
         <button
           type="button"
@@ -101,20 +146,20 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
       )}
 
       {items.map((item, i) => {
-        const pos = positions[i] || { x: 0, y: 0, delay: 0 };
+        const pos = positions[i] || { x: 0, y: 0, delay: 0, ring: 0, flipLabel: false };
 
         return (
           <button
             key={item.id}
             type="button"
-            className="orbital-satellite"
+            className={`orbital-satellite ${pos.flipLabel ? 'label-right' : ''}`}
             title={item.label}
             aria-label={item.label}
             style={{
               '--sat-x': `${pos.x}px`,
               '--sat-y': `${pos.y}px`,
-              '--sat-delay': `${pos.delay ?? i * 38}ms`,
-              '--sat-z': pos.ring === 1 ? 2 : 1,
+              '--sat-delay': `${pos.delay ?? i * 30}ms`,
+              '--sat-z': (pos.ring ?? 0) + 1,
             }}
             onClick={() => {
               item.onClick();
@@ -141,8 +186,8 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
       <style>{`
         .dm-orbital-menu {
           position: fixed;
-          right: 24px;
-          bottom: 24px;
+          right: var(--orbital-inset, 24px);
+          bottom: var(--orbital-inset, 24px);
           z-index: 2500;
           width: 56px;
           height: 56px;
@@ -183,7 +228,7 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           z-index: 10;
           pointer-events: auto;
         }
-        .orbital-fab:hover { transform: scale(1.06); box-shadow: 0 0 32px rgba(255, 204, 0, 0.45); }
+        .orbital-fab:hover { transform: scale(1.05); box-shadow: 0 0 32px rgba(255, 204, 0, 0.45); }
         .dm-orbital-menu.is-open .orbital-fab {
           border-color: #fff;
           color: #fff;
@@ -200,10 +245,10 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           position: absolute;
           right: 28px;
           bottom: 28px;
-          width: 48px;
-          height: 48px;
-          margin-right: -24px;
-          margin-bottom: -24px;
+          width: var(--sat-size, 48px);
+          height: var(--sat-size, 48px);
+          margin-right: calc(var(--sat-size, 48px) / -2);
+          margin-bottom: calc(var(--sat-size, 48px) / -2);
           border-radius: 50%;
           border: 2px solid #555;
           background: rgba(8, 8, 8, 0.95);
@@ -224,6 +269,7 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           transition-delay: var(--sat-delay, 0ms);
           z-index: var(--sat-z, 1);
           box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+          touch-action: manipulation;
         }
         .dm-orbital-menu.is-open .orbital-satellite {
           transform: translate(var(--sat-x), var(--sat-y)) scale(1);
@@ -234,7 +280,7 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
         .orbital-satellite:focus-visible {
           border-color: #ffcc00;
           color: #ffcc00;
-          transform: translate(var(--sat-x), var(--sat-y)) scale(1.06);
+          transform: translate(var(--sat-x), var(--sat-y)) scale(1.05);
           z-index: 20;
           box-shadow: 0 0 18px rgba(255, 204, 0, 0.35), 0 4px 16px rgba(0,0,0,0.5);
         }
@@ -250,10 +296,13 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           justify-content: center;
           pointer-events: none;
         }
+        .dm-orbital-menu.is-compact .orbital-sat-icon { font-size: 16px; }
         .orbital-sat-icon svg { width: 20px; height: 20px; }
+        .dm-orbital-menu.is-compact .orbital-sat-icon svg { width: 18px; height: 18px; }
+
         .orbital-sat-label {
           position: absolute;
-          right: calc(100% + 12px);
+          right: calc(100% + 10px);
           top: 50%;
           transform: translateY(-50%);
           white-space: nowrap;
@@ -269,6 +318,10 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           pointer-events: none;
           transition: opacity 0.15s;
           z-index: 30;
+        }
+        .orbital-satellite.label-right .orbital-sat-label {
+          right: auto;
+          left: calc(100% + 10px);
         }
         .orbital-satellite:hover .orbital-sat-label,
         .orbital-satellite:focus-visible .orbital-sat-label {
@@ -291,13 +344,6 @@ export default function DmOrbitalMenu({ open, onToggle, items = [], comfortable 
           align-items: center;
           justify-content: center;
           pointer-events: none;
-        }
-
-        .dm-orbital-menu.is-comfortable .orbital-satellite {
-          width: 46px;
-          height: 46px;
-          margin-right: -23px;
-          margin-bottom: -23px;
         }
       `}</style>
     </div>
