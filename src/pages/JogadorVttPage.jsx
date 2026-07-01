@@ -1065,7 +1065,12 @@ export default function JogadorVttPage() {
 
         <Bazar isMestre={false} playerData={personagem} hideTrigger isOpen={bazarOpen} onOpenChange={setBazarOpen} />
 
-        <DmOrbitalMenu open={orbitalOpen} onToggle={setOrbitalOpen} items={orbitalItems} />
+        <DmOrbitalMenu
+          open={orbitalOpen}
+          onToggle={setOrbitalOpen}
+          items={orbitalItems}
+          comfortable={Boolean(currentVttSession)}
+        />
 
         {showCalendar && (
           <CalendarSystemPlayer onClose={() => setShowCalendar(false)} disponibilidades={disponibilidades} sessoes={allSessoes} />
